@@ -39,138 +39,6 @@
   `(error (make-condition ',condition :ctrie ,ctrie ,@args)))
 
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Some Helpful Utility Functions and Macros
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-#+swank 
-(defun ^ (thing &optional wait)
-  (swank:inspect-in-emacs thing :wait wait))
-
-(define-symbol-macro ?  (prog1 * (describe *)))
-
-#+swank
-(define-symbol-macro ?^ (prog1 * (^ *)))
-
-
-;;; lmj/lparallel
-(defmacro let1 (var value &body body)
-  "Make a single `let' binding, heroically saving three columns."
-  `(let ((,var ,value))
-     ,@body))
-
-;;; lmj/lparallel
-(defmacro defun/inline (name args &body body)
-  "Like `defun' but declare the function as inline"
-  `(progn
-     (declaim (inline ,name))
-     (defun ,name ,args ,@body)))
-
-
-;;; place utils (from ??)
-(defmacro place-fn (place-form)
-  "This creates a closure which can write to and read from the \"place\"
-   designated by PLACE-FORM."
-  (with-gensyms (value value-supplied-p)
-    `(sb-int:named-lambda place (&optional (,value nil ,value-supplied-p))
-       (if ,value-supplied-p
-           (setf ,place-form ,value)
-         ,place-form))))
-
-(defmacro post-incf (place &optional (delta 1))
-  "place++ ala C"
-  `(prog1 ,place (incf ,place ,delta)))
-
-
-;;; gensymmetry (from ??)
-(defun gensym-list (length)
-  (loop repeat length collect (gensym)))
-  
-(defmacro gensym-values (num)
-  `(values ,@(loop REPEAT num COLLECT '(gensym))))
-
-(defmacro gensym-let ((&rest symbols) &body body)
-  (let ((n (length symbols)))
-    `(multiple-value-bind ,symbols (gensyms-values ,n)
-       ,@body)))
-
-
-;; KMRCL/USENET
-(defmacro deflex (var val &optional (doc nil docp))
-  "Defines a top level (global) lexical VAR with initial value VAL,
-      which is assigned unconditionally as with DEFPARAMETER. If a DOC
-      string is provided, it is attached to both the name |VAR| and the
-      name *STORAGE-FOR-DEFLEX-VAR-|VAR|* as a documentation string of
-      kind 'VARIABLE. The new VAR will have lexical scope and thus may
-      be shadowed by LET bindings without affecting its global value."
-  (let* ((s0 (load-time-value (symbol-name '#:*storage-for-deflex-var-)))
-         (s1 (symbol-name var))
-         (p1 (symbol-package var))
-         (s2 (load-time-value (symbol-name '#:*)))
-         (backing-var (intern (concatenate 'string s0 s1 s2) p1)))
-    `(progn
-      (defparameter ,backing-var ,val ,@(when docp `(,doc)))
-      ,@(when docp
-              `((setf (documentation ',var 'variable) ,doc)))
-       (define-symbol-macro ,var ,backing-var))))
-
-
-;;; anaphora
-(defmacro anaphoric (op test &body body)
-  `(let ((it ,test))
-     (,op it ,@body)))
-
-(defmacro aprog1 (first &body rest)
-  "Binds IT to the first form so that it can be used in the rest of the
-  forms. The whole thing returns IT."
-  `(anaphoric prog1 ,first ,@rest))
-
-(defmacro awhen (test &body body)
-  "Like WHEN, except binds the result of the test to IT (via LET) for the scope
-  of the body."
-  `(anaphoric when ,test ,@body))
-
-(defmacro atypecase (keyform &body cases)
-  "Like TYPECASE, except binds the result of the keyform to IT (via LET) for
-  the scope of the cases."
-  `(anaphoric typecase ,keyform ,@cases))
-
-
-;;; emacs?
-(defun mapappend (fun &rest args)
-   (if (some 'null args)
-       '()
-       (append (apply fun (mapcar 'car args))
-               (mapappend fun (mapcar 'cdr args)))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Atomic Update (sbcl src copied over until i update to a more recent release)
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;; TODO: unused
-
-(defmacro atomic-update (place update-fn &rest arguments &environment env) 
-  "Updates PLACE atomically to the value returned by calling function
-designated by UPDATE-FN with ARGUMENTS and the previous value of PLACE.
-PLACE may be read and UPDATE-FN evaluated and called multiple times before the
-update succeeds: atomicity in this context means that value of place did not
-change between the time it was read, and the time it was replaced with the
-computed value. PLACE can be any place supported by SB-EXT:COMPARE-AND-SWAP."
-  (multiple-value-bind (vars vals old new cas-form read-form)
-      (get-cas-expansion place env)
-    `(let* (,@(mapcar 'list vars vals)
-            (,old ,read-form))
-       (loop for ,new = (funcall ,update-fn ,@arguments ,old)
-             until (eq ,old (setf ,old ,cas-form))
-             finally (return ,new)))))
-
-;;; Examples:
-;;
-;; Conses T to the head of FOO-LIST.
-;;
-;;   (defstruct foo list)
-;;   (defvar *foo* (make-foo))
-;;   (atomic-update (foo-list *foo*) #'cons t)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Multi-Catch/Case
@@ -268,6 +136,8 @@ computed value. PLACE can be any place supported by SB-EXT:COMPARE-AND-SWAP."
   ref)
 
 (defmethod print-object ((o inode) stream)
+  (terpri stream)
+  (format stream "    ")
   (if (ref-p (inode-ref o))
     (print-unreadable-object (o stream)
       (format stream "~a ~C~A ~A~C~%            ~s ~s~%            ~s ~s" 
@@ -285,14 +155,6 @@ computed value. PLACE can be any place supported by SB-EXT:COMPARE-AND-SWAP."
   (:method ((obj inode))
     (let ((o (inode-ref obj)))
       (values (ref-value o) (ref-stamp o) (ref-prev o)))))
-
-#+()
-(defgeneric read-inode (inode)
-  (:method ((null null)) nil)
-  (:method ((inode inode))
-    (if (ref-p #1=(inode-ref inode))
-      (deref inode)
-      #1#)))
   
 (defgeneric deref-set! (object value &optional stamp prev)
   (:method ((object inode) value &optional stamp prev)
@@ -697,8 +559,6 @@ computed value. PLACE can be any place supported by SB-EXT:COMPARE-AND-SWAP."
 ;; CTRIE-MAP & Friends
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;;; Implementation Methods
-
 (defgeneric map-node (node fn))
 
 (defmethod map-node ((node inode) fn)
@@ -718,8 +578,6 @@ computed value. PLACE can be any place supported by SB-EXT:COMPARE-AND-SWAP."
   (loop for arc across (cnode-arcs node)
     do (map-node arc fn)))
 
-;;; Public API
-
 (defun ctrie-map (ctrie fn &aux accum)
   (declare (special accum))
   (let ((root (find-ctrie-root ctrie)))
@@ -727,13 +585,12 @@ computed value. PLACE can be any place supported by SB-EXT:COMPARE-AND-SWAP."
   accum)
 
 (defmacro ctrie-do ((key value ctrie) &body body)
-  "Iterate over (key . value) in ctrie in the manner of dolist"
+  "Iterate over (key . value) in ctrie in the manner of dolist.
+   EXAMPLE: (ctrie-do (k v ctrie)
+              (format t \"~&~8S => ~10S~%\" k v))"
   `(ctrie-map ,ctrie
      #'(lambda (,key ,value)
          ,@body)))
-
-;; (ctrie-do (k v ctrie)
-;;   (format t "~&~8S => ~10S~%" k v))
 
 (defun ctrie-map-keys (ctrie fn)
   (ctrie-map ctrie
@@ -808,28 +665,4 @@ computed value. PLACE can be any place supported by SB-EXT:COMPARE-AND-SWAP."
     (prog1 ctrie
       (maphash (lambda (k v) (ctrie-put ctrie k v))
         hashtable))))
-
-
-;; (defmacro ctrie-get-chain (ctrie key &rest keys)
-;;   (if keys `(ctrie-get-chain ctrie (ctrie-get ,ctrie ,key) ,@keys) `(ctrie-get ,ctrie ,key)))
-
-;; (defmacro ctrie-put-chain (ctrie key value &rest rest)
-;;   (if rest `(ctrie-put-chain ctrie (ctrie-put ,ctrie ,key ,value) ,@rest) `(ctrie-put ,ctrie ,key ,value)))
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; conditions alterative to catch-case (maybe)
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;; (defvar *retry* 5)
-
-;; (define-condition restart-teansaction (error) ()
-;;   (:documentation "Condition to abort the operation and if possible try again"))
-
-;; (define-condition restart-insert (error) ()
-;;   ((ctrie        :initarg :ctrie  :accessor ctrie)
-;;     (caught-case :initarg :caught :accessor caught-case)
-;;     (thrown-data :initarg :thrown :accessor thrown-data)
-;;     (retry-count :initarg :count  :accessor retry-count))
-;;   (:documentation "Condition to abort the operation and if possible try again"))
 

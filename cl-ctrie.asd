@@ -62,10 +62,12 @@
                      also well instrumented with lock-free, atomic primitives, although
                      this is not necessarily a high priority for the initial development
                      cycle."
+  :weakly-depends-on (:lparallel)
   :depends-on (:alexandria :lisp-unit)
   :components ((:static-file  "cl-ctrie.asd")
                 (:static-file "readme.md")
                 (:file "ctrie-package")
+                (:file "ctrie-util")
                 (:file "ctrie")
                 (:file "ctrie-test")))
 
