@@ -1,0 +1,1580 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="../../../cldoc/src/cludg.css"/>
+<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1"/>
+<title>
+ctrie-util</title>
+</head>
+<body>
+<div id="navbar">
+<table cellspacing="0" cellpadding="0" border="0" style="width: 100%;">
+<colgroup span="3">
+<col width="0*"/>
+<col width="0*"/>
+<col width="1*"/>
+</colgroup>
+<tr>
+<td align="left" valign="baseline">
+<a href="ctrie-cas.html">
+Prev:&nbsp;ctrie-cas</a>
+<br/>
+<a href="ctrie.html">
+Next:&nbsp;ctrie</a>
+</td>
+<td>
+&nbsp;&nbsp;&nbsp;&nbsp;</td>
+<td align="left" valign="baseline">
+<span class="upchain">
+<b>
+ctrie-util</b>
+<br/>
+<a href="index.html">
+Index</a>
+</span>
+&nbsp;&nbsp;&nbsp;&nbsp;</td>
+</tr>
+</table>
+</div>
+<div class="cludg-doc-body">
+<h2>
+ctrie-util
+</h2>
+<table style="width: 100%;" class="summary-table">
+<tr class="table-heading-color">
+<th class="summary" colspan="2">
+Method summary</th>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie-util.html#_g11492">
+render</a>
+</td>
+<td class="summary">
+desc <em>&amp;optional</em> stream</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie-util.html#_g11493">
+render</a>
+</td>
+<td class="summary">
+(desc cldoc::define-condition-descriptor) <em>&amp;optional</em> (stream nil)</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie-util.html#_g11494">
+render</a>
+</td>
+<td class="summary">
+(desc cldoc::defun-descriptor) <em>&amp;optional</em> (stream nil)</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie-util.html#_g11495">
+render</a>
+</td>
+<td class="summary">
+(desc cldoc::defgeneric-descriptor) <em>&amp;optional</em> (stream nil)</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie-util.html#_g11496">
+render</a>
+</td>
+<td class="summary">
+(desc cldoc::defmethod-descriptor) <em>&amp;optional</em> (stream nil)</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie-util.html#_g11497">
+render</a>
+</td>
+<td class="summary">
+(desc cldoc::defmacro-descriptor) <em>&amp;optional</em> (stream nil)</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie-util.html#_g11498">
+render</a>
+</td>
+<td class="summary">
+(desc cldoc::defvar-descriptor) <em>&amp;optional</em> (stream nil)</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie-util.html#_g11499">
+render</a>
+</td>
+<td class="summary">
+(desc cldoc::defparameter-descriptor) <em>&amp;optional</em> (stream nil)</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie-util.html#_g11500">
+render</a>
+</td>
+<td class="summary">
+(desc cldoc::defconstant-descriptor) <em>&amp;optional</em> (stream nil)</td>
+</tr>
+</table>
+<table style="width: 100%;" class="summary-table">
+<tr class="table-heading-color">
+<th class="summary" colspan="2">
+Function summary</th>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie-util.html#_g11491">
+all-descs</a>
+</td>
+<td class="summary">
+docs</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie-util.html#_g11501">
+apidoc</a>
+</td>
+<td class="summary">
+<em>&amp;optional</em> (scope :external)</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie-util.html#_g11459">
+break</a>
+</td>
+<td class="summary">
+name <em>&amp;rest</em> values</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie-util.html#_g11486">
+byte-vector-to-hex-string</a>
+</td>
+<td class="summary">
+vector</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie-util.html#_g11490">
+collect-docs</a>
+</td>
+<td class="summary">
+<em>&amp;optional</em> (scope :external)</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie-util.html#_g11485">
+create-null-id-byte-vector</a>
+</td>
+<td class="summary">
+</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie-util.html#_g11484">
+create-unique-id-byte-vector</a>
+</td>
+<td class="summary">
+</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie-util.html#_g11480">
+gensym-list</a>
+</td>
+<td class="summary">
+length</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie-util.html#_g11466">
+has-declare-p</a>
+</td>
+<td class="summary">
+body</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie-util.html#_g11465">
+has-docstring-p</a>
+</td>
+<td class="summary">
+body</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie-util.html#_g11487">
+hex-string-to-byte-vector</a>
+</td>
+<td class="summary">
+string</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie-util.html#_g11478">
+mapappend</a>
+</td>
+<td class="summary">
+fun <em>&amp;rest</em> args</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie-util.html#_g11483">
+random-string</a>
+</td>
+<td class="summary">
+<em>&amp;key</em> (length 16)</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie-util.html#_g11488">
+test-byte-vector-hex-string-roundrip</a>
+</td>
+<td class="summary">
+</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie-util.html#_g11464">
+unsplice</a>
+</td>
+<td class="summary">
+form</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie-util.html#_g11457">
+^</a>
+</td>
+<td class="summary">
+thing <em>&amp;optional</em> wait</td>
+</tr>
+</table>
+<table style="width: 100%;" class="summary-table">
+<tr class="table-heading-color">
+<th class="summary" colspan="2">
+Macro summary</th>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie-util.html#_g11474">
+anaphoric</a>
+</td>
+<td class="summary">
+op test <em>&amp;body</em> body</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie-util.html#_g11475">
+aprog1</a>
+</td>
+<td class="summary">
+first <em>&amp;body</em> rest</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie-util.html#_g11479">
+atomic-update</a>
+</td>
+<td class="summary">
+place update-fn <em>&amp;rest</em> arguments <em>&amp;environment</em> env</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie-util.html#_g11477">
+atypecase</a>
+</td>
+<td class="summary">
+keyform <em>&amp;body</em> cases</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie-util.html#_g11476">
+awhen</a>
+</td>
+<td class="summary">
+test <em>&amp;body</em> body</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie-util.html#_g11473">
+deflex</a>
+</td>
+<td class="summary">
+var val <em>&amp;optional</em> (doc nil docp)</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie-util.html#_g11468">
+defmacro/once</a>
+</td>
+<td class="summary">
+name params <em>&amp;body</em> body</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie-util.html#_g11461">
+defun/inline</a>
+</td>
+<td class="summary">
+name args <em>&amp;body</em> body</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie-util.html#_g11482">
+gensym-let</a>
+</td>
+<td class="summary">
+(<em>&amp;rest</em> symbols) <em>&amp;body</em> body</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie-util.html#_g11481">
+gensym-values</a>
+</td>
+<td class="summary">
+num</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie-util.html#_g11460">
+let1</a>
+</td>
+<td class="summary">
+var value <em>&amp;body</em> body</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie-util.html#_g11471">
+map-fn</a>
+</td>
+<td class="summary">
+place-form</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie-util.html#_g11463">
+once-only</a>
+</td>
+<td class="summary">
+vars <em>&amp;body</em> body</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie-util.html#_g11462">
+once-only-1</a>
+</td>
+<td class="summary">
+var <em>&amp;body</em> body</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie-util.html#_g11470">
+place-fn</a>
+</td>
+<td class="summary">
+place-form</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie-util.html#_g11472">
+post-incf</a>
+</td>
+<td class="summary">
+place <em>&amp;optional</em> (delta 1)</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie-util.html#_g11469">
+ppmx</a>
+</td>
+<td class="summary">
+form</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie-util.html#_g11467">
+with-preamble</a>
+</td>
+<td class="summary">
+(preamble body-var) <em>&amp;body</em> body</td>
+</tr>
+</table>
+<div class="defparam">
+<div class="defunsignatures">
+<a id="_g11458">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+*break*&nbsp;&nbsp;</td>
+<td class="lambda-list">
+</td>
+<td class="symbol-type">
+&nbsp;[Variable]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+special variable used for dynamic control of break loops 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11492">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+render&nbsp;&nbsp;</td>
+<td class="lambda-list">
+desc <em>&amp;optional</em> stream</td>
+<td class="symbol-type">
+&nbsp;[Method]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11493">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+render&nbsp;&nbsp;</td>
+<td class="lambda-list">
+(desc cldoc::define-condition-descriptor) <em>&amp;optional</em> (stream nil)</td>
+<td class="symbol-type">
+&nbsp;[Method]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11494">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+render&nbsp;&nbsp;</td>
+<td class="lambda-list">
+(desc cldoc::defun-descriptor) <em>&amp;optional</em> (stream nil)</td>
+<td class="symbol-type">
+&nbsp;[Method]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11495">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+render&nbsp;&nbsp;</td>
+<td class="lambda-list">
+(desc cldoc::defgeneric-descriptor) <em>&amp;optional</em> (stream nil)</td>
+<td class="symbol-type">
+&nbsp;[Method]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11496">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+render&nbsp;&nbsp;</td>
+<td class="lambda-list">
+(desc cldoc::defmethod-descriptor) <em>&amp;optional</em> (stream nil)</td>
+<td class="symbol-type">
+&nbsp;[Method]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11497">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+render&nbsp;&nbsp;</td>
+<td class="lambda-list">
+(desc cldoc::defmacro-descriptor) <em>&amp;optional</em> (stream nil)</td>
+<td class="symbol-type">
+&nbsp;[Method]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11498">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+render&nbsp;&nbsp;</td>
+<td class="lambda-list">
+(desc cldoc::defvar-descriptor) <em>&amp;optional</em> (stream nil)</td>
+<td class="symbol-type">
+&nbsp;[Method]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11499">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+render&nbsp;&nbsp;</td>
+<td class="lambda-list">
+(desc cldoc::defparameter-descriptor) <em>&amp;optional</em> (stream nil)</td>
+<td class="symbol-type">
+&nbsp;[Method]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11500">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+render&nbsp;&nbsp;</td>
+<td class="lambda-list">
+(desc cldoc::defconstant-descriptor) <em>&amp;optional</em> (stream nil)</td>
+<td class="symbol-type">
+&nbsp;[Method]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11457">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+^&nbsp;&nbsp;</td>
+<td class="lambda-list">
+thing <em>&amp;optional</em> wait</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+inspect THING in the emacs SLIME inspector, optionally waiting 
+ for the inspector to be dismissed before continuing if WAIT is 
+ not null 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11459">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+break&nbsp;&nbsp;</td>
+<td class="lambda-list">
+name <em>&amp;rest</em> values</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Demark an instrumented break-point that includes a STOP-BREAKING 
+ restart. Subsequently calling (:break t) will re-enable <span class="keyword">
+:break </span>
+
+ breakpoints. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11464">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+unsplice&nbsp;&nbsp;</td>
+<td class="lambda-list">
+form</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11465">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+has-docstring-p&nbsp;&nbsp;</td>
+<td class="lambda-list">
+body</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11466">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+has-declare-p&nbsp;&nbsp;</td>
+<td class="lambda-list">
+body</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11478">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+mapappend&nbsp;&nbsp;</td>
+<td class="lambda-list">
+fun <em>&amp;rest</em> args</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11480">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+gensym-list&nbsp;&nbsp;</td>
+<td class="lambda-list">
+length</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+generate a list of LENGTH uninterned symbols 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11483">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+random-string&nbsp;&nbsp;</td>
+<td class="lambda-list">
+<em>&amp;key</em> (length 16)</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns a random alphabetic string. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11484">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+create-unique-id-byte-vector&nbsp;&nbsp;</td>
+<td class="lambda-list">
+</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Create a universally unique 16-byte vector using unicly or uuid 
+ libraries if available, or else fall back to random generation. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11485">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+create-null-id-byte-vector&nbsp;&nbsp;</td>
+<td class="lambda-list">
+</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Generate a 16-byte vector representing the NULL uuid. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11486">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+byte-vector-to-hex-string&nbsp;&nbsp;</td>
+<td class="lambda-list">
+vector</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Return a 32 character string that maps uniquely to the given byte vector. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11487">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+hex-string-to-byte-vector&nbsp;&nbsp;</td>
+<td class="lambda-list">
+string</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Return the byte vector represented by the (hex) STRING, which is assumed 
+ to be valid, as by 'byte-vector-to-hex-string' 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11488">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+test-byte-vector-hex-string-roundrip&nbsp;&nbsp;</td>
+<td class="lambda-list">
+</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11490">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+collect-docs&nbsp;&nbsp;</td>
+<td class="lambda-list">
+<em>&amp;optional</em> (scope :external)</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Regenerate on-disk html documentation and collect the cached in-memory descriptors 
+ for further processing. If SCOPE is specified it must be either <span class="keyword">
+:EXTERNAL. </span>
+corresponding 
+ to those symbols exported as the public API, or <span class="keyword">
+:HOME, </span>
+which designates all symbols 
+ defined locally in package. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11491">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+all-descs&nbsp;&nbsp;</td>
+<td class="lambda-list">
+docs</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11501">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+apidoc&nbsp;&nbsp;</td>
+<td class="lambda-list">
+<em>&amp;optional</em> (scope :external)</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11460">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+let1&nbsp;&nbsp;</td>
+<td class="lambda-list">
+var value <em>&amp;body</em> body</td>
+<td class="symbol-type">
+&nbsp;[Macro]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Make a single `let' binding, heroically saving three columns. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11461">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+defun/inline&nbsp;&nbsp;</td>
+<td class="lambda-list">
+name args <em>&amp;body</em> body</td>
+<td class="symbol-type">
+&nbsp;[Macro]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Like `defun' but declare the function as inline 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11462">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+once-only-1&nbsp;&nbsp;</td>
+<td class="lambda-list">
+var <em>&amp;body</em> body</td>
+<td class="symbol-type">
+&nbsp;[Macro]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11463">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+once-only&nbsp;&nbsp;</td>
+<td class="lambda-list">
+vars <em>&amp;body</em> body</td>
+<td class="symbol-type">
+&nbsp;[Macro]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11467">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+with-preamble&nbsp;&nbsp;</td>
+<td class="lambda-list">
+(preamble body-var) <em>&amp;body</em> body</td>
+<td class="symbol-type">
+&nbsp;[Macro]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Pop docstring and declarations off `body-var' and assign them to `preamble'. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11468">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+defmacro/once&nbsp;&nbsp;</td>
+<td class="lambda-list">
+name params <em>&amp;body</em> body</td>
+<td class="symbol-type">
+&nbsp;[Macro]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Like `defmacro' except that params which are immediately preceded 
+ by `&amp;once' are passed to a `once-only' call which surrounds `body'. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11469">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+ppmx&nbsp;&nbsp;</td>
+<td class="lambda-list">
+form</td>
+<td class="symbol-type">
+&nbsp;[Macro]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Pretty prints the macro expansion of FORM. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11470">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+place-fn&nbsp;&nbsp;</td>
+<td class="lambda-list">
+place-form</td>
+<td class="symbol-type">
+&nbsp;[Macro]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+This creates a closure which can write to and read from the 'place' 
+ designated by PLACE-FORM. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11471">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+map-fn&nbsp;&nbsp;</td>
+<td class="lambda-list">
+place-form</td>
+<td class="symbol-type">
+&nbsp;[Macro]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+This creates a closure which can write to and read from 'maps' 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11472">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+post-incf&nbsp;&nbsp;</td>
+<td class="lambda-list">
+place <em>&amp;optional</em> (delta 1)</td>
+<td class="symbol-type">
+&nbsp;[Macro]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+place++ ala C 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11473">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+deflex&nbsp;&nbsp;</td>
+<td class="lambda-list">
+var val <em>&amp;optional</em> (doc nil docp)</td>
+<td class="symbol-type">
+&nbsp;[Macro]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Defines a top level (global) lexical VAR with initial value VAL, 
+ which is assigned unconditionally as with DEFPARAMETER. If a DOC 
+ string is provided, it is attached to both the name |VAR| and the 
+ name *STORAGE-FOR-DEFLEX-VAR-|VAR|* as a documentation string of 
+ kind 'VARIABLE. The new VAR will have lexical scope and thus may 
+ be shadowed by LET bindings without affecting its global value. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11474">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+anaphoric&nbsp;&nbsp;</td>
+<td class="lambda-list">
+op test <em>&amp;body</em> body</td>
+<td class="symbol-type">
+&nbsp;[Macro]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+higher-order anaphoric operator creation macro. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11475">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+aprog1&nbsp;&nbsp;</td>
+<td class="lambda-list">
+first <em>&amp;body</em> rest</td>
+<td class="symbol-type">
+&nbsp;[Macro]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Binds IT to the first form so that it can be used in the rest of the 
+ forms. The whole thing returns IT. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11476">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+awhen&nbsp;&nbsp;</td>
+<td class="lambda-list">
+test <em>&amp;body</em> body</td>
+<td class="symbol-type">
+&nbsp;[Macro]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Like WHEN, except binds the result of the test to IT (via LET) for the scope 
+ of the body. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11477">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+atypecase&nbsp;&nbsp;</td>
+<td class="lambda-list">
+keyform <em>&amp;body</em> cases</td>
+<td class="symbol-type">
+&nbsp;[Macro]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Like TYPECASE, except binds the result of the keyform to IT (via LET) for 
+ the scope of the cases. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11479">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+atomic-update&nbsp;&nbsp;</td>
+<td class="lambda-list">
+place update-fn <em>&amp;rest</em> arguments <em>&amp;environment</em> env</td>
+<td class="symbol-type">
+&nbsp;[Macro]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Updates PLACE atomically to the value returned by calling function 
+ designated by UPDATE-FN with ARGUMENTS and the previous value of PLACE. 
+ PLACE may be read and UPDATE-FN evaluated and called multiple times before the 
+ update succeeds: atomicity in this context means that value of place did not 
+ change between the time it was read, and the time it was replaced with the 
+ computed value. PLACE can be any place supported by SB-EXT:COMPARE-AND-SWAP. 
+ EXAMPLE: Conses T to the head of FOO-LIST: 
+ </p>
+<pre>
+      (defstruct foo list) 
+       (defvar *foo* (make-foo)) 
+       (atomic-update (foo-list *foo*) #'cons t) </pre>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11481">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+gensym-values&nbsp;&nbsp;</td>
+<td class="lambda-list">
+num</td>
+<td class="symbol-type">
+&nbsp;[Macro]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11482">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+gensym-let&nbsp;&nbsp;</td>
+<td class="lambda-list">
+(<em>&amp;rest</em> symbols) <em>&amp;body</em> body</td>
+<td class="symbol-type">
+&nbsp;[Macro]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<div class="cludg-footer">
+Generated by&nbsp;<a href="mailto:ihatchondo@common-lisp.net" lang="en">
+CLDOC</a>
+- 2012-07-25 13:48:03</div>
+</body>
+</html>

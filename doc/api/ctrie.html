@@ -1,0 +1,6059 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="../../../cldoc/src/cludg.css"/>
+<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1"/>
+<title>
+ctrie</title>
+</head>
+<body>
+<div id="navbar">
+<table cellspacing="0" cellpadding="0" border="0" style="width: 100%;">
+<colgroup span="3">
+<col width="0*"/>
+<col width="0*"/>
+<col width="1*"/>
+</colgroup>
+<tr>
+<td align="left" valign="baseline">
+<a href="ctrie-util.html">
+Prev:&nbsp;ctrie-util</a>
+<br/>
+</td>
+<td>
+&nbsp;&nbsp;&nbsp;&nbsp;</td>
+<td align="left" valign="baseline">
+<span class="upchain">
+<b>
+ctrie</b>
+<br/>
+<a href="index.html">
+Index</a>
+</span>
+&nbsp;&nbsp;&nbsp;&nbsp;</td>
+</tr>
+</table>
+</div>
+<div class="cludg-doc-body">
+<h2>
+ctrie
+</h2>
+<table style="width: 100%;" class="summary-table">
+<tr class="table-heading-color">
+<th class="summary" colspan="2">
+Condition summary</th>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11508">
+ctrie-error</a>
+</td>
+<td class="summary">
+inherits from <em class="cl">error</em></td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11512">
+ctrie-generational-mismatch</a>
+</td>
+<td class="summary">
+inherits from <a href="ctrie.html#_g11510"><em class="cl">ctrie-structural-error</em></a></td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11517">
+ctrie-invalid-dynamic-context</a>
+</td>
+<td class="summary">
+inherits from <a href="ctrie.html#_g11515"><em class="cl">ctrie-operational-error</em></a></td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11524">
+ctrie-not-implemented</a>
+</td>
+<td class="summary">
+inherits from <a href="ctrie.html#_g11508"><em class="cl">ctrie-error</em></a></td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11525">
+ctrie-not-supported</a>
+</td>
+<td class="summary">
+inherits from <a href="ctrie.html#_g11508"><em class="cl">ctrie-error</em></a></td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11522">
+ctrie-operation-retries-exceeded</a>
+</td>
+<td class="summary">
+inherits from <a href="ctrie.html#_g11515"><em class="cl">ctrie-operational-error</em></a></td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11520">
+ctrie-operation-timeout-exceeded</a>
+</td>
+<td class="summary">
+inherits from <a href="ctrie.html#_g11515"><em class="cl">ctrie-operational-error</em></a></td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11515">
+ctrie-operational-error</a>
+</td>
+<td class="summary">
+inherits from <a href="ctrie.html#_g11508"><em class="cl">ctrie-error</em></a></td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11510">
+ctrie-structural-error</a>
+</td>
+<td class="summary">
+inherits from <a href="ctrie.html#_g11508"><em class="cl">ctrie-error</em></a></td>
+</tr>
+</table>
+<table style="width: 100%;" class="summary-table">
+<tr class="table-heading-color">
+<th class="summary" colspan="2">
+Structure summary</th>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11586">
+cnode</a>
+</td>
+<td class="summary">
+</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11609">
+ctrie</a>
+</td>
+<td class="summary">
+</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11545">
+failed-ref</a>
+</td>
+<td class="summary">
+includes <a href="ctrie.html#_g11538"><em class="cl">ref</em></a></td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11549">
+inode</a>
+</td>
+<td class="summary">
+</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11568">
+lnode</a>
+</td>
+<td class="summary">
+</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11620">
+rdcss-descriptor</a>
+</td>
+<td class="summary">
+</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11538">
+ref</a>
+</td>
+<td class="summary">
+</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11561">
+snode</a>
+</td>
+<td class="summary">
+</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11579">
+tnode</a>
+</td>
+<td class="summary">
+</td>
+</tr>
+</table>
+<table style="width: 100%;" class="summary-table">
+<tr class="table-heading-color">
+<th class="summary" colspan="2">
+Method summary</th>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11519">
+ctrie-context</a>
+</td>
+<td class="summary">
+ctrie-invalid-dynamic-context</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11669">
+ctrie-export</a>
+</td>
+<td class="summary">
+ctrie place <em>&amp;key</em> <em>&amp;allow-other-keys</em></td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11672">
+ctrie-import</a>
+</td>
+<td class="summary">
+place <em>&amp;key</em> <em>&amp;allow-other-keys</em></td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11667">
+ctrie-load</a>
+</td>
+<td class="summary">
+place <em>&amp;key</em> <em>&amp;allow-other-keys</em></td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11650">
+ctrie-map-into</a>
+</td>
+<td class="summary">
+ctrie place fn</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11509">
+ctrie-of</a>
+</td>
+<td class="summary">
+ctrie-error</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11665">
+ctrie-save</a>
+</td>
+<td class="summary">
+ctrie place <em>&amp;key</em> <em>&amp;allow-other-keys</em></td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11584">
+entomb</a>
+</td>
+<td class="summary">
+node</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11514">
+expected</a>
+</td>
+<td class="summary">
+ctrie-generational-mismatch</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11619">
+find-ctrie-root</a>
+</td>
+<td class="summary">
+ctrie-designator</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11513">
+found</a>
+</td>
+<td class="summary">
+ctrie-generational-mismatch</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11518">
+gen-context</a>
+</td>
+<td class="summary">
+ctrie-invalid-dynamic-context</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11607">
+leaf-node-key</a>
+</td>
+<td class="summary">
+resource</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11608">
+leaf-node-value</a>
+</td>
+<td class="summary">
+resource</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11675">
+make-diagram</a>
+</td>
+<td class="summary">
+thing context <em>&amp;key</em> <em>&amp;allow-other-keys</em></td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11640">
+map-node</a>
+</td>
+<td class="summary">
+node fn</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11511">
+node-of</a>
+</td>
+<td class="summary">
+ctrie-structural-error</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11516">
+op-of</a>
+</td>
+<td class="summary">
+ctrie-operational-error</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11556">
+print-object</a>
+</td>
+<td class="summary">
+(o inode) stream</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11598">
+refresh</a>
+</td>
+<td class="summary">
+place gen</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11585">
+resurrect</a>
+</td>
+<td class="summary">
+node</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11523">
+retries-of</a>
+</td>
+<td class="summary">
+ctrie-operation-retries-exceeded</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11521">
+seconds-of</a>
+</td>
+<td class="summary">
+ctrie-operation-timeout-exceeded</td>
+</tr>
+</table>
+<table style="width: 100%;" class="summary-table">
+<tr class="table-heading-color">
+<th class="summary" colspan="2">
+Function summary</th>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11601">
+clean</a>
+</td>
+<td class="summary">
+inode level</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11603">
+clean-parent</a>
+</td>
+<td class="summary">
+parent-inode target-inode key level</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11587">
+cnode-arcs</a>
+</td>
+<td class="summary">
+cnode</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11589">
+cnode-bitmap</a>
+</td>
+<td class="summary">
+cnode</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11600">
+cnode-compressed</a>
+</td>
+<td class="summary">
+cnode level</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11599">
+cnode-contracted</a>
+</td>
+<td class="summary">
+cnode level</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11594">
+cnode-extended</a>
+</td>
+<td class="summary">
+cnode flag position value</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11588">
+cnode-flags</a>
+</td>
+<td class="summary">
+cnode</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11591">
+cnode-p</a>
+</td>
+<td class="summary">
+object</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11596">
+cnode-truncated</a>
+</td>
+<td class="summary">
+cnode flag pos</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11595">
+cnode-updated</a>
+</td>
+<td class="summary">
+cnode position value</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11653">
+collect-keys</a>
+</td>
+<td class="summary">
+x y</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11654">
+collect-values</a>
+</td>
+<td class="summary">
+x y</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11652">
+collect2</a>
+</td>
+<td class="summary">
+x y</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11592">
+copy-cnode</a>
+</td>
+<td class="summary">
+cnode</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11616">
+copy-ctrie</a>
+</td>
+<td class="summary">
+ctrie</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11548">
+copy-failed-ref</a>
+</td>
+<td class="summary">
+failed-ref</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11554">
+copy-inode</a>
+</td>
+<td class="summary">
+inode</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11573">
+copy-lnode</a>
+</td>
+<td class="summary">
+lnode</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11627">
+copy-rdcss-descriptor</a>
+</td>
+<td class="summary">
+rdcss-descriptor</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11544">
+copy-ref</a>
+</td>
+<td class="summary">
+ref</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11566">
+copy-snode</a>
+</td>
+<td class="summary">
+snode</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11583">
+copy-tnode</a>
+</td>
+<td class="summary">
+tnode</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11531">
+ctequal</a>
+</td>
+<td class="summary">
+x y</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11530">
+cthash</a>
+</td>
+<td class="summary">
+key</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11632">
+ctrie-clear</a>
+</td>
+<td class="summary">
+ctrie</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11639">
+ctrie-drop</a>
+</td>
+<td class="summary">
+ctrie key</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11658">
+ctrie-empty-p</a>
+</td>
+<td class="summary">
+ctrie</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11659">
+ctrie-ensure-get</a>
+</td>
+<td class="summary">
+ctrie key default</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11663">
+ctrie-from-alist</a>
+</td>
+<td class="summary">
+alist</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11664">
+ctrie-from-hashtable</a>
+</td>
+<td class="summary">
+hashtable</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11636">
+ctrie-get</a>
+</td>
+<td class="summary">
+ctrie key</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11611">
+ctrie-hash</a>
+</td>
+<td class="summary">
+ctrie</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11655">
+ctrie-keys</a>
+</td>
+<td class="summary">
+ctrie <em>&amp;key</em> atomic</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11641">
+ctrie-map</a>
+</td>
+<td class="summary">
+ctrie fn <em>&amp;key</em> atomic <em>&amp;aux</em> accum</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11648">
+ctrie-map-keys</a>
+</td>
+<td class="summary">
+ctrie fn <em>&amp;key</em> atomic</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11649">
+ctrie-map-values</a>
+</td>
+<td class="summary">
+ctrie fn <em>&amp;key</em> atomic</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11615">
+ctrie-p</a>
+</td>
+<td class="summary">
+object</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11661">
+ctrie-pprint</a>
+</td>
+<td class="summary">
+ctrie <em>&amp;optional</em> (stream t)</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11634">
+ctrie-put</a>
+</td>
+<td class="summary">
+ctrie key value</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11613">
+ctrie-readonly-p</a>
+</td>
+<td class="summary">
+ctrie</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11610">
+ctrie-root</a>
+</td>
+<td class="summary">
+ctrie</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11657">
+ctrie-size</a>
+</td>
+<td class="summary">
+ctrie <em>&amp;aux</em> (accum 0)</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11631">
+ctrie-snapshot</a>
+</td>
+<td class="summary">
+ctrie <em>&amp;key</em> read-only</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11612">
+ctrie-test</a>
+</td>
+<td class="summary">
+ctrie</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11660">
+ctrie-to-alist</a>
+</td>
+<td class="summary">
+ctrie <em>&amp;key</em> atomic</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11662">
+ctrie-to-hashtable</a>
+</td>
+<td class="summary">
+ctrie <em>&amp;key</em> atomic</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11656">
+ctrie-values</a>
+</td>
+<td class="summary">
+ctrie <em>&amp;key</em> atomic</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11677">
+diagram</a>
+</td>
+<td class="summary">
+thing <em>&amp;optional</em> (context *context*)</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11574">
+enlist</a>
+</td>
+<td class="summary">
+<em>&amp;rest</em> rest</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11547">
+failed-ref-p</a>
+</td>
+<td class="summary">
+object</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11532">
+flag</a>
+</td>
+<td class="summary">
+key level</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11534">
+flag-arc-position</a>
+</td>
+<td class="summary">
+flag bitmap</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11533">
+flag-present-p</a>
+</td>
+<td class="summary">
+flag bitmap</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11535">
+flag-vector</a>
+</td>
+<td class="summary">
+<em>&amp;optional</em> (content 0)</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11560">
+inode-commit</a>
+</td>
+<td class="summary">
+inode ref</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11551">
+inode-gen</a>
+</td>
+<td class="summary">
+inode</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11559">
+inode-mutate</a>
+</td>
+<td class="summary">
+inode old-value new-value</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11553">
+inode-p</a>
+</td>
+<td class="summary">
+object</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11558">
+inode-read</a>
+</td>
+<td class="summary">
+inode</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11550">
+inode-ref</a>
+</td>
+<td class="summary">
+inode</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11570">
+lnode-elt</a>
+</td>
+<td class="summary">
+lnode</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11576">
+lnode-inserted</a>
+</td>
+<td class="summary">
+orig-lnode key value test</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11578">
+lnode-length</a>
+</td>
+<td class="summary">
+lnode</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11569">
+lnode-next</a>
+</td>
+<td class="summary">
+lnode</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11572">
+lnode-p</a>
+</td>
+<td class="summary">
+object</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11575">
+lnode-removed</a>
+</td>
+<td class="summary">
+orig-lnode key test</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11577">
+lnode-search</a>
+</td>
+<td class="summary">
+lnode key test</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11593">
+make-cnode</a>
+</td>
+<td class="summary">
+<em>&amp;optional</em> (bitmap 0)</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11617">
+make-ctrie</a>
+</td>
+<td class="summary">
+<em>&amp;rest</em> args <em>&amp;key</em> name root (readonly-p nil) (test 'equal) (hash 'sxhash)</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11546">
+make-failed-ref</a>
+</td>
+<td class="summary">
+<em>&amp;key</em></td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11555">
+make-inode</a>
+</td>
+<td class="summary">
+link-to <em>&amp;optional</em> gen stamp prev</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11571">
+make-lnode</a>
+</td>
+<td class="summary">
+<em>&amp;key</em> elt next</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11625">
+make-rdcss-descriptor</a>
+</td>
+<td class="summary">
+<em>&amp;key</em> ov ovmain nv committed</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11542">
+make-ref</a>
+</td>
+<td class="summary">
+<em>&amp;key</em> (stamp (local-time:now)) (value t) prev</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11564">
+make-snode</a>
+</td>
+<td class="summary">
+<em>&amp;key</em> key value</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11581">
+make-tnode</a>
+</td>
+<td class="summary">
+<em>&amp;key</em> cell</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11597">
+map-cnode</a>
+</td>
+<td class="summary">
+fn cnode</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11528">
+multi-catch-1</a>
+</td>
+<td class="summary">
+block-name tag-list forms</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11651">
+print2</a>
+</td>
+<td class="summary">
+x y <em>&amp;optional</em> (stream t)</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11621">
+rdcss-descriptor-committed</a>
+</td>
+<td class="summary">
+rdcss-descriptor</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11622">
+rdcss-descriptor-nv</a>
+</td>
+<td class="summary">
+rdcss-descriptor</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11624">
+rdcss-descriptor-ov</a>
+</td>
+<td class="summary">
+rdcss-descriptor</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11623">
+rdcss-descriptor-ovmain</a>
+</td>
+<td class="summary">
+rdcss-descriptor</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11626">
+rdcss-descriptor-p</a>
+</td>
+<td class="summary">
+object</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11543">
+ref-p</a>
+</td>
+<td class="summary">
+object</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11539">
+ref-prev</a>
+</td>
+<td class="summary">
+ref</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11541">
+ref-stamp</a>
+</td>
+<td class="summary">
+ref</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11540">
+ref-value</a>
+</td>
+<td class="summary">
+ref</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11628">
+root-node-access</a>
+</td>
+<td class="summary">
+ctrie <em>&amp;optional</em> abort</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11630">
+root-node-commit</a>
+</td>
+<td class="summary">
+ctrie <em>&amp;optional</em> abort</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11629">
+root-node-replace</a>
+</td>
+<td class="summary">
+ctrie ov ovmain nv</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11637">
+(setf ctrie-get)</a>
+</td>
+<td class="summary">
+value ctrie key</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11567">
+snode</a>
+</td>
+<td class="summary">
+k v</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11563">
+snode-key</a>
+</td>
+<td class="summary">
+snode</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11565">
+snode-p</a>
+</td>
+<td class="summary">
+object</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11562">
+snode-value</a>
+</td>
+<td class="summary">
+snode</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11580">
+tnode-cell</a>
+</td>
+<td class="summary">
+tnode</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11582">
+tnode-p</a>
+</td>
+<td class="summary">
+object</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11633">
+%insert</a>
+</td>
+<td class="summary">
+inode key value level parent startgen</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11635">
+%lookup</a>
+</td>
+<td class="summary">
+inode key level parent startgen</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11590">
+%make-cnode</a>
+</td>
+<td class="summary">
+<em>&amp;key</em> (bitmap 0) (flags %no-flags%) (arcs %empty-map%)</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11614">
+%make-ctrie</a>
+</td>
+<td class="summary">
+<em>&amp;key</em> readonly-p (test 'equal) (hash 'sxhash) (root
+                                              (make-inode (make-cnode)
+                                                          (gensym &quot;ctrie&quot;)))</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11552">
+%make-inode</a>
+</td>
+<td class="summary">
+<em>&amp;key</em> gen ref</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11638">
+%remove</a>
+</td>
+<td class="summary">
+inode key level parent startgen</td>
+</tr>
+</table>
+<table style="width: 100%;" class="summary-table">
+<tr class="table-heading-color">
+<th class="summary" colspan="2">
+Macro summary</th>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11529">
+catch-case</a>
+</td>
+<td class="summary">
+form <em>&amp;rest</em> cases</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11642">
+ctrie-do</a>
+</td>
+<td class="summary">
+(key value ctrie <em>&amp;key</em> atomic) <em>&amp;body</em> body</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11526">
+ctrie-error</a>
+</td>
+<td class="summary">
+ctrie condition <em>&amp;rest</em> args</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11678">
+define-diagram</a>
+</td>
+<td class="summary">
+type (<em>&amp;optional</em> context) <em>&amp;body</em> body</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11557">
+gcas-compare-and-set</a>
+</td>
+<td class="summary">
+obj expected new expected-stamp new-stamp prev</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11527">
+multi-catch</a>
+</td>
+<td class="summary">
+tag-list <em>&amp;body</em> forms</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie.html#_g11618">
+with-ctrie</a>
+</td>
+<td class="summary">
+&amp;once ctrie <em>&amp;body</em> body</td>
+</tr>
+</table>
+<div class="defclass">
+<div class="defunsignatures">
+<a id="_g11508">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+ctrie-error&nbsp;&nbsp;</td>
+<td class="lambda-list">
+inherits from <em class="cl">error</em></td>
+<td class="symbol-type">
+&nbsp;[Condition]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Abstract superclass of CTRIE related conditions. 
+ </p>
+</div>
+<div class="defclass-initargs">
+<div>
+<div>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+:ctrie&nbsp;&nbsp;</td>
+<td class="lambda-list">
+</td>
+<td class="symbol-type">
+&nbsp;[Initarg]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<div class="defclass-slots-doc">
+</div>
+<div class="defclass-generics">
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11509">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+ctrie-of&nbsp;&nbsp;</td>
+<td class="lambda-list">
+ctrie-error</td>
+<td class="symbol-type">
+&nbsp;[Generic&nbsp;function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns the ctrie of the specified ctrie-error 
+ </p>
+</div>
+</div>
+</div>
+</div>
+<div class="defclass">
+<div class="defunsignatures">
+<a id="_g11510">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+ctrie-structural-error&nbsp;&nbsp;</td>
+<td class="lambda-list">
+inherits from <a href="ctrie.html#_g11508"><em class="cl">ctrie-error</em></a></td>
+<td class="symbol-type">
+&nbsp;[Condition]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Condition designating that the CTRIE data structure 
+ has been determined to be invalid. 
+ </p>
+</div>
+<div class="defclass-initargs">
+<div>
+<div>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+:node&nbsp;&nbsp;</td>
+<td class="lambda-list">
+</td>
+<td class="symbol-type">
+&nbsp;[Initarg]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<div class="defclass-slots-doc">
+</div>
+<div class="defclass-generics">
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11511">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+node-of&nbsp;&nbsp;</td>
+<td class="lambda-list">
+ctrie-structural-error</td>
+<td class="symbol-type">
+&nbsp;[Generic&nbsp;function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns the node of the specified ctrie-structural-error 
+ </p>
+</div>
+</div>
+</div>
+</div>
+<div class="defclass">
+<div class="defunsignatures">
+<a id="_g11512">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+ctrie-generational-mismatch&nbsp;&nbsp;</td>
+<td class="lambda-list">
+inherits from <a href="ctrie.html#_g11510"><em class="cl">ctrie-structural-error</em></a></td>
+<td class="symbol-type">
+&nbsp;[Condition]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Condition indicating an operation encountered an 
+ outdated or inconsistent node during its attempted traversal 
+ </p>
+</div>
+<div class="defclass-initargs">
+<div>
+<div>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+:expected&nbsp;&nbsp;</td>
+<td class="lambda-list">
+</td>
+<td class="symbol-type">
+&nbsp;[Initarg]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div>
+<div>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+:found&nbsp;&nbsp;</td>
+<td class="lambda-list">
+</td>
+<td class="symbol-type">
+&nbsp;[Initarg]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<div class="defclass-slots-doc">
+</div>
+<div class="defclass-generics">
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11513">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+found&nbsp;&nbsp;</td>
+<td class="lambda-list">
+ctrie-generational-mismatch</td>
+<td class="symbol-type">
+&nbsp;[Generic&nbsp;function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns the found of the specified ctrie-generational-mismatch 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11514">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+expected&nbsp;&nbsp;</td>
+<td class="lambda-list">
+ctrie-generational-mismatch</td>
+<td class="symbol-type">
+&nbsp;[Generic&nbsp;function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns the expected of the specified ctrie-generational-mismatch 
+ </p>
+</div>
+</div>
+</div>
+</div>
+<div class="defclass">
+<div class="defunsignatures">
+<a id="_g11515">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+ctrie-operational-error&nbsp;&nbsp;</td>
+<td class="lambda-list">
+inherits from <a href="ctrie.html#_g11508"><em class="cl">ctrie-error</em></a></td>
+<td class="symbol-type">
+&nbsp;[Condition]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Conditixon for when an operational failure or 
+ inconsistency has occurred. 
+ </p>
+</div>
+<div class="defclass-initargs">
+<div>
+<div>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+:op&nbsp;&nbsp;</td>
+<td class="lambda-list">
+</td>
+<td class="symbol-type">
+&nbsp;[Initarg]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<div class="defclass-slots-doc">
+</div>
+<div class="defclass-generics">
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11516">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+op-of&nbsp;&nbsp;</td>
+<td class="lambda-list">
+ctrie-operational-error</td>
+<td class="symbol-type">
+&nbsp;[Generic&nbsp;function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns the op of the specified ctrie-operational-error 
+ </p>
+</div>
+</div>
+</div>
+</div>
+<div class="defclass">
+<div class="defunsignatures">
+<a id="_g11517">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+ctrie-invalid-dynamic-context&nbsp;&nbsp;</td>
+<td class="lambda-list">
+inherits from <a href="ctrie.html#_g11515"><em class="cl">ctrie-operational-error</em></a></td>
+<td class="symbol-type">
+&nbsp;[Condition]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Condition indicating an operation was attempted 
+ outside the dynamic extent of a valid enclosing WITH-CTRIE form 
+ </p>
+</div>
+<div class="defclass-initargs">
+<div>
+<div>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+:ctrie-context&nbsp;&nbsp;</td>
+<td class="lambda-list">
+</td>
+<td class="symbol-type">
+&nbsp;[Initarg]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div>
+<div>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+:gen-context&nbsp;&nbsp;</td>
+<td class="lambda-list">
+</td>
+<td class="symbol-type">
+&nbsp;[Initarg]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<div class="defclass-slots-doc">
+</div>
+<div class="defclass-generics">
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11518">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+gen-context&nbsp;&nbsp;</td>
+<td class="lambda-list">
+ctrie-invalid-dynamic-context</td>
+<td class="symbol-type">
+&nbsp;[Generic&nbsp;function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns the gen-context of the specified ctrie-invalid-dynamic-context 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11519">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+ctrie-context&nbsp;&nbsp;</td>
+<td class="lambda-list">
+ctrie-invalid-dynamic-context</td>
+<td class="symbol-type">
+&nbsp;[Generic&nbsp;function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns the ctrie-context of the specified ctrie-invalid-dynamic-context 
+ </p>
+</div>
+</div>
+</div>
+</div>
+<div class="defclass">
+<div class="defunsignatures">
+<a id="_g11520">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+ctrie-operation-timeout-exceeded&nbsp;&nbsp;</td>
+<td class="lambda-list">
+inherits from <a href="ctrie.html#_g11515"><em class="cl">ctrie-operational-error</em></a></td>
+<td class="symbol-type">
+&nbsp;[Condition]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Condition indicating an operation has failed the 
+ maximum number of times specified by the s-variable *retries* 
+ </p>
+</div>
+<div class="defclass-initargs">
+<div>
+<div>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+:seconds&nbsp;&nbsp;</td>
+<td class="lambda-list">
+</td>
+<td class="symbol-type">
+&nbsp;[Initarg]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<div class="defclass-slots-doc">
+</div>
+<div class="defclass-generics">
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11521">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+seconds-of&nbsp;&nbsp;</td>
+<td class="lambda-list">
+ctrie-operation-timeout-exceeded</td>
+<td class="symbol-type">
+&nbsp;[Generic&nbsp;function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns the seconds of the specified ctrie-operation-timeout-exceeded 
+ </p>
+</div>
+</div>
+</div>
+</div>
+<div class="defclass">
+<div class="defunsignatures">
+<a id="_g11522">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+ctrie-operation-retries-exceeded&nbsp;&nbsp;</td>
+<td class="lambda-list">
+inherits from <a href="ctrie.html#_g11515"><em class="cl">ctrie-operational-error</em></a></td>
+<td class="symbol-type">
+&nbsp;[Condition]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Condition indicating an operation has failed the 
+ maximum number of times specified by the special-variable 
+ *retries* 
+ </p>
+</div>
+<div class="defclass-initargs">
+<div>
+<div>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+:retries&nbsp;&nbsp;</td>
+<td class="lambda-list">
+</td>
+<td class="symbol-type">
+&nbsp;[Initarg]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<div class="defclass-slots-doc">
+</div>
+<div class="defclass-generics">
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11523">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+retries-of&nbsp;&nbsp;</td>
+<td class="lambda-list">
+ctrie-operation-retries-exceeded</td>
+<td class="symbol-type">
+&nbsp;[Generic&nbsp;function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns the retries of the specified ctrie-operation-retries-exceeded 
+ </p>
+</div>
+</div>
+</div>
+</div>
+<div class="defclass">
+<div class="defunsignatures">
+<a id="_g11524">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+ctrie-not-implemented&nbsp;&nbsp;</td>
+<td class="lambda-list">
+inherits from <a href="ctrie.html#_g11508"><em class="cl">ctrie-error</em></a></td>
+<td class="symbol-type">
+&nbsp;[Condition]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Condition designating functionality for which the 
+ implementation has not been written, but has not been deliberately 
+ excluded. 
+ </p>
+</div>
+</div>
+<div class="defclass">
+<div class="defunsignatures">
+<a id="_g11525">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+ctrie-not-supported&nbsp;&nbsp;</td>
+<td class="lambda-list">
+inherits from <a href="ctrie.html#_g11508"><em class="cl">ctrie-error</em></a></td>
+<td class="symbol-type">
+&nbsp;[Condition]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Condition designating functionality that is 
+ deliberately not supported. 
+ </p>
+</div>
+</div>
+<div class="defstruct">
+<div class="defunsignatures">
+<a id="_g11538">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+ref&nbsp;&nbsp;</td>
+<td class="lambda-list">
+</td>
+<td class="symbol-type">
+&nbsp;[Structure]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Atomically Stamped Reference structure [Herlithy, TAOMP] that 
+ encapsulates the mutable slots within an inode, although each ref 
+ structure is, itself, never mutated. Incorporation of the ref 
+ structure provides the capability to 'bundle' additional metadata in 
+ an inode while still providing atomic compare and swap based a the 
+ single comparison of the aggregate ref instance 
+ </p>
+</div>
+<div class="defclass-initargs">
+</div>
+<div class="defclass-slots-doc">
+</div>
+<div class="defclass-generics">
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11539">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+ref-prev&nbsp;&nbsp;</td>
+<td class="lambda-list">
+ref</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns and (with setf) changes the prev of the specified ref 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11540">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+ref-value&nbsp;&nbsp;</td>
+<td class="lambda-list">
+ref</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns and (with setf) changes the value of the specified ref 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11541">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+ref-stamp&nbsp;&nbsp;</td>
+<td class="lambda-list">
+ref</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns and (with setf) changes the stamp of the specified ref 
+ </p>
+</div>
+</div>
+</div>
+<div class="defstruct-defuns">
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11542">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+make-ref&nbsp;&nbsp;</td>
+<td class="lambda-list">
+<em>&amp;key</em> (stamp (local-time:now)) (value t) prev</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns a newly created ref. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11544">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+copy-ref&nbsp;&nbsp;</td>
+<td class="lambda-list">
+ref</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns a copy of the specified ref. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11543">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+ref-p&nbsp;&nbsp;</td>
+<td class="lambda-list">
+object</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns T if the specified object is of type ref. 
+ </p>
+</div>
+</div>
+</div>
+</div>
+<div class="defstruct">
+<div class="defunsignatures">
+<a id="_g11545">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+failed-ref&nbsp;&nbsp;</td>
+<td class="lambda-list">
+</td>
+<td class="symbol-type">
+&nbsp;[Structure]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+A FAILED-REF is a structure that is used to preserve the linkage to 
+ prior inode state following a failed GCAS. Any inode access that 
+ detects a FAILED-REF will immediately invoke a commit to restore the 
+ inode to the state recorded in FAILED-REF-PREV. 
+ </p>
+</div>
+<div class="defstruct-defuns">
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11546">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+make-failed-ref&nbsp;&nbsp;</td>
+<td class="lambda-list">
+<em>&amp;key</em></td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns a newly created failed-ref. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11548">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+copy-failed-ref&nbsp;&nbsp;</td>
+<td class="lambda-list">
+failed-ref</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns a copy of the specified failed-ref. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11547">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+failed-ref-p&nbsp;&nbsp;</td>
+<td class="lambda-list">
+object</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns T if the specified object is of type failed-ref. 
+ </p>
+</div>
+</div>
+</div>
+</div>
+<div class="defstruct">
+<div class="defunsignatures">
+<a id="_g11549">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+inode&nbsp;&nbsp;</td>
+<td class="lambda-list">
+</td>
+<td class="symbol-type">
+&nbsp;[Structure]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+An INODE, or 'Indirection Node' is the mutable structure 
+ representing the link between other 'main-node' structures found in 
+ a ctrie. An inode is the only type of node that may change the 
+ value of its content during its lifetime. In this implementation, 
+ all such values as may change are encapsulated within a REF 
+ substructure. Each inode also contains a generational descriptor 
+ object, comparible by identity only, which is used to identify the 
+ state of synchronization between the inode and the current 
+ 'generation' indicated by the root inode at the base of the 
+ CTRIE. As an inode may not change its 'gen identity' during its 
+ lifetime, this disparity with the generation of the root node will 
+ immediately result in the replacement of the inode with a new one 
+ properly synchronized with the root's GEN object. In this 
+ implementation, GEN objects are implemented by GENSYMS -- unique, 
+ uninterned symbols which inherently provide very similar symantics 
+ to those required of the generational descriptor. 
+ </p>
+</div>
+<div class="defclass-initargs">
+</div>
+<div class="defclass-slots-doc">
+</div>
+<div class="defclass-generics">
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11550">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+inode-ref&nbsp;&nbsp;</td>
+<td class="lambda-list">
+inode</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns and (with setf) changes the ref of the specified inode 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11551">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+inode-gen&nbsp;&nbsp;</td>
+<td class="lambda-list">
+inode</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns and (with setf) changes the gen of the specified inode 
+ </p>
+</div>
+</div>
+</div>
+<div class="defstruct-defuns">
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11552">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+%make-inode&nbsp;&nbsp;</td>
+<td class="lambda-list">
+<em>&amp;key</em> gen ref</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns a newly created inode. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11554">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+copy-inode&nbsp;&nbsp;</td>
+<td class="lambda-list">
+inode</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns a copy of the specified inode. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11553">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+inode-p&nbsp;&nbsp;</td>
+<td class="lambda-list">
+object</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns T if the specified object is of type inode. 
+ </p>
+</div>
+</div>
+</div>
+</div>
+<div class="defstruct">
+<div class="defunsignatures">
+<a id="_g11561">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+snode&nbsp;&nbsp;</td>
+<td class="lambda-list">
+</td>
+<td class="symbol-type">
+&nbsp;[Structure]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Storage Node 
+ </p>
+</div>
+<div class="defclass-initargs">
+</div>
+<div class="defclass-slots-doc">
+</div>
+<div class="defclass-generics">
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11562">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+snode-value&nbsp;&nbsp;</td>
+<td class="lambda-list">
+snode</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns and (with setf) changes the value of the specified snode 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11563">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+snode-key&nbsp;&nbsp;</td>
+<td class="lambda-list">
+snode</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns and (with setf) changes the key of the specified snode 
+ </p>
+</div>
+</div>
+</div>
+<div class="defstruct-defuns">
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11564">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+make-snode&nbsp;&nbsp;</td>
+<td class="lambda-list">
+<em>&amp;key</em> key value</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns a newly created snode. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11566">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+copy-snode&nbsp;&nbsp;</td>
+<td class="lambda-list">
+snode</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns a copy of the specified snode. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11565">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+snode-p&nbsp;&nbsp;</td>
+<td class="lambda-list">
+object</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns T if the specified object is of type snode. 
+ </p>
+</div>
+</div>
+</div>
+</div>
+<div class="defstruct">
+<div class="defunsignatures">
+<a id="_g11568">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+lnode&nbsp;&nbsp;</td>
+<td class="lambda-list">
+</td>
+<td class="symbol-type">
+&nbsp;[Structure]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+List Node 
+ </p>
+</div>
+<div class="defclass-initargs">
+</div>
+<div class="defclass-slots-doc">
+</div>
+<div class="defclass-generics">
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11569">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+lnode-next&nbsp;&nbsp;</td>
+<td class="lambda-list">
+lnode</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns and (with setf) changes the next of the specified lnode 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11570">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+lnode-elt&nbsp;&nbsp;</td>
+<td class="lambda-list">
+lnode</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns and (with setf) changes the elt of the specified lnode 
+ </p>
+</div>
+</div>
+</div>
+<div class="defstruct-defuns">
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11571">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+make-lnode&nbsp;&nbsp;</td>
+<td class="lambda-list">
+<em>&amp;key</em> elt next</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns a newly created lnode. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11573">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+copy-lnode&nbsp;&nbsp;</td>
+<td class="lambda-list">
+lnode</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns a copy of the specified lnode. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11572">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+lnode-p&nbsp;&nbsp;</td>
+<td class="lambda-list">
+object</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns T if the specified object is of type lnode. 
+ </p>
+</div>
+</div>
+</div>
+</div>
+<div class="defstruct">
+<div class="defunsignatures">
+<a id="_g11579">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+tnode&nbsp;&nbsp;</td>
+<td class="lambda-list">
+</td>
+<td class="symbol-type">
+&nbsp;[Structure]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Tomb Node 
+ </p>
+</div>
+<div class="defclass-initargs">
+</div>
+<div class="defclass-slots-doc">
+</div>
+<div class="defclass-generics">
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11580">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+tnode-cell&nbsp;&nbsp;</td>
+<td class="lambda-list">
+tnode</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns and (with setf) changes the cell of the specified tnode 
+ </p>
+</div>
+</div>
+</div>
+<div class="defstruct-defuns">
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11581">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+make-tnode&nbsp;&nbsp;</td>
+<td class="lambda-list">
+<em>&amp;key</em> cell</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns a newly created tnode. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11583">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+copy-tnode&nbsp;&nbsp;</td>
+<td class="lambda-list">
+tnode</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns a copy of the specified tnode. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11582">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+tnode-p&nbsp;&nbsp;</td>
+<td class="lambda-list">
+object</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns T if the specified object is of type tnode. 
+ </p>
+</div>
+</div>
+</div>
+</div>
+<div class="defstruct">
+<div class="defunsignatures">
+<a id="_g11586">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+cnode&nbsp;&nbsp;</td>
+<td class="lambda-list">
+</td>
+<td class="symbol-type">
+&nbsp;[Structure]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Content Node 
+ </p>
+</div>
+<div class="defclass-initargs">
+</div>
+<div class="defclass-slots-doc">
+</div>
+<div class="defclass-generics">
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11587">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+cnode-arcs&nbsp;&nbsp;</td>
+<td class="lambda-list">
+cnode</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns and (with setf) changes the arcs of the specified cnode 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11588">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+cnode-flags&nbsp;&nbsp;</td>
+<td class="lambda-list">
+cnode</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns and (with setf) changes the flags of the specified cnode 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11589">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+cnode-bitmap&nbsp;&nbsp;</td>
+<td class="lambda-list">
+cnode</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns and (with setf) changes the bitmap of the specified cnode 
+ </p>
+</div>
+</div>
+</div>
+<div class="defstruct-defuns">
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11590">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+%make-cnode&nbsp;&nbsp;</td>
+<td class="lambda-list">
+<em>&amp;key</em> (bitmap 0) (flags %no-flags%) (arcs %empty-map%)</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns a newly created cnode. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11592">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+copy-cnode&nbsp;&nbsp;</td>
+<td class="lambda-list">
+cnode</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns a copy of the specified cnode. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11591">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+cnode-p&nbsp;&nbsp;</td>
+<td class="lambda-list">
+object</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns T if the specified object is of type cnode. 
+ </p>
+</div>
+</div>
+</div>
+</div>
+<div class="defstruct">
+<div class="defunsignatures">
+<a id="_g11609">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+ctrie&nbsp;&nbsp;</td>
+<td class="lambda-list">
+</td>
+<td class="symbol-type">
+&nbsp;[Structure]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+A CTRIE root container uniquely identifies a CTRIE instance, and 
+ contains the following perameters which specify the customizable 
+ aspects of each CTRIE instance: 
+ * READONLY-P, if true, prohibits any future modification or 
+ cloning of this instance. 
+ * TEST is a designator for an equality predicate that will be applied to 
+ determine the disambiguation of any two keys. It is recommened that 
+ this value be a symbol that is fboundp, to retain capability of 
+ externalization (save/restore). At present, though, this is not 
+ enforced and a function object or lambda expression will also be 
+ accepted, albeit without the ability of save/restore. 
+ * HASH is a designator for a hash function, which may be desirable to 
+ customize when one has specific knowledge about the set of keys 
+ which will populate the table. At this time, a 32-bit hash is 
+ recommended as this is what has been used for development and 
+ testing and has been shown to provide good performance in 
+ practice. As with TEST, it is recommended that HASH be specified 
+ by a symbol that is fboundp. 
+ </p>
+</div>
+<div class="defclass-initargs">
+</div>
+<div class="defclass-slots-doc">
+</div>
+<div class="defclass-generics">
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11610">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+ctrie-root&nbsp;&nbsp;</td>
+<td class="lambda-list">
+ctrie</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns and (with setf) changes the root of the specified ctrie 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11611">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+ctrie-hash&nbsp;&nbsp;</td>
+<td class="lambda-list">
+ctrie</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns and (with setf) changes the hash of the specified ctrie 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11612">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+ctrie-test&nbsp;&nbsp;</td>
+<td class="lambda-list">
+ctrie</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns and (with setf) changes the test of the specified ctrie 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11613">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+ctrie-readonly-p&nbsp;&nbsp;</td>
+<td class="lambda-list">
+ctrie</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns and (with setf) changes the readonly-p of the specified ctrie 
+ </p>
+</div>
+</div>
+</div>
+<div class="defstruct-defuns">
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11614">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+%make-ctrie&nbsp;&nbsp;</td>
+<td class="lambda-list">
+<em>&amp;key</em> readonly-p (test 'equal) (hash 'sxhash) (root
+                                              (make-inode (make-cnode)
+                                                          (gensym &quot;ctrie&quot;)))</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns a newly created ctrie. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11616">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+copy-ctrie&nbsp;&nbsp;</td>
+<td class="lambda-list">
+ctrie</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns a copy of the specified ctrie. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11615">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+ctrie-p&nbsp;&nbsp;</td>
+<td class="lambda-list">
+object</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns T if the specified object is of type ctrie. 
+ </p>
+</div>
+</div>
+</div>
+</div>
+<div class="defstruct">
+<div class="defunsignatures">
+<a id="_g11620">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+rdcss-descriptor&nbsp;&nbsp;</td>
+<td class="lambda-list">
+</td>
+<td class="symbol-type">
+&nbsp;[Structure]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+An RDCSS-DESCRIPTOR object represents a 'plan' for a proposed RDCSS 
+ (restricted double compare single swap) operation. The use of this 
+ descriptor object provides the means to effect an atomic RDCSS in 
+ software, requiring only hardware support for single CAS, as that is 
+ what is commonly available. 
+ </p>
+</div>
+<div class="defclass-initargs">
+</div>
+<div class="defclass-slots-doc">
+</div>
+<div class="defclass-generics">
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11621">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+rdcss-descriptor-committed&nbsp;&nbsp;</td>
+<td class="lambda-list">
+rdcss-descriptor</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns and (with setf) changes the committed of the specified rdcss-descriptor 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11622">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+rdcss-descriptor-nv&nbsp;&nbsp;</td>
+<td class="lambda-list">
+rdcss-descriptor</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns and (with setf) changes the nv of the specified rdcss-descriptor 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11623">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+rdcss-descriptor-ovmain&nbsp;&nbsp;</td>
+<td class="lambda-list">
+rdcss-descriptor</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns and (with setf) changes the ovmain of the specified rdcss-descriptor 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11624">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+rdcss-descriptor-ov&nbsp;&nbsp;</td>
+<td class="lambda-list">
+rdcss-descriptor</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns and (with setf) changes the ov of the specified rdcss-descriptor 
+ </p>
+</div>
+</div>
+</div>
+<div class="defstruct-defuns">
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11625">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+make-rdcss-descriptor&nbsp;&nbsp;</td>
+<td class="lambda-list">
+<em>&amp;key</em> ov ovmain nv committed</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns a newly created rdcss-descriptor. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11627">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+copy-rdcss-descriptor&nbsp;&nbsp;</td>
+<td class="lambda-list">
+rdcss-descriptor</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns a copy of the specified rdcss-descriptor. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11626">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+rdcss-descriptor-p&nbsp;&nbsp;</td>
+<td class="lambda-list">
+object</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Returns T if the specified object is of type rdcss-descriptor. 
+ </p>
+</div>
+</div>
+</div>
+</div>
+<div class="deftype">
+<div class="defunsignatures">
+<a id="_g11604">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+leaf-node&nbsp;&nbsp;</td>
+<td class="lambda-list">
+'(or snode tnode)</td>
+<td class="symbol-type">
+&nbsp;[Type]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+A LEAF-NODE represents a terminal value in a CTRIE arc. 
+ </p>
+<p>
+LEAF-NODEs always contain a unit-payload of CTRIE data 
+ storage; For example, an SNODE contains a key/value pair. 
+ </p>
+</div>
+</div>
+<div class="deftype">
+<div class="defunsignatures">
+<a id="_g11605">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+branch-node&nbsp;&nbsp;</td>
+<td class="lambda-list">
+'(or inode snode)</td>
+<td class="symbol-type">
+&nbsp;[Type]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="deftype">
+<div class="defunsignatures">
+<a id="_g11606">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+main-node&nbsp;&nbsp;</td>
+<td class="lambda-list">
+'(or cnode lnode tnode)</td>
+<td class="symbol-type">
+&nbsp;[Type]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defparam">
+<div class="defunsignatures">
+<a id="_g11503">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+*ctrie*&nbsp;&nbsp;</td>
+<td class="lambda-list">
+</td>
+<td class="symbol-type">
+&nbsp;[Variable]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Within the dynamic extent of a CTRIE operation this variable will 
+ be bound to the root-container CTRIE operand. It is an error if an 
+ operation is defined that attempts access to a CTRIE without this 
+ binding, which is properly established by wrapping the operation in 
+ an appropriate WITH-CTRIE form. 
+ </p>
+</div>
+</div>
+<div class="defparam">
+<div class="defunsignatures">
+<a id="_g11504">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+*retries*&nbsp;&nbsp;</td>
+<td class="lambda-list">
+</td>
+<td class="symbol-type">
+&nbsp;[Variable]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Establishes the number of restarts permitted to a CTRIE operation 
+ established by a WITH-CTRIE form before a condition of type 
+ CTRIE-OPERATION-RETRIES-EXCEEDED will be signaled, aborting the 
+ operatation, and requiring operator intervention to resume 
+ processing. 
+ </p>
+</div>
+</div>
+<div class="defparam">
+<div class="defunsignatures">
+<a id="_g11505">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+*timeout*&nbsp;&nbsp;</td>
+<td class="lambda-list">
+</td>
+<td class="symbol-type">
+&nbsp;[Variable]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Establishes the duration (in seconds) allotted to a CTRIE operation 
+ established by a WITH-CTRIE form before a condition of type 
+ CTRIE-OPERATION-TIMEOUT-EXCEEDED will be signaled, aborting the 
+ operatation, and requiring operator intervention to resume 
+ processing. 
+ </p>
+</div>
+</div>
+<div class="defparam">
+<div class="defunsignatures">
+<a id="_g11506">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+*context*&nbsp;&nbsp;</td>
+<td class="lambda-list">
+</td>
+<td class="symbol-type">
+&nbsp;[Variable]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Diagnostic value, not used in production, used to maintain 
+ additional information tracking the current dynamic state. 
+ </p>
+</div>
+</div>
+<div class="defparam">
+<div class="defunsignatures">
+<a id="_g11507">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+*debug*&nbsp;&nbsp;</td>
+<td class="lambda-list">
+</td>
+<td class="symbol-type">
+&nbsp;[Variable]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Debugging flag, not used in production, to enable generation of 
+ additional diagnostic and reporting information. 
+ </p>
+</div>
+</div>
+<div class="defparam">
+<div class="defunsignatures">
+<a id="_g11536">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+%empty-map%&nbsp;&nbsp;</td>
+<td class="lambda-list">
+</td>
+<td class="symbol-type">
+&nbsp;[Variable]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defparam">
+<div class="defunsignatures">
+<a id="_g11537">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+%no-flags%&nbsp;&nbsp;</td>
+<td class="lambda-list">
+</td>
+<td class="symbol-type">
+&nbsp;[Variable]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11584">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+entomb&nbsp;&nbsp;</td>
+<td class="lambda-list">
+node</td>
+<td class="symbol-type">
+&nbsp;[Generic&nbsp;function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11585">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+resurrect&nbsp;&nbsp;</td>
+<td class="lambda-list">
+node</td>
+<td class="symbol-type">
+&nbsp;[Generic&nbsp;function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11598">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+refresh&nbsp;&nbsp;</td>
+<td class="lambda-list">
+place gen</td>
+<td class="symbol-type">
+&nbsp;[Generic&nbsp;function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11607">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+leaf-node-key&nbsp;&nbsp;</td>
+<td class="lambda-list">
+resource</td>
+<td class="symbol-type">
+&nbsp;[Generic&nbsp;function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11608">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+leaf-node-value&nbsp;&nbsp;</td>
+<td class="lambda-list">
+resource</td>
+<td class="symbol-type">
+&nbsp;[Generic&nbsp;function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11619">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+find-ctrie-root&nbsp;&nbsp;</td>
+<td class="lambda-list">
+ctrie-designator</td>
+<td class="symbol-type">
+&nbsp;[Generic&nbsp;function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+FIND-CTRIE-ROOT is a subprimitive used by the 
+ internal CTRIE implementation to access the root inode of a given 
+ ctrie root-container. It does not provide safe access to the 
+ contents of that inode and should not be referenced by the 
+ higher-level implementation or end-user code. The purpose of 
+ FIND-CTRIE-ROOT is to incorporate a level of indirection specialized 
+ on the class of the root container to facilitate future extension 
+ with alternate storage models, eg an external persistent disk-based 
+ store. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11640">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+map-node&nbsp;&nbsp;</td>
+<td class="lambda-list">
+node fn</td>
+<td class="symbol-type">
+&nbsp;[Generic&nbsp;function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11650">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+ctrie-map-into&nbsp;&nbsp;</td>
+<td class="lambda-list">
+ctrie place fn</td>
+<td class="symbol-type">
+&nbsp;[Generic&nbsp;function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11665">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+ctrie-save&nbsp;&nbsp;</td>
+<td class="lambda-list">
+ctrie place <em>&amp;key</em> <em>&amp;allow-other-keys</em></td>
+<td class="symbol-type">
+&nbsp;[Generic&nbsp;function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11667">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+ctrie-load&nbsp;&nbsp;</td>
+<td class="lambda-list">
+place <em>&amp;key</em> <em>&amp;allow-other-keys</em></td>
+<td class="symbol-type">
+&nbsp;[Generic&nbsp;function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11669">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+ctrie-export&nbsp;&nbsp;</td>
+<td class="lambda-list">
+ctrie place <em>&amp;key</em> <em>&amp;allow-other-keys</em></td>
+<td class="symbol-type">
+&nbsp;[Generic&nbsp;function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11672">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+ctrie-import&nbsp;&nbsp;</td>
+<td class="lambda-list">
+place <em>&amp;key</em> <em>&amp;allow-other-keys</em></td>
+<td class="symbol-type">
+&nbsp;[Generic&nbsp;function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11675">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+make-diagram&nbsp;&nbsp;</td>
+<td class="lambda-list">
+thing context <em>&amp;key</em> <em>&amp;allow-other-keys</em></td>
+<td class="symbol-type">
+&nbsp;[Generic&nbsp;function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11556">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+print-object&nbsp;&nbsp;</td>
+<td class="lambda-list">
+(o inode) stream</td>
+<td class="symbol-type">
+&nbsp;[Method]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11528">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+multi-catch-1&nbsp;&nbsp;</td>
+<td class="lambda-list">
+block-name tag-list forms</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Helper for multi-catch macro 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11530">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+cthash&nbsp;&nbsp;</td>
+<td class="lambda-list">
+key</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Compute the hash value of KEY using the hash function defined by 
+ the CTRIE designated by the innermost enclosing WITH-CTRIE form. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11531">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+ctequal&nbsp;&nbsp;</td>
+<td class="lambda-list">
+x y</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Test the equality of X and Y using the equality predicate defined 
+ by the CTRIE designated by the innermost enclosing WITH-CTRIE form. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11532">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+flag&nbsp;&nbsp;</td>
+<td class="lambda-list">
+key level</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+For a given depth, LEVEL, within a CTRIE, extract the correspondant 
+ sequence of bits from the computed hash of KEY that indicate the 
+ logical index of the arc on the path to which that key may be found. 
+ Note that the logical index of the arc is most likely not the same 
+ as the physical index where it is actually located -- for that see 
+ 'flag-arc-position' 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11533">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+flag-present-p&nbsp;&nbsp;</td>
+<td class="lambda-list">
+flag bitmap</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Tests the (fixnum) BITMAP representing the logical index of all 
+ arcs present in a CNODE for the presence of a particular arc whose 
+ logical index is represented by FLAG. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11534">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+flag-arc-position&nbsp;&nbsp;</td>
+<td class="lambda-list">
+flag bitmap</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Given FLAG representing the logical index of an arc, and BITMAP 
+ representing all arcs present, compute a physical index for FLAG in 
+ such a manner as to always ensure all arcs map uniquely and 
+ contiguously to the smallest vector that can contain the given 
+ arcs. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11535">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+flag-vector&nbsp;&nbsp;</td>
+<td class="lambda-list">
+<em>&amp;optional</em> (content 0)</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+FLAG-VECTOR is a bit-vector representation of the (fixnum) 
+ BITMAP. It is currently not used for any calculation, however it is 
+ included within each CNODE as a convenience because it makes it 
+ immediately clear from visual inspection which logical arc indexes 
+ are represented in the node. For example, from the bit-vector 
+ #*10010000000000000000000000000000 one can easily see that the first 
+ and fourth positions are occupied, and the rest empty. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11555">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+make-inode&nbsp;&nbsp;</td>
+<td class="lambda-list">
+link-to <em>&amp;optional</em> gen stamp prev</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Construct a new INODE that represents a link to LINK-TO, optionally 
+ augmented with a specified generational descriptor, timestamp, and/or 
+ previous state. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11558">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+inode-read&nbsp;&nbsp;</td>
+<td class="lambda-list">
+inode</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+INODE-READ provides the top-level interface to the inode GCAS ACCESS api, 
+ which is the mechanism which must be used to gain access to the 
+ content of any NON-ROOT inode. For access to the root inode, refer 
+ to the RDCSS inode api 'ROOT-NODE-ACCESS'. Returns as four values, 
+ the MAIN-NODE, the STAMP, the PREVIOUS STATE (if any), and the REF 
+ structure encapsulated by the inode. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11559">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+inode-mutate&nbsp;&nbsp;</td>
+<td class="lambda-list">
+inode old-value new-value</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+INODE-MUTATE provides the top-level interface to the inode GCAS 
+ MODIFICATION api, which is the mechanism which must be used to 
+ effect any change in a NON-ROOT inode. For modification of the 
+ root-inode, refer to the RDCSS inode api 
+ 'ROOT-NODE-REPLACE'. Returns a boolean value which indicates the 
+ success or failure of the modification attempt. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11560">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+inode-commit&nbsp;&nbsp;</td>
+<td class="lambda-list">
+inode ref</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+INODE-COMMIT implements the GCAS COMMIT protocol which is invoked 
+ as necessary by the INODE-READ and INODE-MUTATE entry-points. It is 
+ not meant to be invoked directly, as this would most likely result 
+ in corruption. Returns the REF structure representing the content of 
+ whatever root inode wound up successfully committed -- either the 
+ one requested, or one represented by a previous state. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11567">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+snode&nbsp;&nbsp;</td>
+<td class="lambda-list">
+k v</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11574">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+enlist&nbsp;&nbsp;</td>
+<td class="lambda-list">
+<em>&amp;rest</em> rest</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11575">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+lnode-removed&nbsp;&nbsp;</td>
+<td class="lambda-list">
+orig-lnode key test</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11576">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+lnode-inserted&nbsp;&nbsp;</td>
+<td class="lambda-list">
+orig-lnode key value test</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11577">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+lnode-search&nbsp;&nbsp;</td>
+<td class="lambda-list">
+lnode key test</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11578">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+lnode-length&nbsp;&nbsp;</td>
+<td class="lambda-list">
+lnode</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11593">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+make-cnode&nbsp;&nbsp;</td>
+<td class="lambda-list">
+<em>&amp;optional</em> (bitmap 0)</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11594">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+cnode-extended&nbsp;&nbsp;</td>
+<td class="lambda-list">
+cnode flag position value</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11595">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+cnode-updated&nbsp;&nbsp;</td>
+<td class="lambda-list">
+cnode position value</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11596">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+cnode-truncated&nbsp;&nbsp;</td>
+<td class="lambda-list">
+cnode flag pos</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11597">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+map-cnode&nbsp;&nbsp;</td>
+<td class="lambda-list">
+fn cnode</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11599">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+cnode-contracted&nbsp;&nbsp;</td>
+<td class="lambda-list">
+cnode level</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11600">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+cnode-compressed&nbsp;&nbsp;</td>
+<td class="lambda-list">
+cnode level</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11601">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+clean&nbsp;&nbsp;</td>
+<td class="lambda-list">
+inode level</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11603">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+clean-parent&nbsp;&nbsp;</td>
+<td class="lambda-list">
+parent-inode target-inode key level</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11617">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+make-ctrie&nbsp;&nbsp;</td>
+<td class="lambda-list">
+<em>&amp;rest</em> args <em>&amp;key</em> name root (readonly-p nil) (test 'equal) (hash 'sxhash)</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+CREATE a new CTRIE instance. This is the entry-point constructor api 
+ intended for use by the end-user. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11628">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+root-node-access&nbsp;&nbsp;</td>
+<td class="lambda-list">
+ctrie <em>&amp;optional</em> abort</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+ROOT-NODE-ACCESS extends FIND-CTRIE-ROOT, implementing the RDCSS 
+ root node api for access to root inode of CTRIE. In particular, it 
+ ensures that if, instead of an inode, the root of CTRIE contains an 
+ RDCSS descriptor of a proposed root-node update, that it will 
+ immediately invoke ROOT-NODE-COMMIT to act on that descriptor and 
+ return only an inode value that is the result of the completed 
+ commit process. ROOT-NODE-ACCESS only provides access to the root 
+ inode structure, it does not provide safe access to the contents of 
+ that inode itself. In order to access those contents the root node 
+ returned by ROOT-NODE-ACCESS must be further processed by INODE-READ 
+ in order to still properly comply with the undrlying GCAS protocol 
+ implementation for inodes. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11629">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+root-node-replace&nbsp;&nbsp;</td>
+<td class="lambda-list">
+ctrie ov ovmain nv</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+rdcss api for replacement of root ctrie inode 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11630">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+root-node-commit&nbsp;&nbsp;</td>
+<td class="lambda-list">
+ctrie <em>&amp;optional</em> abort</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+rdcss api to complete a root-node transaction 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11631">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+ctrie-snapshot&nbsp;&nbsp;</td>
+<td class="lambda-list">
+ctrie <em>&amp;key</em> read-only</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11632">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+ctrie-clear&nbsp;&nbsp;</td>
+<td class="lambda-list">
+ctrie</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11633">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+%insert&nbsp;&nbsp;</td>
+<td class="lambda-list">
+inode key value level parent startgen</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11634">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+ctrie-put&nbsp;&nbsp;</td>
+<td class="lambda-list">
+ctrie key value</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11635">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+%lookup&nbsp;&nbsp;</td>
+<td class="lambda-list">
+inode key level parent startgen</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11636">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+ctrie-get&nbsp;&nbsp;</td>
+<td class="lambda-list">
+ctrie key</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11637">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+(setf ctrie-get)&nbsp;&nbsp;</td>
+<td class="lambda-list">
+value ctrie key</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11638">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+%remove&nbsp;&nbsp;</td>
+<td class="lambda-list">
+inode key level parent startgen</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11639">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+ctrie-drop&nbsp;&nbsp;</td>
+<td class="lambda-list">
+ctrie key</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Remove KEY and it's value from the CTRIE. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11641">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+ctrie-map&nbsp;&nbsp;</td>
+<td class="lambda-list">
+ctrie fn <em>&amp;key</em> atomic <em>&amp;aux</em> accum</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11648">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+ctrie-map-keys&nbsp;&nbsp;</td>
+<td class="lambda-list">
+ctrie fn <em>&amp;key</em> atomic</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11649">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+ctrie-map-values&nbsp;&nbsp;</td>
+<td class="lambda-list">
+ctrie fn <em>&amp;key</em> atomic</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11651">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+print2&nbsp;&nbsp;</td>
+<td class="lambda-list">
+x y <em>&amp;optional</em> (stream t)</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11652">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+collect2&nbsp;&nbsp;</td>
+<td class="lambda-list">
+x y</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11653">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+collect-keys&nbsp;&nbsp;</td>
+<td class="lambda-list">
+x y</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11654">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+collect-values&nbsp;&nbsp;</td>
+<td class="lambda-list">
+x y</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11655">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+ctrie-keys&nbsp;&nbsp;</td>
+<td class="lambda-list">
+ctrie <em>&amp;key</em> atomic</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11656">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+ctrie-values&nbsp;&nbsp;</td>
+<td class="lambda-list">
+ctrie <em>&amp;key</em> atomic</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11657">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+ctrie-size&nbsp;&nbsp;</td>
+<td class="lambda-list">
+ctrie <em>&amp;aux</em> (accum 0)</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11658">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+ctrie-empty-p&nbsp;&nbsp;</td>
+<td class="lambda-list">
+ctrie</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11659">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+ctrie-ensure-get&nbsp;&nbsp;</td>
+<td class="lambda-list">
+ctrie key default</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Like CTRIE-GET, but if KEY is not found in CTRIE, automatically adds 
+ the entry (KEY. DEFAULT). Secondary return value is true if key was 
+ already in the table. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11660">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+ctrie-to-alist&nbsp;&nbsp;</td>
+<td class="lambda-list">
+ctrie <em>&amp;key</em> atomic</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11661">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+ctrie-pprint&nbsp;&nbsp;</td>
+<td class="lambda-list">
+ctrie <em>&amp;optional</em> (stream t)</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11662">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+ctrie-to-hashtable&nbsp;&nbsp;</td>
+<td class="lambda-list">
+ctrie <em>&amp;key</em> atomic</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11663">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+ctrie-from-alist&nbsp;&nbsp;</td>
+<td class="lambda-list">
+alist</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11664">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+ctrie-from-hashtable&nbsp;&nbsp;</td>
+<td class="lambda-list">
+hashtable</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+create a new ctrie containing the same (k . v) pairs and equivalent 
+ test function as HASHTABLE 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11677">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+diagram&nbsp;&nbsp;</td>
+<td class="lambda-list">
+thing <em>&amp;optional</em> (context *context*)</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11526">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+ctrie-error&nbsp;&nbsp;</td>
+<td class="lambda-list">
+ctrie condition <em>&amp;rest</em> args</td>
+<td class="symbol-type">
+&nbsp;[Macro]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Signal a CTRIE related condition. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11527">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+multi-catch&nbsp;&nbsp;</td>
+<td class="lambda-list">
+tag-list <em>&amp;body</em> forms</td>
+<td class="symbol-type">
+&nbsp;[Macro]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Macro allowing catch of multiple tags at once and 
+ finding out which tag was thrown. 
+ * RETURNS: (values RESULT TAG) 
+ </p>
+<ul>
+<li>
+<p>
+RESULT is either the result of evaluationg FORMS or the value 
+ thrown by the throw form. 
+ </p>
+</li>
+<li>
+<p>
+TAG is NIl if evaluation of the FORMS completed normally 
+ or the tag thrown and cought. 
+ * EXAMPLE: 
+ </p>
+<pre>
+    (multiple-value-bind (result tag) 
+                (multi-catch (:a :b) 
+                     ...FORMS...) 
+                  (case tag  
+                     (:a ...) 
+                     (:b ...) 
+                     (t ...))) </pre>
+</li>
+</ul>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11529">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+catch-case&nbsp;&nbsp;</td>
+<td class="lambda-list">
+form <em>&amp;rest</em> cases</td>
+<td class="symbol-type">
+&nbsp;[Macro]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+User api encapsulating the MULTI-CATCH control-structure in a 
+ syntactic format that is identical to that of the familiar CASE 
+ statement, with the addition that within the scope of each CASE 
+ clause, a lexical binding is established between the symbol IT and 
+ the value caught from the throw form. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11557">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+gcas-compare-and-set&nbsp;&nbsp;</td>
+<td class="lambda-list">
+obj expected new expected-stamp new-stamp prev</td>
+<td class="symbol-type">
+&nbsp;[Macro]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+A thin, macro layer abstraction over the basic compare-and-swap 
+ primitive which provides a consistent interface to the underlying 
+ inode structure and manages additional metadata, providing 
+ reasonable defaults when they are not specified. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11618">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+with-ctrie&nbsp;&nbsp;</td>
+<td class="lambda-list">
+&amp;once ctrie <em>&amp;body</em> body</td>
+<td class="symbol-type">
+&nbsp;[Macro]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Configure the dynamic environment with the appropriate condition handlers, 
+ control fixtures, and instrumentation necessary to perform the 
+ operations in BODY on the specified CTRIE. Unless specifically 
+ documented, the particular configuration of this dynamic environment 
+ should be considered an implementation detail and not relied upon. A 
+ particular exception, however, is that within the dynamic extent of 
+ a WITH-CTRIE form, the code implementing a CTRIE operation may 
+ expect that the special variable *CTRIE* will be bound to the root 
+ container of CTRIE operated upon. See also the documentation for 
+ '*CTRIE*' 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11642">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+ctrie-do&nbsp;&nbsp;</td>
+<td class="lambda-list">
+(key value ctrie <em>&amp;key</em> atomic) <em>&amp;body</em> body</td>
+<td class="symbol-type">
+&nbsp;[Macro]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Iterate over (key . value) in ctrie in the manner of dolist. 
+ </p>
+<p>
+EXAMPLE: (ctrie-do (k v ctrie) 
+ (format t &quot;~&amp;~8S =&gt; ~10S~%&quot; k v)) 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g11678">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+define-diagram&nbsp;&nbsp;</td>
+<td class="lambda-list">
+type (<em>&amp;optional</em> context) <em>&amp;body</em> body</td>
+<td class="symbol-type">
+&nbsp;[Macro]</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<div class="cludg-footer">
+Generated by&nbsp;<a href="mailto:ihatchondo@common-lisp.net" lang="en">
+CLDOC</a>
+- 2012-07-25 13:48:03</div>
+</body>
+</html>

@@ -5,10 +5,11 @@
 
 (asdf:defsystem :cl-ctrie
   :serial t
-  :description      "CTrie: a lock-free, concurrent, key/value indexed storage structure"
+  :description      "CTrie: a lock-free, concurrent, key/value map"
   :author           "Dan Lentz <danlentz@gmail.com>"
   :license          "MIT"
-  :version          "0.0.1"
+  :version          "0.0.3"
+  
   :long-description "This is a common-lisp implementation of the CTrie unordered map
                      data-structure described in the paper 'Concurrent Tries with
                      Efficient Non-Blocking Snapshots, (c) ACM 2-25-2012' by Prokopec,
@@ -62,18 +63,34 @@
                      also well instrumented with lock-free, atomic primitives, although
                      this is not necessarily a high priority for the initial development
                      cycle."
-  :weakly-depends-on (:lparallel)
-  :depends-on (:alexandria :lisp-unit)
+  
+  :weakly-depends-on (:cl-store :donuts :cldoc)
+  :depends-on (:alexandria :lisp-unit :local-time)
   :components ((:static-file  "cl-ctrie.asd")
                 (:static-file "readme.md")
                 (:file "ctrie-package")
+                (:file "ctrie-cas")
                 (:file "ctrie-util")
-                (:file "ctrie")
-                (:file "ctrie-test")))
+                (:file "ctrie")))
+
+
+
+(asdf:defsystem :cl-ctrie-test
+  :serial t
+  :depends-on (:cl-ctrie :lparallel)
+  :components ((:file "ctrie-test")))
+
 
 (defmethod asdf:perform ((o asdf:test-op) (c (eql (asdf:find-system :cl-ctrie))))
-  (asdf:load-system :cl-ctrie)
-  (funcall (intern (symbol-name :run-ctrie-tests) (find-package :cl-ctrie))))
+  (asdf:load-system :cl-ctrie-test)
+  (funcall (intern (symbol-name :run-ctrie-tests) (find-package :cl-ctrie-test))))
+
+(defmethod asdf:perform ((o asdf:test-op) (c (eql (asdf:find-system :cl-ctrie-test))))
+  (asdf:load-system :cl-ctrie-test)
+  (funcall (intern (symbol-name :run-ctrie-tests) (find-package :cl-ctrie-test))))
 
 (defmethod asdf:operation-done-p ((o asdf:test-op) (c (eql (asdf:find-system :cl-ctrie))))
+  nil)
+
+(defmethod asdf:operation-done-p ((o asdf:test-op) (c (eql (asdf:find-system :cl-ctrie-test))))
   nil)

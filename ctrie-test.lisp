@@ -1,7 +1,26 @@
 ;;;;; -*- mode: common-lisp;   common-lisp-style: modern;    coding: utf-8; -*-
 ;;;;;
 
-(in-package :ctrie)
+
+(eval-when (:load-toplevel :compile-toplevel :execute)
+  (macrolet ((define-package (name doc &rest packages)
+               `(defpackage ,name
+                  (:documentation ,doc)
+                  (:use :common-lisp :lisp-unit :lparallel ,@packages)
+                  (:export :run-ctrie-tests)
+                  ,@(loop :for pkg :in packages :collect
+                      `(:import-from ,pkg ,@(loop :for sym :being :the :symbols :in pkg
+                                              :collect (make-symbol (string sym))))))))
+    (define-package #:cl-ctrie-test
+      "This is a testing sandbox for the system :cl-ctrie"
+      :cl-ctrie))) 
+
+(in-package :cl-ctrie-test)
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; RUN-CTRIE-TESTS entry point
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defun run-ctrie-tests ()
   (let* ((banner (format nil "Starting test run on ~A" (sb-int:format-universal-time
@@ -13,9 +32,193 @@
     (finish-output))
   (values))
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Scaffolding
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+(defmacro with-hash-tables (&body body)
+  `(flet ((make-table (&key (test #'eql))
+            (make-hash-table :synchronized t :test test))
+           (table-clear (tbl)
+             (sb-ext:with-locked-hash-table (tbl)
+               (clrhash tbl)))
+           (table-get (tbl k)
+             (sb-ext:with-locked-hash-table (tbl)
+               (gethash k tbl)))
+           (table-put (tbl k v)
+             (sb-ext:with-locked-hash-table (tbl)             
+               (setf (gethash k tbl) v)))
+           (table-drop (tbl k)
+             (sb-ext:with-locked-hash-table (tbl)
+               (remhash k tbl)))
+           (table-map (fn tbl)
+             (sb-ext:with-locked-hash-table (tbl)
+               (maphash fn tbl))))
+     ,@body))
+
+
+(defmacro with-ctrie-tables (&body body)
+  `(flet ((make-table (&key (test #'eql))
+            (make-ctrie :test test))
+           (table-get (tbl k)
+             (ctrie-get tbl k))
+           (table-put (tbl k v)
+             (setf (ctrie-get tbl k) v))
+           (table-drop (tbl k)
+             (ctrie-drop tbl k))
+           (table-map (fn tbl)
+             (ctrie-map tbl fn)))
+     ,@body))
+
+
+(define-test check-table-abstraction-fixtures
+  (assert-equalp (values "1" t)
+    (with-hash-tables
+      (let1 ht (make-table) x
+        (table-put ht 1 "1")
+        (table-get ht 1))))
+  (assert-equalp (values "1" t)
+    (with-ctrie-tables
+      (let1 ct (make-table) x
+        (table-put ct 1 "1")
+        (table-get ct 1)))))
+
+
+(defun collect-timing (thunk)
+  "Executes THUNK and returns a timing-info object specifying how long
+  execution took and how much memory was used. Implementation of
+  collect-timing for SBCL. This code is a cut and paste adoption from
+  from sbcl/src/code/time.lisp"
+  (declare (type function thunk))
+  
+  (let (old-run-utime       new-run-utime       old-run-stime
+         new-run-stime       old-real-time       new-real-time
+         old-page-faults     new-page-faults     real-time-overhead
+         run-utime-overhead  run-stime-overhead  page-faults-overhead
+         old-bytes-consed    new-bytes-consed    cons-overhead)
+    
+    (multiple-value-setq                ;; Calculate the overhead...
+      (old-run-utime old-run-stime old-page-faults old-bytes-consed)
+      (sb-impl::time-get-sys-info))
+
+    (multiple-value-setq                ;; Do it a second time
+      (old-run-utime old-run-stime old-page-faults old-bytes-consed)
+      (sb-impl::time-get-sys-info))    
+
+    (multiple-value-setq
+      (new-run-utime new-run-stime new-page-faults new-bytes-consed)
+      (sb-impl::time-get-sys-info))
+    
+    (setq run-utime-overhead   (- new-run-utime old-run-utime))
+    (setq run-stime-overhead   (- new-run-stime old-run-stime))
+    (setq page-faults-overhead (- new-page-faults old-page-faults))
+    (setq old-real-time        (get-internal-real-time))
+    (setq old-real-time        (get-internal-real-time))
+    (setq new-real-time        (get-internal-real-time))
+    (setq real-time-overhead   (- new-real-time old-real-time))
+    (setq cons-overhead        (- new-bytes-consed old-bytes-consed))
+
+    (multiple-value-setq                ;; Now get the initial times.
+      (old-run-utime old-run-stime old-page-faults old-bytes-consed)
+      (sb-impl::time-get-sys-info))    
+    (setq old-real-time (get-internal-real-time))
+    
+    (let ((start-gc-run-time sb-impl::*gc-run-time*)
+           result timing)
+      (progn
+        (setq result (multiple-value-list (funcall thunk)))
+        (multiple-value-setq
+          (new-run-utime new-run-stime new-page-faults new-bytes-consed)
+          (sb-impl::time-get-sys-info))        
+        (setq new-real-time (- (get-internal-real-time) real-time-overhead))
+        
+        (let ((gc-run-time (max (- sb-impl::*gc-run-time* start-gc-run-time) 0)))          
+          (setq timing
+            (list
+              :real-time     (max (- new-real-time old-real-time) 0.0)
+              :user-time     (max (/ (- new-run-utime old-run-utime) 1000.0) 0.0)
+              :system-time   (max (/ (- new-run-stime old-run-stime) 1000.0) 0.0)
+              :gc-time       (float gc-run-time)
+              :page-faults   (max (- new-page-faults old-page-faults) 0)
+              :bytes-consed  (max (- new-bytes-consed old-bytes-consed) 0))))))))
+
+
+(defmacro with-timing-collected-runs ((num) &body body)
+  "automate agregation of metrics collected over NUM iterations of the
+   execution of code in BODY via 'collect-timing'"
+  (with-gensyms (iter)
+    `(let ((,iter ,num))
+       (loop repeat ,iter collect (collect-timing (lambda () ,@body))))))
+
+
+(defun collate-timing (result-list)
+  (loop
+    with iter = (length result-list)
+    for run in result-list
+    summing (getf run :real-time) into total-real-time
+    summing (getf run :user-time) into total-user-time
+    summing (getf run :system-time) into total-system-time
+    summing (getf run :gc-time) into total-gc-time
+    summing (getf run :page-faults) into total-page-faults
+    summing (getf run :bytes-consed) into total-bytes-consed
+    maximizing (getf run :real-time) into max-real-time
+    maximizing (getf run :user-time) into max-user-time
+    maximizing (getf run :system-time) into max-system-time
+    maximizing (getf run :gc-time) into max-gc-time
+    maximizing (getf run :page-faults) into max-page-faults
+    maximizing (getf run :bytes-consed) into max-bytes-consed
+    minimizing (getf run :real-time) into min-real-time
+    minimizing (getf run :user-time) into min-user-time
+    minimizing (getf run :system-time) into min-system-time
+    minimizing (getf run :gc-time) into min-gc-time
+    minimizing (getf run :page-faults) into min-page-faults
+    minimizing (getf run :bytes-consed) into min-bytes-consed
+    finally (return
+              `(:real-time     (:max ,max-real-time
+                                 :min ,min-real-time
+                                 :avg ,(/ total-real-time iter))
+                 :user-time    (:max ,max-user-time
+                                 :min ,min-user-time
+                                 :avg ,(/ total-user-time iter))
+                 :system-time  (:max ,max-system-time
+                                 :min ,min-system-time
+                                 :avg ,(/ total-system-time iter))
+                 :gc-time      (:max ,max-gc-time
+                                 :min ,min-gc-time
+                                 :avg ,(/ total-gc-time iter))
+                 :page-faults  (:max ,max-page-faults
+                                 :min ,min-page-faults
+                                 :avg ,(/ total-page-faults iter))
+                 :bytes-consed (:max ,max-bytes-consed
+                                 :min ,min-bytes-consed
+                                 :avg ,(/ total-bytes-consed iter))))))
+
+
+(define-test check-timing-collection-fixtures
+  (let1 stats (collate-timing (with-timing-collected-runs (5) t))
+    (loop for major in '(:REAL-TIME :USER-TIME :SYSTEM-TIME :GC-TIME
+                          :PAGE-FAULTS :BYTES-CONSED) 
+      do (loop for minor in '(:MAX :MIN :AVG) 
+           do (assert-true (numberp (getf (getf stats major) minor)))))))
+
+
+(define-test check-byte-vector-hex-string-roundrip
+  (loop repeat 10 do
+    (let* ((bv0 (create-unique-id-byte-vector))
+            (bv1 (hex-string-to-byte-vector (byte-vector-to-hex-string bv0))))
+      (assert-equalp bv0 bv1))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Tests
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
 (define-test check-atomic-update
   ;; Guaranteed to be (:COUNT . 1000000) -- if you replace
-  ;; atomic update with (INCF (CDR X)) above, the result becomes
+  ;; atomic update with (INCF (CDR X)), the result becomes
   ;; unpredictable.
   (let ((x (cons :count 0)))
     (mapc #'sb-thread:join-thread
@@ -120,35 +323,37 @@
         for rest = (lnode-removed ln i 'eql) then (lnode-removed rest i 'eql)
         do (assert-eql remain (lnode-length rest))))))
   
-
-(defun test-cas-ctrie-root (&optional (iterations 10))
-  (assert (notany #'null (loop for ct in
-                           (list (make-ctrie) (make-ctrie :root (make-inode 0))
-                             (make-ctrie
-                               :root (make-inode
-                                       :ref (%make-cnode
-                                              :bitmap (random 32)
-                                              :arcs (iota (random 32))))))
-                           do (cas-ctrie-root ct (make-inode :ref 42))
-                           collect (inode-ref (ctrie-root ct)))))
-  (loop repeat iterations
-    with value-cases = (list
-                         nil
-                         (make-inode :ref (gensym))
-                         (make-inode :ref (make-cnode))
-                         (make-inode :ref (%make-cnode :arcs (make-gensym-list (random 32)))))
-    with ctrie-cases = (list
-                        (make-ctrie)
-                        (make-ctrie :root (make-inode 0))
-                        (make-ctrie :root (make-inode :ref (random 255)))
-                        (make-ctrie :root (make-inode :ref (%make-cnode :arcs (iota (random 32))))))
-    for ct = (random-elt ctrie-cases) then (random-elt ctrie-cases)
-    for vt = (random-elt value-cases) then (random-elt value-cases)
-    collect ct into test-cases
-    do (cas-ctrie-root ct vt)
-    collect (ctrie-root ct) into test-results
-    finally (assert (length= test-cases test-results))  
-    (return (values test-cases test-results))))
+;; #+()
+;;           ;; alloc     stream-length          :extend nil           
+;;           (open-mmap-stream file *mmap-size* :element-type element-type :extend nil))
+;; (defun test-cas-ctrie-root (&optional (iterations 10))
+;;   (assert (notany #'null (loop for ct in
+;;                            (list (make-ctrie) (make-ctrie :root (make-inode 0))
+;;                              (make-ctrie
+;;                                :root (make-inode
+;;                                        :ref (%make-cnode
+;;                                               :bitmap (random 32)
+;;                                               :arcs (iota (random 32))))))
+;;                            do (cas-ctrie-root ct (make-inode :ref 42))
+;;                            collect (inode-ref (ctrie-root ct)))))
+;;   (loop repeat iterations
+;;     with value-cases = (list
+;;                          nil
+;;                          (make-inode :ref (gensym))
+;;                          (make-inode :ref (make-cnode))
+;;                          (make-inode :ref (%make-cnode :arcs (make-gensym-list (random 32)))))
+;;     with ctrie-cases = (list
+;;                         (make-ctrie)
+;;                         (make-ctrie :root (make-inode 0))
+;;                         (make-ctrie :root (make-inode :ref (random 255)))
+;;                         (make-ctrie :root (make-inode :ref (%make-cnode :arcs (iota (random 32))))))
+;;     for ct = (random-elt ctrie-cases) then (random-elt ctrie-cases)
+;;     for vt = (random-elt value-cases) then (random-elt value-cases)
+;;     collect ct into test-cases
+;;     do (cas-ctrie-root ct vt)
+;;     collect (ctrie-root ct) into test-results
+;;     finally (assert (length= test-cases test-results))  
+;;     (return (values test-cases test-results))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

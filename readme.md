@@ -60,3 +60,15 @@ compare-and-swap functionality, notably LispWorks 5.x/6.x, which is
 also well instrumented with lock-free, atomic primitives, although
 this is not necessarily a high priority for the initial development
 cycle.
+
+### Current Status
+
+
+### Ctrie Structure
+
+```common-lisp
+
+```
+
+### User API
+
