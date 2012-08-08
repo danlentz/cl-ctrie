@@ -67,33 +67,34 @@ TODO
 
 ### Ideosyncrasies
 
-Perhaps most ideosyncrasies of this ctrie implementation as compared
-with the [original](http://github.com/axel22/Ctries), written in
-Scala, result from the efforts I have taken to, where feasible, adopt
-an approach emphasizing more functional oriented decomposition of the
-algortithm, written in a manner more closely representative of
-ideomatic, common-lisp coding style.  For example, rather than expose
-a general purpose GCAS and RDCSS api, these protocols are incorporated
-into ctrie-specific abstractions. For __GCAS__ the exposed api
-includes: `INODE-READ` `INODE-MUTATE` and `INODE-COMMIT` and for
-__RDCSS:__ `ROOT-NODE-ACCESS` `ROOT-NODE-REPLACE` and
-`ROOT-NODE-COMMIT.` The liberties I have taken have the intended
-benefit of providing an interface that is much easier to digest,
-understand, remember, and work with (at least for me) than direct
-exposure in imperative style of the intricate mechanations that
-underlie the ctrie algorithm.  On the other hand, the further one
-strays from a direct translation of the original (verified) ctrie
-implementation, the greater the likelihood of introducing bugs into an
-environment (lock-free concurrent data structure development) in which
-bugs can be extremely subtle and are notoriously difficult to detect.
-I have attempted to strike an appropriate balance between these
-conflicting concerns, and I intend to mitigate the risk, at least in
-part, through development of a more extensive arsenal of regression
-tests and benchmarking facilities.
+Perhaps most ideosyncrasies of this common-lisp ctrie implementation
+as compared with the [original](http://github.com/axel22/Ctries),
+written in Scala, result from the efforts I have taken to, where
+feasible, adopt an approach emphasizing a more functional oriented
+decomposition of the algortithm, written in a manner that is more
+closely representative of ideomatic, common-lisp coding style.  For
+example, rather than expose a general purpose GCAS and RDCSS api,
+these protocols are incorporated into ctrie-specific abstractions. For
+__GCAS__ the exposed api includes: `INODE-READ` `INODE-MUTATE` and
+`INODE-COMMIT` and for __RDCSS:__ `ROOT-NODE-ACCESS`
+`ROOT-NODE-REPLACE` and `ROOT-NODE-COMMIT.` The liberties I have taken
+have the intended benefit of providing an interface that is much
+easier to digest, understand, remember, and work with (at least for
+me) than direct exposure in imperative style of the intricate
+mechanations that underlie the ctrie algorithm.  On the other hand,
+the further one strays from a direct translation of the original
+(verified) ctrie implementation, the greater the likelihood of
+introducing bugs into an environment (lock-free concurrent data
+structure development) in which bugs can be extremely subtle and
+notoriously difficult to detect.  I have attempted to strike an
+appropriate balance between these conflicting concerns, and I intend
+to mitigate the risk, at least in part, through continued development
+of an extensive arsenal of regression tests and benchmarking
+facilities.
 
 In addition, there are a few differences in the feature set that
-is provided, such as a suite of mapping operators in leiu of a
-Java style iterator.  For the most part I expect that these
+is provided -- such as a suite of mapping operators in leiu of a
+Java-style Iterator.  For the most part I expect that these
 changes will be preferable to developers accustomed to a more
 'lispy' coding style.
 
@@ -151,12 +152,12 @@ incorporated via USE-PACKAGE or equivalent package definition.  The
 following definitions comprise a quick reference to the the public
 user api:
 
-* * * * *
+* * * * * *
 
 _[structure]_        `CTRIE ()`
 
 > A CTRIE root container uniquely identifies a CTRIE instance, and
-  contains the following perameters which specify the customizable
+  contains the following perameters which specify the definable
   aspects of each CTRIE:
    - `READONLY-P` if not `NIL` prohibits any future modification or
   cloning of this instance.
@@ -178,10 +179,47 @@ _[structure]_        `CTRIE ()`
   structure that maintains the reference to the contents of the ctrie
   proper.  The ctrie-root must only be accessed using the _RDCSS ROOT
   NODE PROTOCOL_ defined by the top-level entry-points `ROOT-NODE-ACCESS`
-  and `ROOT-NODE-COMMIT`
+  and `ROOT-NODE-REPLACE`
 
 
-_[function]_         `CTRIE-CLEAR  (CTRIE)`
+_[function]_         `MAKE-CTRIE  (&REST ARGS &KEY NAME ROOT (READONLY-P NIL)
+                                   (TEST 'EQUAL) (HASH 'SXHASH))`
+
+> CREATE a new CTRIE instance. This is the entry-point constructor api
+  intended for use by the end-user.
+
+
+_[function]_         `CTRIE-P  (OBJECT)`
+
+> Returns T if the specified object is of type ctrie.
+
+
+_[function]_         `CTRIE-TEST  (CTRIE)`
+
+> Returns the test of the specified ctrie
+
+
+
+_[function]_         `CTRIE-HASH  (CTRIE)`
+
+> Returns the hash of the specified ctrie
+
+
+
+_[function]_         `CTRIE-READONLY-P  (CTRIE)`
+
+> Returns and (with setf) changes the readonly-p of the specified ctrie
+
+
+
+_[function]_         `CTRIE-PUT  (CTRIE KEY VALUE)`
+
+_[function]_         `CTRIE-GET  (CTRIE KEY)`
+
+_[function]_         `CTRIE-DROP  (CTRIE KEY)`
+
+> Remove KEY and it's value from the CTRIE.
+
 
 _[macro]_            `CTRIE-DO  ((KEY VALUE CTRIE &KEY ATOMIC) &BODY BODY)`
 
@@ -190,19 +228,23 @@ _[macro]_            `CTRIE-DO  ((KEY VALUE CTRIE &KEY ATOMIC) &BODY BODY)`
               (format t "~&~8S => ~10S~%" k v))
 
 
-_[function]_         `CTRIE-DROP  (CTRIE KEY)`
+_[function]_         `CTRIE-MAP  (CTRIE FN &KEY ATOMIC &AUX ACCUM)`
 
-> Remove KEY and it's value from the CTRIE.
+_[function]_         `CTRIE-MAP-KEYS  (CTRIE FN &KEY ATOMIC)`
 
+_[function]_         `CTRIE-MAP-VALUES  (CTRIE FN &KEY ATOMIC)`
 
-_[function]_         `CTRIE-EMPTY-P  (CTRIE)`
+_[generic-function]_ `CTRIE-MAP-INTO  (CTRIE PLACE FN)`
 
-_[function]_         `CTRIE-ENSURE-GET  (CTRIE KEY DEFAULT)`
+_[function]_         `CTRIE-KEYS  (CTRIE &KEY ATOMIC)`
 
-> Like CTRIE-GET, but if KEY is not found in CTRIE, automatically adds 
-   the entry (KEY. DEFAULT). Secondary return value is true if key was
-   already in the table.
+_[function]_         `CTRIE-VALUES  (CTRIE &KEY ATOMIC)`
 
+_[function]_         `CTRIE-SIZE  (CTRIE &AUX (ACCUM 0))`
+
+_[function]_         `CTRIE-CLEAR  (CTRIE)`
+
+_[function]_         `CTRIE-PPRINT  (CTRIE &OPTIONAL (STREAM T))`
 
 _[macro]_            `CTRIE-ERROR  (CTRIE CONDITION &REST ARGS)`
 
@@ -214,13 +256,9 @@ _[condition]_        `CTRIE-ERROR (ERROR)`
 > Abstract superclass of CTRIE related conditions.
 
 
-_[method]_           `CTRIE-EXPORT  ((CTRIE CTRIE) (PLACE HASH-TABLE) &KEY)`
+_[function]_         `CTRIE-TO-ALIST  (CTRIE &KEY ATOMIC)`
 
-_[method]_           `CTRIE-EXPORT  ((CTRIE CTRIE) (PLACE PATHNAME) &KEY)`
-
-_[generic-function]_ `CTRIE-EXPORT  (CTRIE PLACE &KEY &ALLOW-OTHER-KEYS)`
-
-_[function]_         `CTRIE-FROM-ALIST  (ALIST)`
+_[function]_         `CTRIE-TO-HASHTABLE  (CTRIE &KEY ATOMIC)`
 
 _[function]_         `CTRIE-FROM-HASHTABLE  (HASHTABLE)`
 
@@ -228,19 +266,23 @@ _[function]_         `CTRIE-FROM-HASHTABLE  (HASHTABLE)`
   test function as HASHTABLE
 
 
-_[condition]_        `CTRIE-GENERATIONAL-MISMATCH (CTRIE-STRUCTURAL-ERROR)`
+_[function]_         `CTRIE-FROM-ALIST  (ALIST)`
 
-> Condition indicating an operation encountered an
-   outdated or inconsistent node during its attempted traversal
+_[function]_         `CTRIE-EMPTY-P  (CTRIE)`
 
+_[method]_           `CTRIE-SAVE  ((CTRIE CTRIE) (PLACE PATHNAME) &KEY)`
 
-_[function]_         `CTRIE-GET  (CTRIE KEY)`
+_[generic-function]_ `CTRIE-SAVE  (CTRIE PLACE &KEY &ALLOW-OTHER-KEYS)`
 
-_[function]_         `CTRIE-HASH  (CTRIE)`
+_[method]_           `CTRIE-LOAD  ((PLACE PATHNAME) &KEY)`
 
-> Returns and (with setf) changes the hash of the specified ctrie
+_[generic-function]_ `CTRIE-LOAD  (PLACE &KEY &ALLOW-OTHER-KEYS)`
 
+_[method]_           `CTRIE-EXPORT  ((CTRIE CTRIE) (PLACE HASH-TABLE) &KEY)`
 
+_[method]_           `CTRIE-EXPORT  ((CTRIE CTRIE) (PLACE PATHNAME) &KEY)`
+
+_[generic-function]_ `CTRIE-EXPORT  (CTRIE PLACE &KEY &ALLOW-OTHER-KEYS)`
 
 _[method]_           `CTRIE-IMPORT  ((PLACE HASH-TABLE) &KEY)`
 
@@ -248,25 +290,36 @@ _[method]_           `CTRIE-IMPORT  ((PLACE PATHNAME) &KEY)`
 
 _[generic-function]_ `CTRIE-IMPORT  (PLACE &KEY &ALLOW-OTHER-KEYS)`
 
-_[condition]_        `CTRIE-INVALID-DYNAMIC-CONTEXT (CTRIE-OPERATIONAL-ERROR)`
+_[function]_         `CTRIE-SNAPSHOT  (CTRIE &KEY READ-ONLY)`
 
-> Condition indicating an operation was attempted
-   outside the dynamic extent of a valid enclosing WITH-CTRIE form
+_[macro]_            `CTRIE-ERROR  (CTRIE CONDITION &REST ARGS)`
+
+> Signal a CTRIE related condition.
 
 
-_[function]_         `CTRIE-KEYS  (CTRIE &KEY ATOMIC)`
+_[condition]_        `CTRIE-ERROR (ERROR)`
 
-_[method]_           `CTRIE-LOAD  ((PLACE PATHNAME) &KEY)`
+> Abstract superclass of CTRIE related conditions.
 
-_[generic-function]_ `CTRIE-LOAD  (PLACE &KEY &ALLOW-OTHER-KEYS)`
 
-_[function]_         `CTRIE-MAP  (CTRIE FN &KEY ATOMIC &AUX ACCUM)`
+_[condition]_        `CTRIE-STRUCTURAL-ERROR (CTRIE-ERROR)`
 
-_[generic-function]_ `CTRIE-MAP-INTO  (CTRIE PLACE FN)`
+> Condition designating that the CTRIE data structure
+   has been determined to be invalid.
 
-_[function]_         `CTRIE-MAP-KEYS  (CTRIE FN &KEY ATOMIC)`
 
-_[function]_         `CTRIE-MAP-VALUES  (CTRIE FN &KEY ATOMIC)`
+_[condition]_        `CTRIE-OPERATIONAL-ERROR (CTRIE-ERROR)`
+
+> Conditixon for when an operational failure or
+  inconsistency has occurred.
+
+
+_[condition]_        `CTRIE-OPERATION-RETRIES-EXCEEDED (CTRIE-OPERATIONAL-ERROR)`
+
+> Condition indicating an operation has failed the
+   maximum number of times specified by the special-variable
+   *retries*
+
 
 _[condition]_        `CTRIE-NOT-IMPLEMENTED (CTRIE-ERROR)`
 
@@ -281,62 +334,19 @@ _[condition]_        `CTRIE-NOT-SUPPORTED (CTRIE-ERROR)`
   deliberately not supported.
 
 
-_[condition]_        `CTRIE-OPERATION-RETRIES-EXCEEDED (CTRIE-OPERATIONAL-ERROR)`
+_[condition]_        `CTRIE-INVALID-DYNAMIC-CONTEXT (CTRIE-OPERATIONAL-ERROR)`
 
-> Condition indicating an operation has failed the
-   maximum number of times specified by the special-variable
-   *retries*
-
-
-_[condition]_        `CTRIE-OPERATIONAL-ERROR (CTRIE-ERROR)`
-
-> Conditixon for when an operational failure or
-  inconsistency has occurred.
+> Condition indicating an operation was attempted
+   outside the dynamic extent of a valid enclosing WITH-CTRIE form
 
 
-_[function]_         `CTRIE-PPRINT  (CTRIE &OPTIONAL (STREAM T))`
+_[condition]_        `CTRIE-GENERATIONAL-MISMATCH (CTRIE-STRUCTURAL-ERROR)`
 
-_[function]_         `CTRIE-PUT  (CTRIE KEY VALUE)`
-
-_[function]_         `CTRIE-READONLY-P  (CTRIE)`
-
-> Returns and (with setf) changes the readonly-p of the specified ctrie
+> Condition indicating an operation encountered an
+   outdated or inconsistent node during its attempted traversal
 
 
-
-_[method]_           `CTRIE-SAVE  ((CTRIE CTRIE) (PLACE PATHNAME) &KEY)`
-
-_[generic-function]_ `CTRIE-SAVE  (CTRIE PLACE &KEY &ALLOW-OTHER-KEYS)`
-
-_[function]_         `CTRIE-SIZE  (CTRIE &AUX (ACCUM 0))`
-
-_[function]_         `CTRIE-SNAPSHOT  (CTRIE &KEY READ-ONLY)`
-
-_[condition]_        `CTRIE-STRUCTURAL-ERROR (CTRIE-ERROR)`
-
-> Condition designating that the CTRIE data structure
-   has been determined to be invalid.
-
-
-_[function]_         `CTRIE-TEST  (CTRIE)`
-
-> Returns and (with setf) changes the test of the specified ctrie
-
-
-
-_[function]_         `CTRIE-TO-ALIST  (CTRIE &KEY ATOMIC)`
-
-_[function]_         `CTRIE-TO-HASHTABLE  (CTRIE &KEY ATOMIC)`
-
-_[function]_         `CTRIE-VALUES  (CTRIE &KEY ATOMIC)`
-
-_[function]_         `MAKE-CTRIE  (&REST ARGS &KEY NAME ROOT (READONLY-P NIL)
-                                   (TEST 'EQUAL) (HASH 'SXHASH))`
-
-> CREATE a new CTRIE instance. This is the entry-point constructor api
-  intended for use by the end-user.
-
-
+* * * * * *
 
 #### Internal Reference (abridged)
 
@@ -351,4 +361,820 @@ documentation](doc/api/index.html) of all symbols is also provided,
 and should be considered the authoratative reference to the CL-CTRIE
 implementation.
 
-* * * * *
+* * * * * *
+
+_[special-variable]_ `*CTRIE*  (NIL)`
+
+> Within the dynamic extent of a CTRIE operation this variable will
+  be bound to the root-container CTRIE operand.  It is an error if an
+  operation is defined that attempts access to a CTRIE without this
+  binding, which is properly established by wrapping the operation in
+  an appropriate WITH-CTRIE form.
+
+
+_[special-variable]_ `*RETRIES*  (16)`
+
+> Establishes the number of restarts permitted to a CTRIE operation
+  established by a WITH-CTRIE form before a condition of type
+  CTRIE-OPERATION-RETRIES-EXCEEDED will be signaled, aborting the
+  operatation, and requiring operator intervention to resume
+  processing.
+
+
+_[special-variable]_ `*TIMEOUT*  (2)`
+
+> Establishes the duration (in seconds) allotted to a CTRIE operation
+  established by a WITH-CTRIE form before a condition of type
+  CTRIE-OPERATION-TIMEOUT-EXCEEDED will be signaled, aborting the
+  operatation, and requiring operator intervention to resume
+  processing.
+
+
+_[macro]_            `MULTI-CATCH  (TAG-LIST &BODY FORMS)`
+
+> Macro allowing catch of multiple tags at once and
+    finding out which tag was thrown.
+    * RETURNS: (values RESULT TAG)
+       -  RESULT is either the result of evaluationg FORMS or the value
+          thrown by the throw form.
+       -  TAG is NIl if evaluation of the FORMS completed normally
+          or the tag thrown and cought.
+    * EXAMPLE:
+    ;;; (multiple-value-bind (result tag)
+    ;;;            (multi-catch (:a :b)
+    ;;;                 ...FORMS...)
+    ;;;              (case tag 
+    ;;;                 (:a ...)
+    ;;;                 (:b ...)
+    ;;;                 (t ...)))
+
+
+_[macro]_            `CATCH-CASE  (FORM &REST CASES)`
+
+> User api encapsulating the MULTI-CATCH control-structure in a
+    syntactic format that is identical to that of the familiar CASE
+    statement, with the addition that within the scope of each CASE
+    clause, a lexical binding is established between the symbol IT and
+    the value caught from the throw form.
+
+
+_[structure]_        `CTRIE ()`
+
+> A CTRIE root container uniquely identifies a CTRIE instance, and
+  contains the following perameters which specify the definable
+  aspects of each CTRIE:
+   - `READONLY-P` if not `NIL` prohibits any future modification or
+  cloning of this instance.
+   - `TEST` is a designator for an equality predicate that will be
+  applied to disambiguate and determine the equality of any two
+  keys. It is recommened that this value be a symbol that is fboundp,
+  to retain capability of externalization (save/restore). At present,
+  though, this is not enforced and a function object or lambda
+  expression will also be accepted, albeit without the ability of
+  save/restore.
+   - `HASH` is a designator for a hash function, which may be
+  desirable to customize when one has specific knowledge about the set
+  of keys which will populate the table.  At this time, a 32-bit hash
+  is recommended as this is what has been used for development and
+  testing and has been shown to provide good performance in
+  practice. As with `TEST` it is recommended that `HASH` be specified
+  by a symbol that is fboundp.
+   - `ROOT` is the slot used internally for storage of the root inode
+  structure that maintains the reference to the contents of the ctrie
+  proper.  The ctrie-root must only be accessed using the _RDCSS ROOT
+  NODE PROTOCOL_ defined by the top-level entry-points `ROOT-NODE-ACCESS`
+  and `ROOT-NODE-REPLACE`
+
+
+_[function]_         `CTRIE-P  (OBJECT)`
+
+> Returns T if the specified object is of type ctrie.
+
+
+_[function]_         `CTRIE-HASH  (CTRIE)`
+
+> Returns the hash of the specified ctrie
+
+
+
+_[function]_         `CTRIE-TEST  (CTRIE)`
+
+> Returns the test of the specified ctrie
+
+
+
+_[function]_         `CTRIE-READONLY-P  (CTRIE)`
+
+> Returns and (with setf) changes the readonly-p of the specified ctrie
+
+
+
+_[function]_         `CTHASH  (KEY)`
+
+> Compute the hash value of KEY using the hash function defined by
+  the CTRIE designated by the innermost enclosing WITH-CTRIE form.
+
+
+_[function]_         `CTEQUAL  (X Y)`
+
+> Test the equality of X and Y using the equality predicate defined
+  by the CTRIE designated by the innermost enclosing WITH-CTRIE form.
+
+
+_[macro]_            `WITH-CTRIE  (&ONCE CTRIE &BODY BODY)`
+
+> Configure the dynamic environment with the appropriate condition handlers,
+  control fixtures, and instrumentation necessary to perform the
+  operations in BODY on the specified CTRIE. Unless specifically
+  documented, the particular configuration of this dynamic environment
+  should be considered an implementation detail and not relied upon. A
+  particular exception, however, is that within the dynamic extent of
+  a WITH-CTRIE form, the code implementing a CTRIE operation may
+  expect that the special variable *CTRIE* will be bound to the root
+  container of CTRIE operated upon.  See also the documentation for
+  '*CTRIE*'
+
+
+_[function]_         `FLAG  (KEY LEVEL)`
+
+> For a given depth, LEVEL, within a CTRIE, extract the correspondant
+  sequence of bits from the computed hash of KEY that indicate the
+  logical index of the arc on the path to which that key may be found.
+  Note that the logical index of the arc is most likely not the same
+  as the physical index where it is actually located -- for that see
+  `FLAG-ARC-POSITION`
+
+
+_[function]_         `FLAG-PRESENT-P  (FLAG BITMAP)`
+
+> Tests the (fixnum) BITMAP representing the logical index of all
+  arcs present in a CNODE for the presence of a particular arc whose
+  logical index is represented by FLAG.
+
+
+_[function]_         `FLAG-ARC-POSITION  (FLAG BITMAP)`
+
+> Given FLAG representing the logical index of an arc, and BITMAP
+  representing all arcs present, compute a physical index for FLAG in
+  such a manner as to always ensure all arcs map uniquely and
+  contiguously to the smallest vector that can contain the given
+  arcs.
+
+
+_[function]_         `FLAG-VECTOR  (&OPTIONAL (CONTENT 0))`
+
+> FLAG-VECTOR is a bit-vector representation of the (fixnum)
+  BITMAP. It is currently not used for any calculation, however it is
+  included within each CNODE as a convenience because it makes it
+  immediately clear from visual inspection which logical arc indexes
+  are represented in the node. For example, from the bit-vector
+  `#*10010000000000000000000000000000` one can easily see that the first
+  and fourth positions are occupied, and the rest empty.
+
+
+_[structure]_        `REF ()`
+
+> Atomically Stamped Reference structure _[Herlithy, TAOMP]_ that
+  encapsulates the mutable slots within an inode. Any specific `REF`
+  structure is, itself, never mutated.  Using the `REF` structure
+  as basis of inode implementation provides the capability to 'bundle'
+  additional metadata in an inode while still providing atomic compare
+  and swap using a single comparison of the aggregate `REF` instance.
+   - `STAMP` defines a slot containing implementation-specific metadata
+     that may be maintained internally as a means of tracking inode
+     modification and update behavior.  It should not be referenced by
+     user code, and the format of its contents should not be relied apon.
+   - `VALUE` defines a slot that contains a reference to the MAIN-NODE
+     that the enclosing inode should be interpreted as 'pointing to'
+   - `PREV` defines a slot which, during the `INODE-COMMIT` phase of the
+     _GCAS INODE PROTOCOL_ maintains a reference to the last valid
+     inode state, which may be restored, if necessary, during the
+     course of the `INODE-READ` / `INODE-COMMIT` arbitration process
+
+
+_[function]_         `REF-P  (OBJECT)`
+
+> Returns T if the specified object is of type ref.
+
+
+_[function]_         `REF-STAMP  (REF)`
+
+> Returns the stamp of the specified ref
+
+
+
+_[function]_         `REF-VALUE  (REF)`
+
+> Returns the value of the specified ref
+
+
+
+_[function]_         `REF-PREV  (REF)`
+
+> Returns and (with setf) changes the prev of the specified ref
+
+
+
+_[structure]_        `FAILED-REF (REF)`
+
+> A `FAILED-REF` is a structure that is used to preserve the linkage to
+  prior inode state following a failed GCAS.  Any inode access that
+  detects a `FAILED-REF` will immediately invoke a commit to restore the
+  inode to the state recorded in `FAILED-REF-PREV`
+
+
+_[function]_         `FAILED-REF-P  (OBJECT)`
+
+> Returns T if the specified object is of type failed-ref.
+
+
+_[structure]_        `INODE ()`
+
+> An INODE, or 'Indirection Node' is the mutable structure
+  representing the link between other 'main-node' structures found in
+  a ctrie.  An inode is the only type of node that may change the
+  value of its content during its lifetime.  In this implementation,
+  all such values as may change are encapsulated within a `REF`
+  substructure.  Each inode also contains a generational descriptor
+  object, comparible by identity only, which is used to identify the
+  state of synchronization between the inode and the current
+  'generation' indicated by the root inode at the base of the
+  CTRIE. As an inode may not change its 'gen identity' during its
+  lifetime, this disparity with the generation of the root node will
+  immediately result in the replacement of the inode with a new one
+  properly synchronized with the root's `GEN` object. In this
+  implementation, `GEN` objects are implemented by GENSYMS -- unique,
+  uninterned symbols which inherently provide very similar symantics
+  to those required of the generational descriptor.
+  - `GEN` defines a slot containing a generational descriptor object
+  - `REF` defines a slot containing a `REF` struct that encapsulates
+    the mutable content within an INODE
+
+
+_[function]_         `INODE-P  (OBJECT)`
+
+> Returns T if the specified object is of type inode.
+
+
+_[function]_         `INODE-GEN  (INODE)`
+
+> Returns the gen of the specified inode
+
+
+
+_[function]_         `INODE-REF  (INODE)`
+
+> Returns and (with setf) changes the ref of the specified inode
+
+
+
+_[function]_         `MAKE-INODE  (LINK-TO &OPTIONAL GEN STAMP PREV)`
+
+> Construct a new INODE that represents a reference to the value
+  provided by argument LINK-TO, optionally augmented with a specified
+  generational descriptor, timestamp, and/or previous state
+
+
+_[macro]_            `GCAS-COMPARE-AND-SET  (OBJ EXPECTED NEW EXPECTED-STAMP
+                                             NEW-STAMP PREV)`
+
+> A thin, macro layer abstraction over the basic compare-and-swap
+  primitive which provides a consistent interface to the underlying
+  inode structure and manages additional metadata, providing
+  reasonable defaults when they are not specified.
+
+
+_[function]_         `INODE-READ  (INODE)`
+
+> INODE-READ provides the top-level interface to the inode _GCAS ACCESS_
+  api, which is the mechanism which must be used to gain access to the
+  content of any NON-ROOT inode. For access to the root inode, refer
+  to the RDCSS inode api `ROOT-NODE-ACCESS`. Returns as four values,
+  the MAIN-NODE, the STAMP, the PREVIOUS STATE (if any), and the REF
+  structure encapsulated by the inode.
+
+
+_[function]_         `INODE-MUTATE  (INODE OLD-VALUE NEW-VALUE)`
+
+> INODE-MUTATE provides the top-level interface to the inode _GCAS
+  MODIFICATION_ api, which is the mechanism which must be used to
+  effect any change in a NON-ROOT inode.  For modification of the
+  root-inode, refer to the `ROOT-NODE-REPLACE` _RDCSS ROOT NODE
+  PROTOCOL_ Returns a boolean value which indicates the success or
+  failure of the modification attempt.
+
+
+_[function]_         `INODE-COMMIT  (INODE REF)`
+
+> INODE-COMMIT implements the _GCAS COMMIT_ protocol which is invoked
+  as necessary by the `INODE-READ` and `INODE-MUTATE` entry-points.  It is
+  not meant to be invoked directly, as this would most likely result
+  in corruption. Returns the `REF` structure representing the content of
+  whatever root inode wound up successfully committed -- either the
+  one requested, or one represented by a previous valid state
+
+
+_[function]_         `SNODE  (KEY VALUE)`
+
+> Construct a new SNODE which represents the mapping from
+  domain-element KEY to range-element VALUE.
+
+
+_[structure]_        `SNODE ()`
+
+> SNODE, i.e., 'Storage Node', is the LEAF-NODE structure ultimately
+  used for the storage of each key/value pair contained in the CTRIE.
+  An SNODE is considered to be immutable during its lifetime.
+   - `KEY` defines the slot containing an element of the map's domain.
+   - `VALUE` defines the slot containing the range-element mapped to `KEY`
+
+
+_[function]_         `SNODE-P  (OBJECT)`
+
+> Returns T if the specified object is of type snode.
+
+
+_[function]_         `SNODE-KEY  (SNODE)`
+
+> Returns the key of the specified snode
+
+
+
+_[function]_         `SNODE-VALUE  (SNODE)`
+
+> Returns the value of the specified snode
+
+
+
+_[structure]_        `LNODE ()`
+
+> LNODE, i.e., 'List Node', is a special structure used to enclose
+  SNODES in a singly-linked chain when the hash-codes of the
+  respective SNODE-KEYS collide, but those keys are determined to be
+  unique by the `CTRIE-TEST` function defined for that ctrie.  An
+  LNODE (and therefore a chain of LNODEs) is considered to be
+  immutable during its lifetime.  The order of the list is
+  implemented (arbitrarily) as most recently added first, analogous to
+  `CL:PUSH`
+   - `ELT` defines the slot containing an enclosed SNODE
+   - `NEXT` defines a slot referencing the next LNODE in the chain, or
+     `NIL` if no further LNODES remain.
+
+
+_[function]_         `LNODE-P  (OBJECT)`
+
+> Returns T if the specified object is of type lnode.
+
+
+_[function]_         `LNODE-ELT  (LNODE)`
+
+> Returns the elt of the specified lnode
+
+
+
+_[function]_         `LNODE-NEXT  (LNODE)`
+
+> Returns the next of the specified lnode
+
+
+
+_[function]_         `ENLIST  (&REST REST)`
+
+> Construct a chain of LNODE structures enclosing the values supplied.
+  It is assumed (elsewhere) that each of these values is a valid SNODE
+  structure.
+
+
+_[function]_         `LNODE-REMOVED  (ORIG-LNODE KEY TEST)`
+
+> Construct a chain of LNODE structures identical to the chain starting
+  with ORIG-LNODE, but with any LNODE containing an SNODE equal to KEY
+  removed.  Equality is tested as by the predicate function passed as
+  the argument TEST. The order of nodes in the resulting list will
+  remain unchanged.
+
+
+_[function]_         `LNODE-INSERTED  (ORIG-LNODE KEY VALUE TEST)`
+
+> Construct a chain of LNODE structures identical to the chain starting
+  with ORIG-LNODE, but ensured to contain an LNODE enclosing an SNODE mapping
+  KEY to VALUE.  If the given KEY equal to a key already present somewhere
+  in the chain (as compared with equality predicate TEST) it will be
+  replaced.  Otherwise a new LNODE will be added. In either case, the LNODE
+  containing `(SNODE KEY VAlUE)` will be the first node in the resulting
+  list
+
+
+_[function]_         `LNODE-SEARCH  (LNODE KEY TEST)`
+
+> Within the list of lnodes beginning with LNODE, return the range value
+  mapped by the first SNODE containing a key equal to KEY as determined
+  by equality predicate TEST, or `NIL` if no such key is found.  As a
+  second value, in order to support storage of `NIL` as a key, return `T` to
+  indicate that the KEY was indeed found during search, or `NIL` to indicate
+  that no such key was present in the list
+
+
+_[function]_         `LNODE-LENGTH  (LNODE)`
+
+> Return the number of LNODES present in the chain beginning at LNODE
+
+
+_[structure]_        `TNODE ()`
+
+> A TNODE, or 'Tomb Node', is a special node structure used to preserve
+  ordering during `CTRIE-DROP` (`%remove`) operations.
+  Any time a TNODE is encountered during the course of a `CTRIE-GET` (`%lookup`)
+  operation, the operative thread is required to invoke a `CLEAN` operation
+  on the TNODE it has encountered and throw to `:RESTART` its lookup activity
+  over again.  A TNODE is considered to be immutable and may not change its
+  value during its lifetime.
+   - `CELL` defines a slot which contains the entombed node structure.
+      Only LNODE and SNODE type nodes are ever entombed
+
+
+_[function]_         `TNODE-P  (OBJECT)`
+
+> Returns T if the specified object is of type tnode.
+
+
+_[function]_         `TNODE-CELL  (TNODE)`
+
+> Returns the cell of the specified tnode
+
+
+
+_[generic-function]_ `ENTOMB  (NODE)`
+
+> Return a newly constructed TNODE enclosing the argument
+  LEAF-NODE structure `NODE`
+
+
+_[generic-function]_ `RESURRECT  (NODE)`
+
+> Return the 'resurection' of the NODE argument.  The
+  resurrection of an INODE that references a TNODE is the
+  LEAF-NODE structure entombed by that TNODE.  The resurrection of
+  any other node is simply itself.
+
+
+_[structure]_        `CNODE ()`
+
+> Content Node
+
+
+_[function]_         `CNODE-P  (OBJECT)`
+
+> Returns T if the specified object is of type cnode.
+
+
+_[function]_         `MAKE-CNODE  (&OPTIONAL (BITMAP 0))`
+
+_[function]_         `CNODE-EXTENDED  (CNODE FLAG POSITION VALUE)`
+
+_[function]_         `CNODE-UPDATED  (CNODE POSITION VALUE)`
+
+_[function]_         `CNODE-TRUNCATED  (CNODE FLAG POS)`
+
+_[function]_         `MAP-CNODE  (FN CNODE)`
+
+_[generic-function]_ `REFRESH  (PLACE GEN)`
+
+_[function]_         `CNODE-CONTRACTED  (CNODE LEVEL)`
+
+_[function]_         `CNODE-COMPRESSED  (CNODE LEVEL)`
+
+_[function]_         `CLEAN  (INODE LEVEL)`
+
+_[function]_         `CLEAN-PARENT  (PARENT-INODE TARGET-INODE KEY LEVEL)`
+
+_[generic-function]_ `LEAF-NODE-KEY  (RESOURCE)`
+
+_[generic-function]_ `LEAF-NODE-VALUE  (RESOURCE)`
+
+_[generic-function]_ `FIND-CTRIE-ROOT  (CTRIE-DESIGNATOR)`
+
+> FIND-CTRIE-ROOT is a subprimitive used by the
+  internal CTRIE implementation to access the root inode of a given
+  ctrie root-container. It does not provide safe access to the
+  contents of that inode and should not be referenced by the
+  higher-level implementation or end-user code.  The purpose of
+  FIND-CTRIE-ROOT is to incorporate a level of indirection specialized
+  on the class of the root container to facilitate future extension
+  with alternate storage models, e.g., an external persistent disk-based
+  store. See {defgeneric (cas cl-ctrie::find-ctrie-root)}
+
+
+_[structure]_        `RDCSS-DESCRIPTOR ()`
+
+> An RDCSS-DESCRIPTOR object represents a 'plan' for a proposed RDCSS
+  (restricted double compare single swap) operation. The use of this
+  descriptor object provides the means to effect an atomic RDCSS in
+  software, requiring only hardware support for single CAS, as that is
+  what is commonly available on curent consumer hardware.
+   - OV         designates a slot containing the OLD (current) root inode.
+                If the swap is unsuccessful, the resulting ctrie will revert
+                to this structure as the root inode. 
+   - OVMAIN     designates a slot containing the CNODE that is referenced
+                by the OLD (current) root inode.
+   - NV         designates a slot containing a fully assembled replacement
+                root inode referencing a valid CNODE. This pair will become
+                the root inode and level-0 main-node of the ctrie if the
+                swap is successful.
+   - COMMITTED  designates a flag which, when not NIL, indicates that the
+                RDCSS plan defined by this descriptor has completed
+                successfully.
+
+
+_[function]_         `RDCSS-DESCRIPTOR-P  (OBJECT)`
+
+> Returns T if the specified object is of type rdcss-descriptor.
+
+
+_[function]_         `RDCSS-DESCRIPTOR-OV  (RDCSS-DESCRIPTOR)`
+
+> Returns the ov of the specified rdcss-descriptor
+
+
+
+_[function]_         `RDCSS-DESCRIPTOR-OVMAIN  (RDCSS-DESCRIPTOR)`
+
+> Returns the ovmain of the specified rdcss-descriptor
+
+
+
+_[function]_         `RDCSS-DESCRIPTOR-NV  (RDCSS-DESCRIPTOR)`
+
+> Returns the nv of the specified rdcss-descriptor
+
+
+
+_[function]_         `RDCSS-DESCRIPTOR-COMMITTED  (RDCSS-DESCRIPTOR)`
+
+> Returns and (with setf) changes the committed of the specified rdcss-descriptor
+
+
+
+_[function]_         `ROOT-NODE-ACCESS  (CTRIE &OPTIONAL ABORT)`
+
+> ROOT-NODE-ACCESS extends {defgeneric cl-ctrie::FIND-CTRIE-ROOT},
+  implementing the RDCSS root node api for access to root inode of
+  CTRIE.  In particular, it ensures that if, instead of an inode, the
+  root of CTRIE contains an RDCSS descriptor of a proposed root-node
+  update, that it will immediately invoke {defun
+  cl-ctrie::ROOT-NODE-COMMIT} to act on that descriptor and return an
+  INODE struct that is the result of the completed commit process.
+  ROOT-NODE-ACCESS only provides access to the root inode
+  _structure_. It does not provide safe access to the _contents_ of
+  that inode itself. In order to access those contents, the root inode
+  returned by ROOT-NODE-ACCESS must be further processed by {defun
+  cl-ctrie::INODE-READ} in order to still properly comply with the
+  undrlying GCAS protocol implementation for inodes.
+
+
+_[function]_         `ROOT-NODE-REPLACE  (CTRIE OV OVMAIN NV)`
+
+> rdcss api for replacement of root ctrie inode
+
+
+_[function]_         `ROOT-NODE-COMMIT  (CTRIE &OPTIONAL ABORT)`
+
+> rdcss api to complete a root-node transaction
+
+
+_[function]_         `CTRIE-SNAPSHOT  (CTRIE &KEY READ-ONLY)`
+
+_[function]_         `CTRIE-CLEAR  (CTRIE)`
+
+_[function]_         `CTRIE-PUT  (CTRIE KEY VALUE)`
+
+_[function]_         `%INSERT  (INODE KEY VALUE LEVEL PARENT STARTGEN)`
+
+_[function]_         `CTRIE-GET  (CTRIE KEY)`
+
+_[function]_         `%LOOKUP  (INODE KEY LEVEL PARENT STARTGEN)`
+
+> The general concept of the procedure for finding a given key within
+  a simplified SEQUENTIAL model of a CTRIE can be summarized as
+  follows: If the internal node is at level `L` then the W bits of the
+  hashcode starting from position `W * L` are used as a logical index
+  into the vector of `2^W` arcs that can possibly be represented
+  within that node (see `FLAG` and `FLAG-VECTOR`). This logical index
+  is then transformed into a physical index that denotes a specific
+  position locating this arc relative to all other arcs currently
+  present in the node (see `FLAG-ARC-POSITION`.  In this way, storage
+  within the node need not be allocated for representation of empty
+  arc positions. At all times the invariant is maintained that the
+  number of arcs allocated within a given CNODE is equal to the
+  Hamming-Weight of its BITMAP -- i.e., the number of nonzero bits
+  present (see `CL:LOGCOUNT`). The arc at this calculated relative
+  position is then followed, and the process repeated until arrival at
+  a leaf-node or empty arc position.
+
+    Locating a given key becomes substantially more complicated in
+  the actual lock-free concurrent ctrie algorithm.  
+
+
+_[function]_         `CTRIE-DROP  (CTRIE KEY)`
+
+> Remove KEY and it's value from the CTRIE.
+
+
+_[function]_         `%REMOVE  (INODE KEY LEVEL PARENT STARTGEN)`
+
+_[function]_         `CTRIE-MAP  (CTRIE FN &KEY ATOMIC &AUX ACCUM)`
+
+_[macro]_            `CTRIE-DO  ((KEY VALUE CTRIE &KEY ATOMIC) &BODY BODY)`
+
+> Iterate over (key . value) in ctrie in the manner of dolist.
+   EXAMPLE: (ctrie-do (k v ctrie)
+              (format t "~&~8S => ~10S~%" k v))
+
+
+_[method]_           `MAP-NODE  ((NODE CNODE) FN)`
+
+_[method]_           `MAP-NODE  ((NODE LNODE) FN)`
+
+_[method]_           `MAP-NODE  ((NODE TNODE) FN)`
+
+_[method]_           `MAP-NODE  ((NODE SNODE) FN)`
+
+_[method]_           `MAP-NODE  ((NODE INODE) FN)`
+
+_[generic-function]_ `MAP-NODE  (NODE FN)`
+
+_[function]_         `CTRIE-MAP-KEYS  (CTRIE FN &KEY ATOMIC)`
+
+_[function]_         `CTRIE-MAP-VALUES  (CTRIE FN &KEY ATOMIC)`
+
+_[generic-function]_ `CTRIE-MAP-INTO  (CTRIE PLACE FN)`
+
+_[function]_         `CTRIE-KEYS  (CTRIE &KEY ATOMIC)`
+
+_[function]_         `CTRIE-VALUES  (CTRIE &KEY ATOMIC)`
+
+_[function]_         `CTRIE-SIZE  (CTRIE &AUX (ACCUM 0))`
+
+_[function]_         `CTRIE-EMPTY-P  (CTRIE)`
+
+_[function]_         `CTRIE-TO-ALIST  (CTRIE &KEY ATOMIC)`
+
+_[function]_         `CTRIE-TO-HASHTABLE  (CTRIE &KEY ATOMIC)`
+
+_[function]_         `CTRIE-PPRINT  (CTRIE &OPTIONAL (STREAM T))`
+
+_[function]_         `CTRIE-FROM-ALIST  (ALIST)`
+
+_[function]_         `CTRIE-FROM-HASHTABLE  (HASHTABLE)`
+
+> create a new ctrie containing the same (k . v) pairs and equivalent
+  test function as HASHTABLE
+
+
+_[method]_           `CTRIE-SAVE  ((CTRIE CTRIE) (PLACE PATHNAME) &KEY)`
+
+_[generic-function]_ `CTRIE-SAVE  (CTRIE PLACE &KEY &ALLOW-OTHER-KEYS)`
+
+_[method]_           `CTRIE-LOAD  ((PLACE PATHNAME) &KEY)`
+
+_[generic-function]_ `CTRIE-LOAD  (PLACE &KEY &ALLOW-OTHER-KEYS)`
+
+_[method]_           `CTRIE-EXPORT  ((CTRIE CTRIE) (PLACE HASH-TABLE) &KEY)`
+
+_[method]_           `CTRIE-EXPORT  ((CTRIE CTRIE) (PLACE PATHNAME) &KEY)`
+
+_[generic-function]_ `CTRIE-EXPORT  (CTRIE PLACE &KEY &ALLOW-OTHER-KEYS)`
+
+_[method]_           `CTRIE-IMPORT  ((PLACE HASH-TABLE) &KEY)`
+
+_[method]_           `CTRIE-IMPORT  ((PLACE PATHNAME) &KEY)`
+
+_[generic-function]_ `CTRIE-IMPORT  (PLACE &KEY &ALLOW-OTHER-KEYS)`
+
+_[macro]_            `CTRIE-ERROR  (CTRIE CONDITION &REST ARGS)`
+
+> Signal a CTRIE related condition.
+
+
+_[condition]_        `CTRIE-ERROR (ERROR)`
+
+> Abstract superclass of CTRIE related conditions.
+
+
+_[condition]_        `CTRIE-STRUCTURAL-ERROR (CTRIE-ERROR)`
+
+> Condition designating that the CTRIE data structure
+   has been determined to be invalid.
+
+
+_[condition]_        `CTRIE-OPERATIONAL-ERROR (CTRIE-ERROR)`
+
+> Conditixon for when an operational failure or
+  inconsistency has occurred.
+
+
+_[condition]_        `CTRIE-OPERATION-RETRIES-EXCEEDED (CTRIE-OPERATIONAL-ERROR)`
+
+> Condition indicating an operation has failed the
+   maximum number of times specified by the special-variable
+   *retries*
+
+
+_[condition]_        `CTRIE-NOT-IMPLEMENTED (CTRIE-ERROR)`
+
+> Condition designating functionality for which the
+   implementation has not been written, but has not been deliberately
+   excluded.
+
+
+_[condition]_        `CTRIE-NOT-SUPPORTED (CTRIE-ERROR)`
+
+> Condition designating functionality that is
+  deliberately not supported.
+
+
+_[condition]_        `CTRIE-INVALID-DYNAMIC-CONTEXT (CTRIE-OPERATIONAL-ERROR)`
+
+> Condition indicating an operation was attempted
+   outside the dynamic extent of a valid enclosing WITH-CTRIE form
+
+
+_[condition]_        `CTRIE-GENERATIONAL-MISMATCH (CTRIE-STRUCTURAL-ERROR)`
+
+> Condition indicating an operation encountered an
+   outdated or inconsistent node during its attempted traversal
+
+
+_[function]_         `APIDOC  (&OPTIONAL (SCOPE :EXTERNAL))`
+
+> Collect a list of strings representing the documentation for
+  CL-CTRIE rendered in a compact format suitable for inclusion in a
+  lightweight text-markup format document.  If SCOPE is specified it
+  must be either :EXTERNAL. corresponding to those symbols exported as
+  the public API, or :HOME, which designates all symbols defined
+  locally in package.
+
+
+_[function]_         `PRINC-APIDOC  (&OPTIONAL (SCOPE :EXTERNAL))`
+
+> Print to *standard-output* the documentation for CL-CTRIE rendered
+  in a compact format.  This is intended primarily as a convenience to
+  the interactive user seeking quick reference at the REPL.  If SCOPE
+  is specified it must be either :EXTERNAL. corresponding to those
+  symbols exported as the public API, or :HOME, which designates all
+  symbols defined locally in package.
+
+
+_[function]_         `COLLECT-DOCS  (&OPTIONAL (SCOPE :EXTERNAL)
+                                     (SORT #'STRING<))`
+
+> Regenerate on-disk html documentation and collect the cached
+  in-memory descriptors for further processing. If SCOPE is specified
+  it must be either :EXTERNAL. corresponding to those symbols exported
+  as the public API, or :HOME, which designates all symbols defined
+  locally in package.  Output order may be customized by an optionally
+  specified SORT function.
+
+
+_[method]_           `RENDER  ((DESC CLDOC::DEFCONSTANT-DESCRIPTOR) &OPTIONAL
+                               STREAM)`
+
+_[method]_           `RENDER  ((DESC CLDOC::DEFPARAMETER-DESCRIPTOR) &OPTIONAL
+                               STREAM)`
+
+_[method]_           `RENDER  ((DESC CLDOC::DEFVAR-DESCRIPTOR) &OPTIONAL STREAM)`
+
+_[method]_           `RENDER  ((DESC CLDOC::DEFMACRO-DESCRIPTOR) &OPTIONAL
+                               STREAM)`
+
+_[method]_           `RENDER  ((DESC CLDOC::DEFMETHOD-DESCRIPTOR) &OPTIONAL
+                               STREAM)`
+
+_[method]_           `RENDER  ((DESC CLDOC::DEFGENERIC-DESCRIPTOR) &OPTIONAL
+                               STREAM)`
+
+_[method]_           `RENDER  ((DESC CLDOC::DEFUN-DESCRIPTOR) &OPTIONAL STREAM)`
+
+_[method]_           `RENDER  ((DESC CLDOC::DEFINE-CONDITION-DESCRIPTOR)
+                               &OPTIONAL STREAM)`
+
+_[method]_           `RENDER  ((DESC CLDOC::DEFSTRUCT-DESCRIPTOR) &OPTIONAL
+                               STREAM)`
+
+_[method]_           `RENDER  (DESC &OPTIONAL STREAM)`
+
+_[generic-function]_ `RENDER  (DESC &OPTIONAL STREAM)`
+
+> Output to STREAM a compact rendering of a
+   documentation-descriptor suitable for inclusion in lightweight
+   text-markup.
+
+
+_[macro]_            `DEFINE-DIAGRAM  (TYPE (&OPTIONAL CONTEXT) &BODY BODY)`
+
+> define a diagrammatic representation of TYPE, optionally specialized
+  for a specific CONTEXT. See {defgeneric cl-ctrie::make-diagram}.
+
+
+* * * * * *
+

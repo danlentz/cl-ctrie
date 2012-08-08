@@ -215,6 +215,95 @@
   (values))
 
 
+#+cl-ppcre
+(defun regex-replace-in-file (pattern replacement pathname)
+  (with-open-file (stream pathname :direction :io :if-exists :overwrite)
+    (loop with regexp = (ppcre:create-scanner pattern)
+      with line and missing-newline-p with position = 0
+      do (setf (values line missing-newline-p) (read-line stream nil))
+      while line do (file-position stream position)
+      (write-string (ppcre:regex-replace regexp line replacement) stream)
+      (unless missing-newline-p (terpri))  (finish-output stream)
+      (setf position (file-position stream)))))
+
+#+cl-ppcre
+(defun regex-search-in-file (pattern pathname)
+  (remove-if-not #'identity
+    (with-open-file (stream pathname :direction :input :if-does-not-exist :error)
+      (loop with regexp = (ppcre:create-scanner pattern)
+        with line and missing-newline-p 
+        do (setf (values line missing-newline-p) (read-line stream nil))
+        while line collect (ppcre:scan-to-strings regexp line)))))
+
+#+() (print
+(regex-search-in-file "\\* \\* \\* \\* \\* \\*.*\\* \\* \\* \\* \\* \\*"
+    (asdf:system-relative-pathname (asdf:find-system :cl-ctrie) "readme.md")))
+  
+(defun readmedoc (symbol-list)  
+  (apply #'concatenate 'string
+    (append (list (format nil "* * * * * *~%~%"))
+      (remove-if #'null
+        (mapcar #'render
+          (loop for desc in
+            (loop for sym in symbol-list
+              collecting (assoc (symbol-name sym) (collect-docs :home) :test #'equalp))
+            appending (cdr desc))))
+      (list (format nil "* * * * * *~%~%")))))
+
+
+(defvar *readme-user-api-symbols*
+  '(ctrie make-ctrie ctrie-p ctrie-test
+     ctrie-hash ctrie-readonly-p  ctrie-put ctrie-get ctrie-drop ctrie-do
+     ctrie-map ctrie-map-keys ctrie-map-values ctrie-map-into ctrie-keys
+     ctrie-values ctrie-size ctrie-clear ctrie-pprint ctrie-error
+     ctrie-to-alist ctrie-to-hashtable ctrie-from-hashtable
+     ctrie-from-alist ctrie-empty-p ctrie-save ctrie-load ctrie-export
+     ctrie-import ctrie-snapshot ctrie-error ctrie-structural-error
+     ctrie-operational-error ctrie-operation-retries-exceeded
+     ctrie-not-implemented ctrie-not-supported
+     ctrie-invalid-dynamic-context ctrie-generational-mismatch))
+
+
+(defvar *readme-internal-reference-symbols*
+  '(*ctrie* *retries* *timeout*
+     multi-catch catch-case
+     ctrie ctrie-p ctrie-hash ctrie-test ctrie-readonly-p cthash ctequal
+     with-ctrie flag flag-present-p flag-arc-position flag-vector
+     ref ref-p ref-stamp ref-value ref-prev
+     failed-ref failed-ref-p failed-ref-prev
+     inode inode-p inode-gen inode-ref make-inode gcas-compare-and-set
+     inode-read inode-mutate inode-commit
+     snode snode-p snode-key snode-value
+     lnode lnode-p lnode-elt lnode-next enlist lnode-removed lnode-inserted
+     lnode-search lnode-length tnode tnode-p tnode-cell entomb resurrect
+     cnode cnode-p make-cnode cnode-extended cnode-updated
+     cnode-truncated map-cnode refresh cnode-contracted cnode-compressed
+     clean clean-parent leaf-node-key leaf-node-value find-ctrie-root   
+     rdcss-descriptor rdcss-descriptor-p rdcss-descriptor-ov
+     rdcss-descriptor-ovmain rdcss-descriptor-nv
+     rdcss-descriptor-committed root-node-access root-node-replace
+     root-node-commit
+     ctrie-snapshot ctrie-clear ctrie-put %insert ctrie-get %lookup
+     ctrie-drop %remove
+     ctrie-map ctrie-do map-node ctrie-map-keys ctrie-map-values
+     ctrie-map-into ctrie-keys ctrie-values ctrie-size ctrie-empty-p
+     ctrie-to-alist ctrie-to-hashtable ctrie-pprint ctrie-from-alist
+     ctrie-from-hashtable
+     ctrie-save ctrie-load ctrie-export ctrie-import
+     ctrie-error ctrie-structural-error ctrie-operational-error
+     ctrie-operation-retries-exceeded ctrie-not-implemented
+     ctrie-not-supported ctrie-invalid-dynamic-context
+     ctrie-generational-mismatch apidoc princ-apidoc collect-docs render
+     define-diagram))
+
+(defun readme-user-api ()
+  (princ (readmedoc *readme-user-api-symbols*))
+  (values))
+
+(defun readme-internal-reference ()
+  (princ (readmedoc *readme-internal-reference-symbols*))
+  (values))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Vivisection
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
