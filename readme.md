@@ -119,7 +119,7 @@ _[structure]_        `CTRIE ()`
 > A CTRIE root container uniquely identifies a CTRIE instance, and
   contains the following perameters which specify the customizable
   aspects of each CTRIE:
-   - `READONLY-P`, if true, prohibits any future modification or
+   - `READONLY-P` if not NIL, prohibits any future modification or
   cloning of this instance.
    - `TEST` is a designator for an equality predicate that will be
   applied to disambiguate and determine the equality of any two
@@ -133,13 +133,13 @@ _[structure]_        `CTRIE ()`
   of keys which will populate the table.  At this time, a 32-bit hash
   is recommended as this is what has been used for development and
   testing and has been shown to provide good performance in
-  practice. As with `TEST`, it is recommended that `HASH` be specified
+  practice. As with `TEST` it is recommended that `HASH` be specified
   by a symbol that is fboundp.
    - `ROOT` is the slot used internally for storage of the root inode
   structure that maintains the reference to the contents of the ctrie
   proper.  The ctrie-root must only be accessed using the _RDCSS ROOT
   NODE PROTOCOL_ defined by the top-level entry-points `ROOT-NODE-ACCESS`
-  and `ROOT-NODE-COMMIT`.
+  and `ROOT-NODE-COMMIT`
 
 
 _[function]_         `CTRIE-CLEAR  (CTRIE)`
