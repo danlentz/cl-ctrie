@@ -78,18 +78,18 @@ respective purpose.
 The following files are the core sources currently necessary
 for correct ctrie operation. 
 
-- __`ctrie-package.lisp`__:  Package definition
-- __`ctrie.lisp`__:          Ctrie implementation
-- __`ctrie-util.lisp`__:     Supporting Utilities
+- __`ctrie-package.lisp:`__  Package definition
+- __`ctrie.lisp        :`__  Ctrie implementation
+- __`ctrie-util.lisp   :`__  Supporting Utilities
 
 #### Supplemental
 
 The following files define extended functionality, management,
 and analysis facilities supporting the development of CL-CTRIE.
 
-- `ctrie-cas.lisp`:      SBCL CAS extensions
-- `ctrie-doc.lisp`:      Automated Documentation Support
-- `ctrie-test.lisp`:     Test and Performance Measurement
+- `ctrie-cas.lisp     :`  SBCL CAS extensions
+- `ctrie-doc.lisp     :`  Automated Documentation Support
+- `ctrie-test.lisp    :`  Test and Performance Measurement
 
 ### Documentation
 
