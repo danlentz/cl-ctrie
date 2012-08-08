@@ -83,6 +83,14 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Lightweight Text-markup Rendering
+;;
+;; rendering attractive representations in html, text, and
+;; 'github-flavoured' markdown from the same docstring markup syntax
+;; seems to become a pretty ugly ordeal pretty fast.  I hope this
+;; strikes a reasonable balance. Not a lot of effort has been spent
+;; eliminating duplicate code or innovating sophisticated format
+;; control strings at present, since this stuff gets repeatedly
+;; revised/replaced/deleted quite a bit.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defgeneric render (desc &optional stream)
@@ -95,49 +103,92 @@
   (declare (ignore desc values))
   (values))
 
-(defmethod render ((desc cldoc::define-condition-descriptor) &optional (stream nil))
-  (with-slots (cldoc::name cldoc::inheritence cldoc::doc cldoc::slots) desc
+
+(defmethod render ((desc cldoc::defstruct-descriptor) &optional stream)
+  (with-slots (cldoc::name cldoc::inheritence cldoc::slots cldoc::doc) desc
     (let ((slot-names (mapcar (lambda (sd) (slot-value sd 'cldoc::name)) cldoc::slots)))
       (declare (ignorable slot-names))
-      (format stream "_[condition]_ `~20A (~{~S~^ ~^-~^>~})`~%~%>  ~A~%~%"
-        (string-upcase cldoc::name) cldoc::inheritence cldoc::doc))))
+      (if (< (length cldoc::doc) 1)
+        (format stream "~20A `~A (~{~S~^ ~^-~^>~})`~%~%"
+          "_[structure]_" (string-upcase cldoc::name) cldoc::inheritence)      
+        (format stream "~20A `~A (~{~S~^ ~^-~^>~})`~%~%> ~A~%~%~%"
+          "_[structure]_" (string-upcase cldoc::name) cldoc::inheritence cldoc::doc)))))
 
-(defmethod render ((desc cldoc::defun-descriptor) &optional (stream nil))
+
+(defmethod render ((desc cldoc::define-condition-descriptor) &optional stream)
+  (with-slots (cldoc::name cldoc::inheritence cldoc::slots cldoc::doc) desc
+    (let ((slot-names (mapcar (lambda (sd) (slot-value sd 'cldoc::name)) cldoc::slots)))
+      (declare (ignorable slot-names))
+      (if (< (length cldoc::doc) 1)
+        (format stream "~20A `~A (~{~S~^ ~^-~^>~})`~%~%"
+          "_[condition]_" (string-upcase cldoc::name) cldoc::inheritence)      
+        (format stream "~20A `~A (~{~S~^ ~^-~^>~})`~%~%> ~A~%~%~%"
+          "_[condition]_" (string-upcase cldoc::name) cldoc::inheritence cldoc::doc)))))
+
+
+(defmethod render ((desc cldoc::defun-descriptor) &optional stream)
   (with-slots (cldoc::name cldoc::lambda-list cldoc::doc) desc
-    (format stream "_[function]_ `~20A  ~S`~%~%>  ~A~%~%"
-      (string-upcase cldoc::name) cldoc::lambda-list cldoc::doc)))
+    (if (< (length cldoc::doc) 1)
+      (format stream "~20A `~A  ~S`~%~%"
+        "_[function]_" (string-upcase cldoc::name) cldoc::lambda-list)
+      (format stream "~20A `~A  ~S`~%~%> ~A~%~%~%"
+        "_[function]_" (string-upcase cldoc::name) cldoc::lambda-list cldoc::doc))))
 
-(defmethod render ((desc cldoc::defgeneric-descriptor) &optional (stream nil))
-  (with-slots (cldoc::name cldoc::lambda-list cldoc::doc cldoc::qualifiers) desc
+
+(defmethod render ((desc cldoc::defgeneric-descriptor) &optional stream)
+  (with-slots (cldoc::name cldoc::lambda-list cldoc::qualifiers  cldoc::doc) desc
     (declare (ignorable cldoc::qualifiers))
-    (format stream "_[generic-function]_ `~20A  ~S`~%~%>  ~A~%~%"
-      (string-upcase cldoc::name)  cldoc::lambda-list cldoc::doc)))
+    (if (< (length cldoc::doc) 1)
+      (format stream "~20A `~A  ~S`~%~%"
+        "_[generic-function]_" (string-upcase cldoc::name)  cldoc::lambda-list)
+      (format stream "~20A `~A  ~S`~%~%> ~A~%~%~%"
+        "_[generic-function]_" (string-upcase cldoc::name)  cldoc::lambda-list cldoc::doc))))
 
-(defmethod render ((desc cldoc::defmethod-descriptor) &optional (stream nil))
-  (with-slots (cldoc::name cldoc::lambda-list cldoc::doc cldoc::qualifiers) desc
+
+(defmethod render ((desc cldoc::defmethod-descriptor) &optional stream)
+  (with-slots (cldoc::name cldoc::lambda-list cldoc::qualifiers cldoc::doc) desc
     (declare (ignorable cldoc::qualifiers))
-    (format stream "_[method]_ `~20A  ~S`~%~%>  ~A~%~%"
-      (string-upcase cldoc::name) cldoc::lambda-list cldoc::doc)))
+    (if (< (length cldoc::doc) 1)
+      (format stream "~20A `~A  ~S`~%~%"
+        "_[method]_" (string-upcase cldoc::name) cldoc::lambda-list)
+      (format stream "~20A `~A  ~S`~%~%> ~A~%~%~%"
+        "_[method]_" (string-upcase cldoc::name) cldoc::lambda-list cldoc::doc))))
 
-(defmethod render ((desc cldoc::defmacro-descriptor) &optional (stream nil))
+
+(defmethod render ((desc cldoc::defmacro-descriptor) &optional stream)
   (with-slots (cldoc::name cldoc::lambda-list cldoc::doc) desc
-    (format stream "_[macro]_ `~20A  ~S`~%~%>  ~A~%~%"
-      (string-upcase cldoc::name) cldoc::lambda-list cldoc::doc)))
+    (if (< (length cldoc::doc) 1)    
+      (format stream "~20A `~A  ~S`~%~%"
+        "_[macro]_" (string-upcase cldoc::name) cldoc::lambda-list)
+      (format stream "~20A `~A  ~S`~%~%> ~A~%~%~%"
+        "_[macro]_" (string-upcase cldoc::name) cldoc::lambda-list cldoc::doc))))
 
-(defmethod render ((desc cldoc::defvar-descriptor) &optional (stream nil))
-  (with-slots (cldoc::name cldoc::value cldoc::doc) desc
-    (format stream "_[special-variable]_ `~20A  ~S`~%~%>  ~A~%~%"
-      (string-upcase cldoc::name) cldoc::value cldoc::doc)))
 
-(defmethod render ((desc cldoc::defparameter-descriptor) &optional (stream nil))
+(defmethod render ((desc cldoc::defvar-descriptor) &optional stream)
   (with-slots (cldoc::name cldoc::value cldoc::doc) desc
-    (format stream "_[special-variable]_ `~20A  ~S`~%~%>  ~A~%~%"
-      (string-upcase cldoc::name) cldoc::value cldoc::doc)))
+    (if (< (length cldoc::doc) 1)    
+      (format stream "~20A `~A  ~S`~%~%"
+        "_[special-variable]_" (string-upcase cldoc::name) cldoc::value)
+      (format stream "~20A `~A  ~S`~%~%> ~A~%~%~%"
+        "_[special-variable]_" (string-upcase cldoc::name) cldoc::value cldoc::doc))))
 
-(defmethod render ((desc cldoc::defconstant-descriptor) &optional (stream nil))
+
+(defmethod render ((desc cldoc::defparameter-descriptor) &optional stream)
   (with-slots (cldoc::name cldoc::value cldoc::doc) desc
-    (format stream "_[constant-variable]_ `~20A  ~S`~%~%>  ~A~%~%"
-      (string-upcase cldoc::name) cldoc::value cldoc::doc)))
+    (if (< (length cldoc::doc) 1)    
+      (format stream "~20A `~A  ~S`~%~%"
+        "_[special-variable]_" (string-upcase cldoc::name) cldoc::value)
+      (format stream "~20A `~A  ~S`~%~%> ~A~%~%~%"
+        "_[special-variable]_" (string-upcase cldoc::name) cldoc::value cldoc::doc))))
+
+
+(defmethod render ((desc cldoc::defconstant-descriptor) &optional stream)
+  (with-slots (cldoc::name cldoc::value cldoc::doc) desc
+    (if (< (length cldoc::doc) 1)    
+      (format stream "~20A `~A  ~S`~%~%"
+        "_[constant-variable]_" (string-upcase cldoc::name) cldoc::value)
+      (format stream "~20A `~A  ~S`~%~%> ~A~%~%~%"
+        "_[constant-variable]_" (string-upcase cldoc::name) cldoc::value cldoc::doc))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -151,7 +202,7 @@
   must be either :EXTERNAL. corresponding to those symbols exported as
   the public API, or :HOME, which designates all symbols defined
   locally in package."
-  (mapcar #'render (all-descs (collect-docs scope))))
+  (remove-if #'null (mapcar #'render (all-descs (collect-docs scope)))))
 
 (defun princ-apidoc (&optional (scope :external))
   "Print to *standard-output* the documentation for CL-CTRIE rendered
