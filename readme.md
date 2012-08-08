@@ -54,12 +54,12 @@ following is a brief excerpt:
 ### Platform ###
 
 Currently the lisp platform supported by cl-ctrie is SBCL version
-1.0.55 or greater, although support could easily be entended to
-other common-lisp implementations that offer support for atomic
-compare-and-swap functionality, notably LispWorks 5.x/6.x, which is
-also well instrumented with lock-free, atomic primitives, although
-this is not necessarily a high priority for the initial development
-cycle.
+1.0.55 or greater hosted on x86/x86-64 architecture. Support could
+easily be entended to include other common-lisp implementations that
+offer atomic compare-and-swap functionality, notably LispWorks
+5.x/6.x, which is also well instrumented with lock-free, atomic
+primitives, although this is not necessarily a high priority for the
+initial development cycle.
 
 ### Status
 
@@ -76,18 +76,19 @@ rather than expose a general purpose GCAS and RDCSS api, these
 protocols are incorporated into ctrie-specific abstractions:
 `INODE-READ` `INODE-MUTATE` and `INODE-COMMIT` for GCAS, and for
 RDCSS, `ROOT-NODE-ACCESS` `ROOT-NODE-REPLACE` and `ROOT-NODE-COMMIT.`
-These liberties I have taken have the benefit of being much easier to
-digest, understand, remember, and work with (at least for me) than
-direct exposure in imperative style of the intricate mechanations that
-underlie the ctrie algorithm.  On the other hand, the further one
-strays from a direct translation of the original (verified) ctrie
-implementation, the greater the likelihood of introducing bugs into an
-environment (lock-free concurrent data structure development) in which
-bugs can be extremely subtle and are notoriously difficult to detect.
-I have attempted to strike an appropriate balance between these
-conflicting concerns, and I intend to mitigate the risk, at least in
-part, through development of a more extensive arsenal of regression
-tests and benchmarking facilities.
+These liberties I have taken have the benefit of providing an
+interface that is much easier to digest, understand, remember, and
+work with (at least for me) than direct exposure in imperative style
+of the intricate mechanations that underlie the ctrie algorithm.  On
+the other hand, the further one strays from a direct translation of
+the original (verified) ctrie implementation, the greater the
+likelihood of introducing bugs into an environment (lock-free
+concurrent data structure development) in which bugs can be extremely
+subtle and are notoriously difficult to detect.  I have attempted to
+strike an appropriate balance between these conflicting concerns, and
+I intend to mitigate the risk, at least in part, through development
+of a more extensive arsenal of regression tests and benchmarking
+facilities.
 
 In addition, there are a few differences in the feature set that
 is provided, such as a suite of mapping operators in leiu of a
