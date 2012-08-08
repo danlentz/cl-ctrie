@@ -74,12 +74,13 @@ an approach emphasizing more functional oriented decomposition of the
 algortithm, written in a manner more closely representative of
 ideomatic, common-lisp coding style.  For example, rather than expose
 a general purpose GCAS and RDCSS api, these protocols are incorporated
-into ctrie-specific abstractions. For __GCAS:__ `INODE-READ`
-`INODE-MUTATE` and `INODE-COMMIT` and for __RDCSS:__ `ROOT-NODE-ACCESS`
-`ROOT-NODE-REPLACE` and `ROOT-NODE-COMMIT.` These liberties I have
-taken have the benefit of providing an interface that is much easier
-to digest, understand, remember, and work with (at least for me) than
-direct exposure in imperative style of the intricate mechanations that
+into ctrie-specific abstractions. For __GCAS__ the exposed api
+includes: `INODE-READ` `INODE-MUTATE` and `INODE-COMMIT` and for
+__RDCSS:__ `ROOT-NODE-ACCESS` `ROOT-NODE-REPLACE` and
+`ROOT-NODE-COMMIT.` The liberties I have taken have the intended
+benefit of providing an interface that is much easier to digest,
+understand, remember, and work with (at least for me) than direct
+exposure in imperative style of the intricate mechanations that
 underlie the ctrie algorithm.  On the other hand, the further one
 strays from a direct translation of the original (verified) ctrie
 implementation, the greater the likelihood of introducing bugs into an
