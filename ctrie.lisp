@@ -225,37 +225,53 @@
     finally (return new-vector)))
 
 
-(defvar %empty-map%
-  (vector))
+(defvar %empty-map% (vector)
+  "Defines the initial value of an empty CNODE arc-vector.")
 
-(defvar %no-flags%
-  (flag-vector))
+(defvar %no-flags%  (flag-vector)
+  "Defines the initial value of a flag-vector representing a
+  cnode containing an empty arc-vector.")
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; INODE
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defstruct ref
+(defstruct (ref
+             (:copier nil))
   "Atomically Stamped Reference structure [Herlithy, TAOMP] that
   encapsulates the mutable slots within an inode, although each ref
   structure is, itself, never mutated.  Incorporation of the ref
   structure provides the capability to 'bundle' additional metadata in
   an inode while still providing atomic compare and swap based a the
-  single comparison of the aggregate ref instance "
+  single comparison of the aggregate ref instance.
+   - STAMP defines a slot containing implementation-specific metadata
+     that may be maintained internally as a means of tracking inode
+     modification and update behavior.  It should not be referenced by
+     user code, and the format of its contents should not be relied apon.
+   - VALUE defines a slot that contains a reference to the MAIN-NODE
+     that the enclosing inode should be interpreted as 'pointing to'
+   - PREV defines a slot which, during the INODE-COMMIT phase of the
+     _GCAS_INODE_PROTOCOL_, maintains a reference to the last valid
+     inode state, which may be restored, if necessary, during the
+     course of the INODE-READ/INODE-COMMIT arbitration."
   (stamp (local-time:now))
   (value t   :type t)
   (prev  nil :type t))
 
 
-(defstruct (failed-ref (:include ref))
+(defstruct (failed-ref
+             (:include ref)
+             (:copier nil))
   "A FAILED-REF is a structure that is used to preserve the linkage to
   prior inode state following a failed GCAS.  Any inode access that
   detects a FAILED-REF will immediately invoke a commit to restore the
   inode to the state recorded in FAILED-REF-PREV.")
 
 
-(defstruct (inode (:constructor %make-inode))
+(defstruct (inode
+             (:constructor %make-inode)
+             (:copier nil))
   "An INODE, or 'Indirection Node' is the mutable structure
   representing the link between other 'main-node' structures found in
   a ctrie.  An inode is the only type of node that may change the
@@ -387,55 +403,97 @@
 ;; SNODE 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defstruct snode
-  "Storage Node"
+(defstruct (snode
+             (:copier nil))
+  "SNODE, i.e., 'Storage Node', is the LEAF-NODE structure ultimately
+  used for the storage of each key/value pair contained in the CTRIE.
+  An SNODE is considered to be immutable during its lifetime.
+   - KEY defines the slot containing an element of the map's domain.
+   - VALUE defines the slot containing the range-element mapped to KEY."
   key value)
   
-(defun snode (k v)
-  (make-snode :key k :value v))
+(defun snode (key value)
+  "Construct a new SNODE which represents the mapping from
+  domain-element KEY to range-element VALUE."
+  (make-snode :key key :value value))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; LNODE
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defstruct lnode
-  "List Node"
+(defstruct (lnode
+             (:copier nil))
+  "LNODE, i.e., 'List Node', is a special structure used to enclose
+  SNODES in a singly-linked chain when the hash-codes of the
+  respective SNODE-KEYS collide, but those keys are determined to be
+  unique by the CTRIE-TEST function defined for that ctrie. The order
+  of the list is implemented (arbitrarily) as most recently added first,
+  analogous to CL:PUSH.  An LNODE (and therefore a chain of LNODEs) is
+  considered to be immutable during its lifetime.
+   - ELT defines the slot containing an enclosed SNODE
+   - NEXT defines a slot referencing the next LNODE in the chain, or NIL
+     if no further LNODES remain."
   elt next)
 
 (defun enlist (&rest rest)
+  "Construct a chain of LNODE structures enclosing the values supplied.
+  It is assumed (elsewhere) that each of these values is a valid SNODE
+  structure."
   (unless (null rest)
     (awhen (car rest)
       (make-lnode :elt it :next (apply #'enlist (cdr rest))))))
 
 (defun lnode-removed (orig-lnode key test)
+  "Construct a chain of LNODE structures identical to the chain starting
+  with ORIG-LNODE, but with any LNODE containing an SNODE equal to KEY
+  removed.  Equality is tested as by the predicate function passed as
+  the argument TEST. The order of nodes in the resulting list will
+  remain unchanged."
   (let1 elts (loop for lnode = orig-lnode then (lnode-next lnode) while lnode
                unless (funcall test key (leaf-node-key (lnode-elt lnode)))
                collect (lnode-elt lnode))
     (apply #'enlist elts)))
 
 (defun lnode-inserted (orig-lnode key value test)
+  "Construct a chain of LNODE structures identical to the chain starting
+  with ORIG-LNODE, but ensured to contain an LNODE enclosing an SNODE of
+  KEY and VALUE.  If the given KEY equal to a key already present somewhere
+  in the chain (as compared with equality predicate TEST) it will be
+  replaced.  Otherwise a new LNODE will be added. In either case, the LNODE
+  containing (SNODE KEY VAlUE) will be the first node in the resulting
+  list."
   (let1 elts (loop for lnode = orig-lnode then (lnode-next lnode) while lnode
                unless (funcall test key (leaf-node-key (lnode-elt lnode)))
                collect (lnode-elt lnode))
     (apply #'enlist (push (snode key value) elts))))
 
 (defun lnode-search (lnode key test)
+  "Within the list of lnodes beginning with LNODE, return the range value
+  mapped to by the first SNODE containing a key equal to KEY as determined
+  by equality predicate TEST, or NIL if no such key is found.  As a
+  second value, in order to support storage of NIL as a key, return T to
+  indicate that the KEY was indeed found during search, or NIL to indicate
+  that no such key was present in the list."
   (loop for current = lnode then (lnode-next current) while current
     when (funcall test key (leaf-node-key (lnode-elt current)))
     return (values (leaf-node-value (lnode-elt current)) t)
     finally (return (values nil nil))))
 
 (defun lnode-length (lnode)
+  "Return the number of LNODES present in the chain beginning at LNODE"
   (loop with len = 0
     for current = lnode then (lnode-next current)
     while current do (incf len)
     finally (return len)))
 
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; TNODE 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defstruct tnode
+(defstruct (tnode
+             (:copier nil))
   "Tomb Node"
   cell)
 
@@ -453,11 +511,14 @@
       (tnode (tnode-cell it))
       (t     node))))
 
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; CNODE
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defstruct (cnode (:constructor %make-cnode))
+(defstruct (cnode
+             (:constructor %make-cnode)
+             (:copier nil))
   "Content Node"
   (bitmap 0)
   (flags  %no-flags%)
@@ -590,21 +651,26 @@
   "A CTRIE root container uniquely identifies a CTRIE instance, and
   contains the following perameters which specify the customizable
   aspects of each CTRIE instance:
-  * READONLY-P, if true, prohibits any future modification or
+   - READONLY-P, if true, prohibits any future modification or
   cloning of this instance.
-  * TEST is a designator for an equality predicate that will be applied to
+   - TEST is a designator for an equality predicate that will be applied to
   determine the disambiguation of any two keys. It is recommened that
   this value be a symbol that is fboundp, to retain capability of
   externalization (save/restore). At present, though, this is not
   enforced and a function object or lambda expression will also be
   accepted, albeit without the ability of save/restore.
-  * HASH is a designator for a hash function, which may be desirable to
+   - HASH is a designator for a hash function, which may be desirable to
   customize when one has specific knowledge about the set of keys
   which will populate the table.  At this time, a 32-bit hash is
   recommended as this is what has been used for development and
   testing and has been shown to provide good performance in
   practice. As with TEST, it is recommended that HASH be specified
-  by a symbol that is fboundp."
+  by a symbol that is fboundp.
+   - ROOT is the slot used internally for storage of the root inode
+  structure that maintains the reference to the contents of the ctrie
+  proper.  The ctrie-root must only be accessed using the RDCSS root
+  node protocol defined by the end-user entrypoints ROOT-NODE-ACCESS
+  and ROOT-NODE-COMMIT."
   (readonly-p  nil)
   (test       'equal)
   (hash       'sxhash)
@@ -636,7 +702,7 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; RDCSS root-node protocol
+;; RDCSS root-inode protocol
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
    
 (defgeneric find-ctrie-root (ctrie-designator)
@@ -647,10 +713,23 @@
   higher-level implementation or end-user code.  The purpose of
   FIND-CTRIE-ROOT is to incorporate a level of indirection specialized
   on the class of the root container to facilitate future extension
-  with alternate storage models, eg an external persistent disk-based
-  store.")
+  with alternate storage models, e.g., an external persistent disk-based
+  store. See {defgeneric (cas cl-ctrie::find-ctrie-root)}")
   (:method ((ctrie ctrie))
     (ctrie-root ctrie)))
+
+
+(defgeneric (cas find-ctrie-root) (ctrie-designator old new)
+  (:documentation "(CAS FIND-CTRIE-ROOT) implements the atomic
+  compare-and swap subprimitive that is the operational analogue to
+  {defgeneric cl-ctrie::find-ctrie-root}. It should not be referenced
+  by the higher-level implementation or end-user code. The purpose of
+  (CAS FIND-CTRIE-ROOT) is to incorporate a level of indirection specialized
+  on the class of the root container to facilitate future extension
+  with alternate storage models, e.g., an external persistent disk-based
+  store.")
+  (:method ((ctrie ctrie) old new)
+    (cas (ctrie-root ctrie) old new)))
 
 
 (defstruct rdcss-descriptor 
@@ -658,23 +737,36 @@
   (restricted double compare single swap) operation. The use of this
   descriptor object provides the means to effect an atomic RDCSS in
   software, requiring only hardware support for single CAS, as that is
-  what is commonly available."
+  what is commonly available on curent consumer hardware.
+   - OV         designates a slot containing the OLD (current) root inode.
+                If the swap is unsuccessful, the resulting ctrie will revert
+                to this structure as the root inode. 
+   - OVMAIN     designates a slot containing the CNODE that is referenced
+                by the OLD (current) root inode.
+   - NV         designates a slot containing a fully assembled replacement
+                root inode referencing a valid CNODE. This pair will become
+                the root inode and level-0 main-node of the ctrie if the
+                swap is successful.
+   - COMMITTED  designates a flag which, when not NIL, indicates that the
+                RDCSS plan defined by this descriptor has completed
+                successfully."
   ov ovmain nv committed)
 
 
 (defun/inline root-node-access (ctrie &optional abort)
-  "ROOT-NODE-ACCESS extends FIND-CTRIE-ROOT, implementing the RDCSS
-  root node api for access to root inode of CTRIE.  In particular, it
-  ensures that if, instead of an inode, the root of CTRIE contains an
-  RDCSS descriptor of a proposed root-node update, that it will
-  immediately invoke ROOT-NODE-COMMIT to act on that descriptor and
-  return only an inode value that is the result of the completed
-  commit process.  ROOT-NODE-ACCESS only provides access to the root
-  inode structure, it does not provide safe access to the contents of
-  that inode itself. In order to access those contents the root node
-  returned by ROOT-NODE-ACCESS must be further processed by INODE-READ
-  in order to still properly comply with the undrlying GCAS protocol
-  implementation for inodes."
+  "ROOT-NODE-ACCESS extends {defgeneric cl-ctrie::FIND-CTRIE-ROOT},
+  implementing the RDCSS root node api for access to root inode of
+  CTRIE.  In particular, it ensures that if, instead of an inode, the
+  root of CTRIE contains an RDCSS descriptor of a proposed root-node
+  update, that it will immediately invoke {defun
+  cl-ctrie::ROOT-NODE-COMMIT} to act on that descriptor and return an
+  INODE struct that is the result of the completed commit process.
+  ROOT-NODE-ACCESS only provides access to the root inode
+  _structure_. It does not provide safe access to the _contents_ of
+  that inode itself. In order to access those contents, the root inode
+  returned by ROOT-NODE-ACCESS must be further processed by {defun
+  cl-ctrie::INODE-READ} in order to still properly comply with the
+  undrlying GCAS protocol implementation for inodes."
   (sb-thread:barrier (:read)
     (atypecase (find-ctrie-root ctrie)
       (inode it)
@@ -684,7 +776,7 @@
 (defun/inline root-node-replace (ctrie ov ovmain nv)
   "rdcss api for replacement of root ctrie inode"
   (let1 desc (make-rdcss-descriptor :ov ov :ovmain ovmain :nv nv)
-    (if (cas (ctrie-root ctrie) ov desc)
+    (if (cas (find-ctrie-root ctrie) ov desc)
       (prog2 (root-node-commit ctrie nil)
         (rdcss-descriptor-committed desc))
       nil)))
@@ -696,16 +788,16 @@
     (atypecase (find-ctrie-root ctrie)
       (inode it)
       (rdcss-descriptor (if abort
-                          (if (cas (ctrie-root ctrie) it (rdcss-descriptor-ov it))
+                          (if (cas (find-ctrie-root ctrie) it (rdcss-descriptor-ov it))
                             (rdcss-descriptor-ov it)
                             (root-node-commit ctrie abort))
                           (let1 oldmain (inode-read (rdcss-descriptor-ov it))
                             (if (eq oldmain (rdcss-descriptor-ovmain it))
-                              (if (cas (ctrie-root ctrie) it (rdcss-descriptor-nv it))
+                              (if (cas (find-ctrie-root ctrie) it (rdcss-descriptor-nv it))
                                 (prog1 (rdcss-descriptor-nv it)
                                   (setf (rdcss-descriptor-committed it) t))
                                 (root-node-commit ctrie abort))
-                              (if (cas (ctrie-root ctrie) it (rdcss-descriptor-ov it))
+                              (if (cas (find-ctrie-root ctrie) it (rdcss-descriptor-ov it))
                                 (rdcss-descriptor-ov it)
                                 (root-node-commit ctrie abort)))))))))
   
@@ -1055,7 +1147,6 @@
 ;; Basic CTRIE I/O
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-
 (eval-when (:load-toplevel :compile-toplevel :execute)
   (when (find-package :cl-store)
     (pushnew :cl-store *features*)))
@@ -1093,46 +1184,3 @@
 
 (defmethod  ctrie-import ((place hash-table) &key)
   (ctrie-from-hashtable place))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Vivisection
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defgeneric make-diagram (thing context &key &allow-other-keys))
-
-(defmethod make-diagram (thing context &key)
-  (donuts::<> thing))
-
-(defun diagram (thing &optional (context *context*))
-  (donuts::& ()
-    (make-diagram thing context)))
-
-(defmacro define-diagram (type (&optional context) &body body)
-  (let ((specializer (if context `(list 'eql ,context) 't)))
-    (with-gensyms (spc)
-      `(let ((,spc ,specializer))
-         (declare (ignorable ,spc))
-         (defmethod make-diagram ((,type ,type) (context ,specializer) &key)
-           ,@body)))))
-
-
-(define-diagram snode ()
-  (donuts:[] (format nil "~A | ~A" (snode-key snode) (snode-value snode))))
-
-(define-diagram symbol ()
-  (cl:prin1-to-string symbol))
-
-(define-diagram inode ()
-  (donuts:<> (concatenate 'string "inode " (string (inode-gen inode)) "\\n"
-               (local-time:format-rfc1123-timestring nil (ref-stamp (inode-ref inode))))))
-  
-(define-diagram cnode ()
-  (donuts:[]   "cnode"))
-
-(define-diagram tnode ()
-  (donuts:[&] (donuts:<> "tnode")))
-
-
-
-;; (defmethod make-diagram ((thing snode) context &key)
-;;   (donuts:[] (format nil "~A | ~A" (snode-key thing) (snode-value thing))))

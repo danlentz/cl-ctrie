@@ -40,7 +40,7 @@
     :ctrie-from-hashtable
     :ctrie-from-alist
     :ctrie-empty-p
-    :ctrie-ensure-get
+    ;; :ctrie-ensure-get
     :ctrie-save
     :ctrie-load
     :ctrie-export

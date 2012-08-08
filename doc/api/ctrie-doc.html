@@ -1,0 +1,390 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="../../../cldoc/src/cludg.css"/>
+<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1"/>
+<title>
+ctrie-doc</title>
+</head>
+<body>
+<div id="navbar">
+<table cellspacing="0" cellpadding="0" border="0" style="width: 100%;">
+<colgroup span="3">
+<col width="0*"/>
+<col width="0*"/>
+<col width="1*"/>
+</colgroup>
+<tr>
+<td align="left" valign="baseline">
+<a href="ctrie.html">
+Prev:&nbsp;ctrie</a>
+<br/>
+</td>
+<td>
+&nbsp;&nbsp;&nbsp;&nbsp;</td>
+<td align="left" valign="baseline">
+<span class="upchain">
+<b>
+ctrie-doc</b>
+<br/>
+<a href="index.html">
+Index</a>
+</span>
+&nbsp;&nbsp;&nbsp;&nbsp;</td>
+</tr>
+</table>
+</div>
+<div class="cludg-doc-body">
+<h2>
+ctrie-doc
+</h2>
+<table style="width: 100%;" class="summary-table">
+<tr class="table-heading-color">
+<th class="summary" colspan="2">
+Method summary</th>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie-doc.html#_g16041">
+make-diagram</a>
+</td>
+<td class="summary">
+thing context <em>&amp;key</em> <em>&amp;allow-other-keys</em></td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie-doc.html#_g16029">
+render</a>
+</td>
+<td class="summary">
+desc <em>&amp;optional</em> stream</td>
+</tr>
+</table>
+<table style="width: 100%;" class="summary-table">
+<tr class="table-heading-color">
+<th class="summary" colspan="2">
+Function summary</th>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie-doc.html#_g16028">
+all-descs</a>
+</td>
+<td class="summary">
+docs</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie-doc.html#_g16039">
+apidoc</a>
+</td>
+<td class="summary">
+<em>&amp;optional</em> (scope :external)</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie-doc.html#_g16027">
+collect-docs</a>
+</td>
+<td class="summary">
+<em>&amp;optional</em> (scope :external) (sort #'string&lt;)</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie-doc.html#_g16043">
+diagram</a>
+</td>
+<td class="summary">
+thing <em>&amp;optional</em> (context *context*)</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie-doc.html#_g16040">
+princ-apidoc</a>
+</td>
+<td class="summary">
+<em>&amp;optional</em> (scope :external)</td>
+</tr>
+</table>
+<table style="width: 100%;" class="summary-table">
+<tr class="table-heading-color">
+<th class="summary" colspan="2">
+Macro summary</th>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="ctrie-doc.html#_g16044">
+define-diagram</a>
+</td>
+<td class="summary">
+type (<em>&amp;optional</em> context) <em>&amp;body</em> body</td>
+</tr>
+</table>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g16029">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+render&nbsp;&nbsp;</td>
+<td class="lambda-list">
+desc <em>&amp;optional</em> stream</td>
+<td class="symbol-type">
+&nbsp;[Generic&nbsp;function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Output to STREAM a compact rendering of a 
+ documentation-descriptor suitable for inclusion in lightweight 
+ text-markup. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g16041">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+make-diagram&nbsp;&nbsp;</td>
+<td class="lambda-list">
+thing context <em>&amp;key</em> <em>&amp;allow-other-keys</em></td>
+<td class="symbol-type">
+&nbsp;[Generic&nbsp;function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Define a specific digram generation procedure specialized 
+ on the class of THING and optionally for a specific context, represented 
+ by an abitrary symbol naming that context. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g16027">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+collect-docs&nbsp;&nbsp;</td>
+<td class="lambda-list">
+<em>&amp;optional</em> (scope :external) (sort #'string&lt;)</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Regenerate on-disk html documentation and collect the cached 
+ in-memory descriptors for further processing. If SCOPE is specified 
+ it must be either <span class="keyword">
+:EXTERNAL. </span>
+corresponding to those symbols exported 
+ as the public API, or <span class="keyword">
+:HOME, </span>
+which designates all symbols defined 
+ locally in package. Output order may be customized by an optionally 
+ specified SORT function. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g16028">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+all-descs&nbsp;&nbsp;</td>
+<td class="lambda-list">
+docs</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Collect all 'descriptors' from an alist of the form 
+ '((symbol . descriptor-list) ... ) such as one generated by 
+ {defun:collect-docs}
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g16039">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+apidoc&nbsp;&nbsp;</td>
+<td class="lambda-list">
+<em>&amp;optional</em> (scope :external)</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Collect a list of strings representing the documentation for 
+ CL-CTRIE rendered in a compact format suitable for inclusion in a 
+ lightweight text-markup format document. If SCOPE is specified it 
+ must be either <span class="keyword">
+:EXTERNAL. </span>
+corresponding to those symbols exported as 
+ the public API, or <span class="keyword">
+:HOME, </span>
+which designates all symbols defined 
+ locally in package. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g16040">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+princ-apidoc&nbsp;&nbsp;</td>
+<td class="lambda-list">
+<em>&amp;optional</em> (scope :external)</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Print to *standard-output* the documentation for CL-CTRIE rendered 
+ in a compact format. This is intended primarily as a convenience to 
+ the interactive user seeking quick reference at the REPL. If SCOPE 
+ is specified it must be either <span class="keyword">
+:EXTERNAL. </span>
+corresponding to those 
+ symbols exported as the public API, or <span class="keyword">
+:HOME, </span>
+which designates all 
+ symbols defined locally in package. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g16043">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+diagram&nbsp;&nbsp;</td>
+<td class="lambda-list">
+thing <em>&amp;optional</em> (context *context*)</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+Generate a DONUTS diagram for THING, optionally specialized for 
+ a specific CONTEXT. See {defgeneric cl-ctrie::make-diagram}. 
+ </p>
+</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g16044">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+define-diagram&nbsp;&nbsp;</td>
+<td class="lambda-list">
+type (<em>&amp;optional</em> context) <em>&amp;body</em> body</td>
+<td class="symbol-type">
+&nbsp;[Macro]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-body">
+<p>
+define a diagrammatic representation of TYPE, optionally specialized 
+ for a specific CONTEXT. See {defgeneric cl-ctrie::make-diagram}. 
+ </p>
+</div>
+</div>
+</div>
+<div class="cludg-footer">
+Generated by&nbsp;<a href="mailto:ihatchondo@common-lisp.net" lang="en">
+CLDOC</a>
+- 2012-08-08 01:53:06</div>
+</body>
+</html>
