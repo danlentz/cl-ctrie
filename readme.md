@@ -79,17 +79,17 @@ The following files are the core sources currently necessary
 for correct ctrie operation. 
 
 - __`ctrie-package.lisp:`__  Package definition
-- __`ctrie.lisp        :`__  Ctrie implementation
-- __`ctrie-util.lisp   :`__  Supporting Utilities
+- __`ctrie.lisp:`__          Ctrie implementation
+- __`ctrie-util.lisp:`__     Supporting Utilities
 
 #### Supplemental
 
 The following files define extended functionality, management,
 and analysis facilities supporting the development of CL-CTRIE.
 
-- `ctrie-cas.lisp     :`  SBCL CAS extensions
-- `ctrie-doc.lisp     :`  Automated Documentation Support
-- `ctrie-test.lisp    :`  Test and Performance Measurement
+- `ctrie-cas.lisp:`   SBCL CAS extensions
+- `ctrie-doc.lisp:`   Automated Documentation Support
+- `ctrie-test.lisp:`  Test and Performance Measurement
 
 ### Documentation
 
@@ -118,27 +118,28 @@ _[structure]_        `CTRIE ()`
 
 > A CTRIE root container uniquely identifies a CTRIE instance, and
   contains the following perameters which specify the customizable
-  aspects of each CTRIE instance:
-   - READONLY-P, if true, prohibits any future modification or
+  aspects of each CTRIE:
+   - `READONLY-P`, if true, prohibits any future modification or
   cloning of this instance.
-   - TEST is a designator for an equality predicate that will be applied to
-  determine the disambiguation of any two keys. It is recommened that
-  this value be a symbol that is fboundp, to retain capability of
-  externalization (save/restore). At present, though, this is not
-  enforced and a function object or lambda expression will also be
-  accepted, albeit without the ability of save/restore.
-   - HASH is a designator for a hash function, which may be desirable to
-  customize when one has specific knowledge about the set of keys
-  which will populate the table.  At this time, a 32-bit hash is
-  recommended as this is what has been used for development and
+   - `TEST` is a designator for an equality predicate that will be
+  applied to disambiguate and determine the equality of any two
+  keys. It is recommened that this value be a symbol that is fboundp,
+  to retain capability of externalization (save/restore). At present,
+  though, this is not enforced and a function object or lambda
+  expression will also be accepted, albeit without the ability of
+  save/restore.
+   - `HASH` is a designator for a hash function, which may be
+  desirable to customize when one has specific knowledge about the set
+  of keys which will populate the table.  At this time, a 32-bit hash
+  is recommended as this is what has been used for development and
   testing and has been shown to provide good performance in
-  practice. As with TEST, it is recommended that HASH be specified
+  practice. As with `TEST`, it is recommended that `HASH` be specified
   by a symbol that is fboundp.
-   - ROOT is the slot used internally for storage of the root inode
+   - `ROOT` is the slot used internally for storage of the root inode
   structure that maintains the reference to the contents of the ctrie
-  proper.  The ctrie-root must only be accessed using the RDCSS root
-  node protocol defined by the end-user entrypoints ROOT-NODE-ACCESS
-  and ROOT-NODE-COMMIT.
+  proper.  The ctrie-root must only be accessed using the _RDCSS ROOT
+  NODE PROTOCOL_ defined by the top-level entry-points `ROOT-NODE-ACCESS`
+  and `ROOT-NODE-COMMIT`.
 
 
 _[function]_         `CTRIE-CLEAR  (CTRIE)`
