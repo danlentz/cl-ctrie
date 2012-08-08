@@ -63,8 +63,44 @@ cycle.
 
 ### Status
 
+TODO
 
 ### Ideosyncrasies
+
+Perhaps most ideosyncrasies of this ctrie implementation as compared
+with the [original](http://github.com/nbronsen/Ctries), written
+in Scala, result from the efforts I have taken to, where feasible,
+attempt to adopt a more functional oriented approach that is
+more representative of ideomatic, common-lisp coding style.  For
+example, rather than expose a general purpose GCAS and RDCSS api,
+these protocols are incorporated into ctrie-specific abstractions:
+`INODE-READ` `INODE-MUTATE` and `INODE-COMMIT` for GCAS, and
+`ROOT-NODE-ACCESS` `ROOT-NODE-REPLACE` and `ROOT-NODE-COMMIT` for
+RDCSS.  This has the benefit of being much easier to understand
+and work with (at least for me) than directly exposing in imperative
+style the intricate mechanations that underlie the ctrie algorithm.
+On the other hand, the further one strays from a direct translation
+of the original (verified) ctrie implementation, the greater the
+likelihood of introducing bugs into an environment (lock-free
+concurrent data structures) in which bugs can be extremely subtle
+and are notoriously difficult to detect.  I have attempted to
+strike an appropriate balance between these conflicting concerns,
+and I intend to mitigate the risk, at least in part, through
+development of a more extensive arsenal of regression tests and
+benchmarking facilities.
+
+In addition, there are a few differences in the feature set that
+is provided, such as a suite of mapping operators in leiu of a
+Java style iterator.  For the most part I expect that these
+changes will be preferable to developers accustomed to a more
+'lispy' coding style.
+
+For additional insight into the specifics unique to this ctrie
+implementation, an abbreviated reference to a number of internal
+details may be found in the section [Internal Reference](Internal
+Reference) of this document, or, of course, by referring to
+the [comprehensive documentation](doc/api/index.html) that is
+provided as part of this distribution.
 
 
 ### Source Files
@@ -110,7 +146,8 @@ The user api of cl-ctrie is should be largely familiar to the average
 common-lisp programmer.  Nearly all exported symbols of the CL-CTRIE 
 package begin with the prefix "ctrie" and thus can be convenientely
 incorporated via USE-PACKAGE or equivalent package definition.  The
-following definitions comprise the public user api:
+following definitions comprise a quick reference to the the public
+user api:
 
 * * * * *
 
@@ -119,7 +156,7 @@ _[structure]_        `CTRIE ()`
 > A CTRIE root container uniquely identifies a CTRIE instance, and
   contains the following perameters which specify the customizable
   aspects of each CTRIE:
-   - `READONLY-P` if not NIL, prohibits any future modification or
+   - `READONLY-P` if not `NIL` prohibits any future modification or
   cloning of this instance.
    - `TEST` is a designator for an equality predicate that will be
   applied to disambiguate and determine the equality of any two
