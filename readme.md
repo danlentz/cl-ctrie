@@ -69,26 +69,26 @@ TODO
 
 Perhaps most ideosyncrasies of this ctrie implementation as compared
 with the [original](http://github.com/axel22/Ctries), written in
-Scala, result from the efforts I have taken to, where feasible,
-attempt to adopt a more functional oriented approach that is more
-representative of ideomatic, common-lisp coding style.  For example,
-rather than expose a general purpose GCAS and RDCSS api, these
-protocols are incorporated into ctrie-specific abstractions:
-`INODE-READ` `INODE-MUTATE` and `INODE-COMMIT` for GCAS, and for
-RDCSS, `ROOT-NODE-ACCESS` `ROOT-NODE-REPLACE` and `ROOT-NODE-COMMIT.`
-These liberties I have taken have the benefit of providing an
-interface that is much easier to digest, understand, remember, and
-work with (at least for me) than direct exposure in imperative style
-of the intricate mechanations that underlie the ctrie algorithm.  On
-the other hand, the further one strays from a direct translation of
-the original (verified) ctrie implementation, the greater the
-likelihood of introducing bugs into an environment (lock-free
-concurrent data structure development) in which bugs can be extremely
-subtle and are notoriously difficult to detect.  I have attempted to
-strike an appropriate balance between these conflicting concerns, and
-I intend to mitigate the risk, at least in part, through development
-of a more extensive arsenal of regression tests and benchmarking
-facilities.
+Scala, result from the efforts I have taken to, where feasible, adopt
+an approach emphasizing more functional oriented decomposition of the
+algortithm, written in a manner more closely representative of
+ideomatic, common-lisp coding style.  For example, rather than expose
+a general purpose GCAS and RDCSS api, these protocols are incorporated
+into ctrie-specific abstractions. For _GCAS:_ `INODE-READ`
+`INODE-MUTATE` and `INODE-COMMIT` and for _RDCSS:_ `ROOT-NODE-ACCESS`
+`ROOT-NODE-REPLACE` and `ROOT-NODE-COMMIT.` These liberties I have
+taken have the benefit of providing an interface that is much easier
+to digest, understand, remember, and work with (at least for me) than
+direct exposure in imperative style of the intricate mechanations that
+underlie the ctrie algorithm.  On the other hand, the further one
+strays from a direct translation of the original (verified) ctrie
+implementation, the greater the likelihood of introducing bugs into an
+environment (lock-free concurrent data structure development) in which
+bugs can be extremely subtle and are notoriously difficult to detect.
+I have attempted to strike an appropriate balance between these
+conflicting concerns, and I intend to mitigate the risk, at least in
+part, through development of a more extensive arsenal of regression
+tests and benchmarking facilities.
 
 In addition, there are a few differences in the feature set that
 is provided, such as a suite of mapping operators in leiu of a
@@ -138,7 +138,7 @@ files incorporating all updates and changes as may be present in the
 source code, a (lightly) enhanced distribution of CLDOC is required
 and may be obtained on [github](http://github.com/danlentz/cldoc).
 
-The following sections provide a compact overview of the User API
+The following sections provide a compact overview of the user api
 and a reference to some internal definitions of interest.
 
 #### User API Reference
