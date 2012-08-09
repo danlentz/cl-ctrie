@@ -595,19 +595,20 @@
 
 
 (defun cnode-extended (cnode flag position new-arc)
-  "Construct a new cnode that is exactly like CNODE, but additionally
-  contains the BRANCH-NODE specified by parameter NEW-ARC and logical
-  index FLAG at the physical index POSITION within its vector of
-  allocated arcs.  The BITMAP of this new CNODE will be calculated as
-  an adjustment of the prior CNODE's BITMAP to reflect the presence of
-  this additional arc.  In addition, the physical index within the
-  extended storage vector for the other arcs present may also change
-  with respect to where they were located in the prior CNODE.  In
-  other words, the physical index of a given arc within the compressed
-  CNODE storage vector should never be relied upon directly, it should
-  always be accessed by calculation based on its LOGICAL index and the
-  current CNODE BITMAP as described in more detail by the
-  documentation for the functions `FLAG` and `FLAG-ARC-POSITION`"
+  "Construct a new cnode structure that is exactly like CNODE, but
+  additionally contains the BRANCH-NODE specified by parameter NEW-ARC
+  and logical index FLAG at the physical index POSITION within its
+  vector of allocated arcs.  The BITMAP of this new CNODE will be
+  calculated as an adjustment of the prior CNODE's BITMAP to reflect
+  the presence of this additional arc.  In addition, the physical
+  index within the extended storage vector for the other arcs present
+  may also change with respect to where they were located in the prior
+  CNODE.  In other words, the physical index of a given arc within the
+  compressed CNODE storage vector should never be relied upon
+  directly, it should always be accessed by calculation based on its
+  LOGICAL index and the current CNODE BITMAP as described in more
+  detail by the documentation for the functions `FLAG` `FLAG-VECTOR` and
+  `FLAG-ARC-POSITION`"
   (let* ((new-bitmap (logior flag (cnode-bitmap cnode)))
           (new-cnode  (make-cnode new-bitmap)))
     (prog1 new-cnode
@@ -619,9 +620,9 @@
 
 
 (defun cnode-updated (cnode position replacement-arc)
-  "Construct a new cnode identical to CNODE, but having the
-  BRANCH-NODE physically located at index POSITION within the storage
-  vector replaced by that specified by REPLACEMENT-ARC.  Unlike
+  "Construct a new cnode structure identical to CNODE, but having the
+  BRANCH-NODE physically located at POSITION within the storage
+  vector replaced by the one specified by REPLACEMENT-ARC.  Unlike
   `CNODE-EXTENDED` and `CNODE-TRUNCATED` the allocated storage and
   existing BITMAP of this CNODE will remain unchanged (as this is
   simply a one-for-one replacement) and correspondingly, no reordering
@@ -633,6 +634,15 @@
 
 
 (defun cnode-truncated (cnode flag pos)
+  "Construct a new cnode structure that is exactly like CNODE, but
+ with the arc at logical index FLAG and physical storage vector
+ location POS removed.  The new CNODE will have an updated bitmap
+ value that is adusted to reflect the removal of this arc, and the
+ position of other arcs within the storage vector of the new CNODE
+ will be adjusted in a manner analogous to that of `CNODE-EXTENDED`
+ More details on this process may be found by referring to the
+ documentation for the functions `FLAG` `FLAG-VECTOR` and
+ `FLAG-ARC-POSITION`"
   (let* ((new-bitmap (logxor flag (cnode-bitmap cnode)))
           (new-cnode (make-cnode new-bitmap)))
     (prog1 new-cnode
@@ -645,6 +655,13 @@
 
 
 (defun map-cnode (fn cnode)
+  "Construct a new cnode structure that is exactly like CNODE, but
+  with each arc (BRANCH-NODE) present in CNODE replaced by the result
+  of applying FN to that arc.  I.e., a simple functional mapping from
+  the old CNODE by FN.  As with `CNODE-UPDATED` the allocated storage and
+  BITMAP of the resulting CNODE will remain unchanged from the
+  original, and no physical reordering of nodes within the storage
+  vector will occur"
   (check-type fn function)
   (check-type cnode cnode)
   (aprog1 (make-cnode (cnode-bitmap cnode))
