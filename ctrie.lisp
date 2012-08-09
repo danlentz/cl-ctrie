@@ -677,10 +677,12 @@
   for this reconciliation vary according to the node type and 
   specializations are defined on a casewise basis."))
 
+
 (defmethod refresh ((cnode cnode) gen)
   "Return a new cnode structure identical to CNODE, but with any
     arcs that are INODES refreshed to generational descriptor GEN"
   (map-cnode (lambda (arc) (refresh arc gen)) cnode))
+
 
 (defmethod refresh ((inode inode) gen)
   "Generate a replacement for inode that continues to reference the
@@ -696,6 +698,7 @@
     (declare (ignore stamp))
     (make-inode val gen (local-time:now))))
 
+
 (defmethod refresh ((snode snode) gen)
   "An SNODE represents a LEAF storage cell and does not require
     any coordination with generational descriptors, and so is simply
@@ -704,10 +707,21 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Compression Operations
+;; Arc Retraction Protocol
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defun cnode-contracted (cnode level)
+  "The _CONTRACTION_ of a CNODE is an ajustment performed when a CNODE
+  at depth other than level 0 contains only a single SNODE arc.  In
+  such a case, that SNODE is entombed in a new TNODE, which is
+  returned as the result of the CNODE contraction. In all other cases
+  the CNODE is simply returned as-is.  A CONTRACTION represents the
+  first of the two-step _ARC RETRACTION PROTOCOL_ that effects the reclaimation
+  of allocated storage no longer used and the optimization of of lookup
+  efficiency by compacting CTRIE depth and thereby the number of levels
+  which must be traversed.  For further information, refer to the function
+  `CNODE-COMPRESSED` which implements the second stage of this protocol,
+  completing the process."
   (let1 arcs (cnode-arcs cnode)
     (if (and (plusp level) (eql 1 (logcount (cnode-bitmap cnode))))
       (atypecase (svref arcs 0)
@@ -717,11 +731,26 @@
 
 
 (defun cnode-compressed (cnode level)
+  "The _COMPRESSION_ of a CNODE is the second step of the _ARC
+  RETRACTION PROTOCOL_ completing a retraction that has been initiated
+  by `CNODE-CONTRACTED`.  The CNODE compression is computed by
+  generating a replacement cnode structure that is similar to CNODE,
+  but with any entombed inode arcs created during contraction simply
+  replaced by the SNODE that had been entombed. This is called the
+  _RESURRECTION_ of that SNODE. After all entombed inode arcs of a
+  cnode have been collapsed into simple SNODE leaves, if the resulting
+  CNODE has been compressed down to only a single SNODE leaf, it is
+  subjected to another CONTRACTION before it is returned as the result
+  of the compression and completes the _ARC RETRACTION PROTOCOL_"
   (check-type cnode cnode)
   (cnode-contracted (map-cnode #'resurrect cnode) level))
 
 
 (defun clean (inode level)
+  "CLEAN is the basic entry-point into the arc retraction protocol. Given an
+  arbitrary, non-root inode referencing a CNODE that can be compressed,
+  update that inode to reference the result of that compression.  Otherwise
+  INODE will remain unaffected."
   (check-type inode inode)
   (check-type level fixnum)
   (loop until (let1 node (inode-read inode)
@@ -731,23 +760,26 @@
 
 
 (defun clean-parent (parent-inode target-inode key level)
+  ""
   (check-type parent-inode (or null inode))
   (check-type target-inode inode)
   (check-type level        fixnum)
-  (if (not (eq #1=(inode-gen target-inode) (inode-gen (find-ctrie-root *ctrie*))))
-    (throw :restart #1#)
-    (loop while (let ((parent-ref  (inode-read parent-inode))
-                       (target-ref (inode-read target-inode)))
-                  (when (cnode-p parent-ref)
-                    (let* ((bmp   (cnode-bitmap parent-ref))
-                            (flag (flag key level))
-                            (pos  (flag-arc-position flag bmp)))
-                      (when (and (flag-present-p flag bmp) (tnode-p target-ref)
-                              (eq target-inode (svref (cnode-arcs parent-ref) pos))
-                              (let1 new-cnode (cnode-updated parent-ref pos
-                                                (resurrect target-inode))
-                                (not (inode-mutate parent-inode parent-ref
-                                       (cnode-contracted new-cnode level))))))))))))
+  (let1 target-gen (inode-gen target-inode)
+    (if (not (eq target-gen (inode-gen (root-node-access *ctrie*))))
+      (throw :restart target-gen)
+      (loop while
+        (let ((parent-ref  (inode-read parent-inode))
+               (target-ref (inode-read target-inode)))
+          (when (cnode-p parent-ref)
+            (let* ((bmp   (cnode-bitmap parent-ref))
+                    (flag (flag key level))
+                    (pos  (flag-arc-position flag bmp)))
+              (when (and (flag-present-p flag bmp)
+                      (tnode-p target-ref)
+                      (eq target-inode (svref (cnode-arcs parent-ref) pos)))
+                (let1 new-cnode (cnode-updated parent-ref pos (resurrect target-inode))
+                  (not (inode-mutate parent-inode parent-ref
+                         (cnode-contracted new-cnode level))))))))))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

@@ -952,9 +952,41 @@ _[generic-function]_ `REFRESH  (PLACE GEN)`
 
 _[function]_         `CNODE-CONTRACTED  (CNODE LEVEL)`
 
+> The _CONTRACTION_ of a CNODE is an ajustment performed when a CNODE
+  at depth other than level 0 contains only a single SNODE arc.  In
+  such a case, that SNODE is entombed in a new TNODE, which is
+  returned as the result of the CNODE contraction. In all other cases
+  the CNODE is simply returned as-is.  A CONTRACTION represents the
+  first of the two-step _ARC RETRACTION PROTOCOL_ that effects the reclaimation
+  of allocated storage no longer used and the optimization of of lookup
+  efficiency by compacting CTRIE depth and thereby the number of levels
+  which must be traversed.  For further information, refer to the function
+  `CNODE-COMPRESSED` which implements the second stage of this protocol,
+  completing the process.
+
+
 _[function]_         `CNODE-COMPRESSED  (CNODE LEVEL)`
 
+> The _COMPRESSION_ of a CNODE is the second step of the _ARC
+  RETRACTION PROTOCOL_ completing a retraction that has been initiated
+  by `CNODE-CONTRACTED`.  The CNODE compression is computed by
+  generating a replacement cnode structure that is similar to CNODE,
+  but with any entombed inode arcs created during contraction simply
+  replaced by the SNODE that had been entombed. This is called the
+  _RESURRECTION_ of that SNODE. After all entombed inode arcs of a
+  cnode have been collapsed into simple SNODE leaves, if the resulting
+  CNODE has been compressed down to only a single SNODE leaf, it is
+  subjected to another CONTRACTION before it is returned as the result
+  of the compression and completes the _ARC RETRACTION PROTOCOL_
+
+
 _[function]_         `CLEAN  (INODE LEVEL)`
+
+> CLEAN is the basic entry-point into the arc retraction protocol. Given an
+  arbitrary, non-root inode referencing a CNODE that can be compressed,
+  update that inode to reference the result of that compression.  Otherwise
+  INODE will remain unaffected.
+
 
 _[function]_         `CLEAN-PARENT  (PARENT-INODE TARGET-INODE KEY LEVEL)`
 
@@ -1263,6 +1295,11 @@ _[macro]_            `DEFINE-DIAGRAM  (TYPE (&OPTIONAL CONTEXT) &BODY BODY)`
 
 > Define a diagrammatic representation of TYPE, optionally specialized
   for a specific CONTEXT. See {defgeneric cl-ctrie::make-diagram}.
+
+
+* * * * * * *
+
+generic cl-ctrie::make-diagram}.
 
 
 * * * * * * *
