@@ -1218,18 +1218,3 @@ _[macro]_            `DEFINE-DIAGRAM  (TYPE (&OPTIONAL CONTEXT) &BODY BODY)`
 
 * * * * * * *
 
-GRAM  (TYPE (&OPTIONAL CONTEXT) &BODY BODY)`
-
-> Define a diagrammatic representation of TYPE, optionally specialized
-  for a specific CONTEXT. See {defgeneric cl-ctrie::make-diagram}.
-
-
-* * * * * * *
-* * * * * * *
-* * * * * * *
-* * * * * * *
-* * * * * * *
-* * * * * * *
-* * * * * * *
-* * * * * * *
-
