@@ -17,7 +17,7 @@
   '(ctrie make-ctrie ctrie-p ctrie-test
      ctrie-hash ctrie-readonly-p  ctrie-put ctrie-get ctrie-drop ctrie-do
      ctrie-map ctrie-map-keys ctrie-map-values ctrie-map-into ctrie-keys
-     ctrie-values ctrie-size ctrie-clear ctrie-pprint ctrie-error
+     ctrie-values ctrie-size ctrie-clear ctrie-pprint 
      ctrie-to-alist ctrie-to-hashtable ctrie-from-hashtable
      ctrie-from-alist ctrie-empty-p ctrie-save ctrie-load ctrie-export
      ctrie-import ctrie-snapshot ctrie-error ctrie-structural-error
@@ -343,27 +343,29 @@
   "Update documentation sections of the README file. When an output stream
   is specified, the results are also echoed to that stream. To inhibit
   output, invoke as `(readme (make-broadcast-stream))` or use `README-QUIETLY`"
+  ;; todo: rewrite when requirements stabilize
   (princ (let1 docs (collect-docs :home)
-      (flet ((gen (syms-prop marker-prop)  
-               (apply #'concatenate 'string 
-                 (loop with in-region with region-line = -1
-                   with syms   = (get 'readme syms-prop)
-                   with marker = (get 'readme marker-prop)
-                   for line in (read-file-to-string-list $README-PATHNAME)
-                   when (not in-region)
-                   collect (progn
-                             (when (equalp line marker)
-                               (setf in-region t))
-                             (concatenate 'string line (format nil "~%")))
-                   when in-region  do (incf region-line)
-                   when (and in-region (zerop region-line))
-                   collect (readmedoc docs syms)
-                   when (and in-region (plusp region-line) (equalp line marker))
-                   collect (progn
-                             (setf in-region nil)
-                             (concatenate 'string line (format nil "~%")))))))
-        (write-string-to-file (gen :user-api     :user-marker)     $readme-pathname)
-        (write-string-to-file (gen :internal-ref :internal-marker) $readme-pathname)))
+           (flet ((gen (syms-prop marker-prop)  
+                    (apply #'concatenate 'string 
+                      (loop
+                        with in-region   = nil
+                        with region-line = -1
+                        with syms        = (get 'readme syms-prop)
+                        with marker      = (get 'readme marker-prop)
+                        for line in (read-file-to-string-list $README-PATHNAME)
+                        when (not in-region) collect (progn
+                                                       (when (equalp line marker)
+                                                         (setf in-region t))
+                                                       (concatenate 'string line
+                                                         (format nil "~%")))
+                        when in-region do (incf region-line)
+                        when (and in-region (zerop region-line)) collect (readmedoc docs syms)
+                        when (and in-region (plusp region-line) (equalp line marker))
+                        collect (progn
+                                  (setf in-region nil)
+                                  (concatenate 'string line (format nil "~%")))))))
+             (write-string-to-file (gen :user-api     :user-marker)     $README-PATHNAME)
+             (write-string-to-file (gen :internal-ref :internal-marker) $README-PATHNAME)))
     stream)
   (values))
 

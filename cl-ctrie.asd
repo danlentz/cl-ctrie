@@ -8,7 +8,7 @@
   :description      "CTrie: a lock-free, concurrent, key/value map"
   :author           "Dan Lentz <danlentz@gmail.com>"
   :license          "MIT"
-  :version          "0.0.4"
+  :version          "0.0.5"
   
   :long-description "This is a common-lisp implementation of the CTrie unordered map
                      data-structure described in the paper 'Concurrent Tries with
@@ -64,7 +64,7 @@
                      this is not necessarily a high priority for the initial development
                      cycle."
   
-  :weakly-depends-on (:cl-store :donuts :cldoc)
+  :weakly-depends-on (:cl-store :donuts :cldoc :cl-ppcre)
   :depends-on (:alexandria :lisp-unit :local-time)
   :components ((:static-file  "cl-ctrie.asd")
                 (:static-file "readme.md")
@@ -94,4 +94,13 @@
   nil)
 
 (defmethod asdf:operation-done-p ((o asdf:test-op) (c (eql (asdf:find-system :cl-ctrie-test))))
+  nil)
+
+#+cldoc
+(defmethod asdf:perform ((o asdf::doc-op) (c (eql (asdf:find-system :cl-ctrie))))
+  (asdf:load-system :cl-ctrie)
+  (funcall (intern (symbol-name :readme-quietly) (find-package :cl-ctrie))))
+
+#+cldoc
+(defmethod asdf:operation-done-p ((o asdf::doc-op) (c (eql (asdf:find-system :cl-ctrie))))
   nil)
