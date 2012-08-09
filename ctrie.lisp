@@ -762,7 +762,7 @@
 
 
 (defun clean-parent (parent-inode target-inode key level)
-  "During a CTRIE-DROP` (`%remove`) operation, if the result of a KEY/VALUE
+  "During a `CTRIE-DROP` (`%remove`) operation, if the result of a KEY/VALUE
   removal is an arc consisting of an `ENTOMBED` inode (one referencing a TNODE), then,
   if that arc remains accessible from the parent of a CNODE containing it, generate
   the compression of that CNODE and update its parent INODE with the result."
@@ -967,7 +967,32 @@
 
 
 (defun/inline root-node-replace (ctrie ov ovmain nv)
-  "rdcss api for replacement of root ctrie inode"
+  "ROOT-NODE-REPLACE implements the _RDCSS ROOT NODE PROTOCOL_ for
+  replacement of the ROOT INODE of a CTRIE structure with another one
+  that contains new or alternative values, achieving the end-result
+  effectively the same as if by mutation.  The replacement of the root
+  inode is accomplished in two, basic conceptual stages. First, an
+  `RDCSS-DESCRIPTOR` object which specifies in full the current state
+  and all desired changes in the proposed resulting state.  Thus,
+  whether any individual replacement attempt succeeds or fails, either
+  result is guarenteed to represent a valid state. An attempt is then
+  made to atomically swap this RDCSS-DESCRIPTOR with the current CTRIE
+  root inode.  Note that, although it contains all of the information
+  representing two, distinct, root inode states, the RDCSS-DESCRIPTOR
+  is not, itself, a valid root inode.  That is the reason why all
+  access to the root inode must be accomplished using this specialized
+  _RDCSS ROOT NODE PROTOCOL_ rather than just the _GCAS INODE
+  PROTOCOL_ alone, as is done with all other non-root inodes.  Once an
+  atomic compare-and-swap of an RDCSS-DESCRIPTOR object with the root
+  inode completes successfully, `ROOT-NODE-COMMIT` is invoked which
+  will attempt to complete the second step of this protocol.  The
+  result of that commit will be one or the other of the two valid
+  states defined in the RDCSS-DESCRIPTOR object.  If another thread
+  concurrently attempts access to a root node holding an
+  RDCSS-DESCRIPTOR object rather than an INODE, it will invoke
+  `ROOT-NODE-COMMIT` itself, possibly prempting our own attempt, but
+  guaranteeing wait-free access to a valid root node to all concurrent
+  threads."
   (let1 desc (make-rdcss-descriptor :ov ov :ovmain ovmain :nv nv)
     (if (cas (find-ctrie-root ctrie) ov desc)
       (prog2 (root-node-commit ctrie nil)
