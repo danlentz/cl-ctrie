@@ -901,6 +901,12 @@ _[function]_         `MAP-CNODE  (FN CNODE)`
 
 _[generic-function]_ `REFRESH  (PLACE GEN)`
 
+> Reconcile the node specified by PLACE with an
+  updated generational descriptor object, GEN. The actions required
+  for this reconciliation vary according to the node type and 
+  specializations are defined on a casewise basis.
+
+
 _[function]_         `CNODE-CONTRACTED  (CNODE LEVEL)`
 
 _[function]_         `CNODE-COMPRESSED  (CNODE LEVEL)`
