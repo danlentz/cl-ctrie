@@ -710,7 +710,7 @@
 ;; Arc Retraction Protocol
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defun cnode-contracted (cnode level)
+(defun/inline cnode-contracted (cnode level)
   "The _CONTRACTION_ of a CNODE is an ajustment performed when a CNODE
   at depth other than level 0 contains only a single SNODE arc.  In
   such a case, that SNODE is entombed in a new TNODE, which is
@@ -730,7 +730,7 @@
       cnode)))
 
 
-(defun cnode-compressed (cnode level)
+(defun/inline cnode-compressed (cnode level)
   "The _COMPRESSION_ of a CNODE is the second step of the _ARC
   RETRACTION PROTOCOL_ completing a retraction that has been initiated
   by `CNODE-CONTRACTED`.  The CNODE compression is computed by
@@ -739,28 +739,33 @@
   replaced by the SNODE that had been entombed. This is called the
   _RESURRECTION_ of that SNODE. After all entombed inode arcs of a
   cnode have been collapsed into simple SNODE leaves, if the resulting
-  CNODE has been compressed down to only a single SNODE leaf, it is
-  subjected to another CONTRACTION before it is returned as the result
-  of the compression and completes the _ARC RETRACTION PROTOCOL_"
+  CNODE has been compressed so far as to contain only a single SNODE
+  leaf, it is subjected to another CONTRACTION before it is returned
+  as the result of the compression. Otherwise it is simply returned
+  and represents a complete iteration of the _ARC RETRACTION PROTOCOL_"
   (check-type cnode cnode)
   (cnode-contracted (map-cnode #'resurrect cnode) level))
 
 
-(defun clean (inode level)
+(defun/inline clean (inode level)
   "CLEAN is the basic entry-point into the arc retraction protocol. Given an
   arbitrary, non-root inode referencing a CNODE that can be compressed,
   update that inode to reference the result of that compression.  Otherwise
   INODE will remain unaffected."
   (check-type inode inode)
   (check-type level fixnum)
-  (loop until (let1 node (inode-read inode)
-                (if (cnode-p node)
-                  (inode-mutate inode node (cnode-compressed node level))
-                  t))))
+  (loop until
+    (let1 node (inode-read inode)
+      (if (cnode-p node)
+        (inode-mutate inode node (cnode-compressed node level))
+        t))))
 
 
 (defun clean-parent (parent-inode target-inode key level)
-  ""
+  "During a CTRIE-DROP` (`%remove`) operation, if the result of a KEY/VALUE
+  removal is an arc consisting of an `ENTOMBED` inode (one referencing a TNODE), then,
+  if that arc remains accessible from the parent of a CNODE containing it, generate
+  the compression of that CNODE and update its parent INODE with the result."
   (check-type parent-inode (or null inode))
   (check-type target-inode inode)
   (check-type level        fixnum)
@@ -794,14 +799,22 @@
 
 
 (deftype branch-node ()
+  "a BRANCH-NODE represents a single arc typically contained
+  within A CNODE."
   `(or inode snode))
 
 
 (deftype main-node ()
+  "A MAIN-NODE is a node that typically represents a specific
+  depth or level within the ctrie and is referenced
+  by its own unique inode."
   `(or cnode lnode tnode))
 
 
 (defgeneric leaf-node-key (resource)
+  (:documentation "Return the KEY contained in a node that may be
+  either an SNODE or entombed SNODE, regardless of which kind it
+  happens to be")
   (:method ((snode snode))
     (snode-key snode))
   (:method ((tnode tnode))
@@ -809,6 +822,9 @@
 
 
 (defgeneric leaf-node-value (resource)
+  (:documentation "Return the VALUE contained in a node that may be
+  either an SNODE or entombed SNODE, regardless of which kind it
+  happens to be")
   (:method ((snode snode))
     (snode-value snode))
   (:method ((tnode tnode))
@@ -859,15 +875,15 @@
 
 
 (defmacro/once with-ctrie (&once ctrie &body body)
-  "Configure the dynamic environment with the appropriate condition handlers,
-  control fixtures, and instrumentation necessary to perform the
-  operations in BODY on the specified CTRIE. Unless specifically
+  "Configure the dynamic environment with the appropriate condition
+  handlers, control fixtures, and instrumentation necessary to execute
+  the operations in BODY on the specified CTRIE. Unless specifically
   documented, the particular configuration of this dynamic environment
   should be considered an implementation detail and not relied upon. A
   particular exception, however, is that within the dynamic extent of
   a WITH-CTRIE form, the code implementing a CTRIE operation may
   expect that the special variable `*CTRIE*` will be bound to the root
-  container of CTRIE operated upon.  See also the documentation for
+  container of subject CTRIE.  See also the documentation for
   `*CTRIE*`"
   `(let* ((*ctrie* ,ctrie))
      (sb-ext:with-timeout *timeout*     
@@ -887,7 +903,7 @@
   FIND-CTRIE-ROOT is to incorporate a level of indirection specialized
   on the class of the root container to facilitate future extension
   with alternate storage models, e.g., an external persistent disk-based
-  store. See {defgeneric (cas cl-ctrie::find-ctrie-root)}")
+  store. See also `(cas cl-ctrie::find-ctrie-root)`")
   (:method ((ctrie ctrie))
     (ctrie-root ctrie)))
 
@@ -895,34 +911,35 @@
 (defgeneric (cas find-ctrie-root) (ctrie-designator old new)
   (:documentation "(CAS FIND-CTRIE-ROOT) implements the atomic
   compare-and swap subprimitive that is the operational analogue to
-  {defgeneric cl-ctrie::find-ctrie-root}. It should not be referenced
-  by the higher-level implementation or end-user code. The purpose of
-  (CAS FIND-CTRIE-ROOT) is to incorporate a level of indirection specialized
-  on the class of the root container to facilitate future extension
-  with alternate storage models, e.g., an external persistent disk-based
-  store.")
+  `FIND-CTRIE-ROOT`. It should not be referenced by the higher-level
+  implementation or end-user code. The purpose of
+  `(CAS FIND-CTRIE-ROOT)` is to incorporate a level of indirection
+  specialized on the class of the root container to facilitate future
+  extension with alternate storage models, e.g., an external
+  persistent disk-based store.")
   (:method ((ctrie ctrie) old new)
     (cas (ctrie-root ctrie) old new)))
 
 
-(defstruct rdcss-descriptor 
+(defstruct (rdcss-descriptor
+             (:copier nil))
   "An RDCSS-DESCRIPTOR object represents a 'plan' for a proposed RDCSS
   (restricted double compare single swap) operation. The use of this
   descriptor object provides the means to effect an atomic RDCSS in
-  software, requiring only hardware support for single CAS, as that is
-  what is commonly available on curent consumer hardware.
-   - OV         designates a slot containing the OLD (current) root inode.
-                If the swap is unsuccessful, the resulting ctrie will revert
-                to this structure as the root inode. 
-   - OVMAIN     designates a slot containing the CNODE that is referenced
-                by the OLD (current) root inode.
-   - NV         designates a slot containing a fully assembled replacement
-                root inode referencing a valid CNODE. This pair will become
-                the root inode and level-0 main-node of the ctrie if the
-                swap is successful.
-   - COMMITTED  designates a flag which, when not NIL, indicates that the
-                RDCSS plan defined by this descriptor has completed
-                successfully."
+  software, requiring only hardware support for single-word CAS, which is
+  preferable because it is commonly available on curent consumer hardware.
+   - `OV`        designates a slot containing the OLD (current) root inode.
+                 If the swap is unsuccessful, the resulting ctrie will revert
+                 to this structure as the root inode. 
+   - `OVMAIN`    designates a slot containing the CNODE that is referenced
+                 by the OLD (current) root inode.
+   - `NV`        designates a slot containing a fully assembled replacement
+                 root inode referencing a valid CNODE. This pair will become
+                 the root inode and level 0 MAIN-NODE of the ctrie if the
+                 swap is successful.
+   - `COMMITTED` designates a flag which, when not NIL, indicates that the
+                 RDCSS plan defined by this descriptor has completed
+                 successfully"
   (ov        nil :read-only t)
   (ovmain    nil :read-only t)
   (nv        nil :read-only t)
@@ -930,19 +947,19 @@
 
 
 (defun/inline root-node-access (ctrie &optional abort)
-  "ROOT-NODE-ACCESS extends {defgeneric cl-ctrie::FIND-CTRIE-ROOT},
-  implementing the RDCSS root node api for access to root inode of
+  "ROOT-NODE-ACCESS extends `FIND-CTRIE-ROOT`,
+  implementing the _RDCSS ROOT NODE PROTOCOL_ for access to root inode of
   CTRIE.  In particular, it ensures that if, instead of an inode, the
   root of CTRIE contains an RDCSS descriptor of a proposed root-node
-  update, that it will immediately invoke {defun
-  cl-ctrie::ROOT-NODE-COMMIT} to act on that descriptor and return an
-  INODE struct that is the result of the completed commit process.
-  ROOT-NODE-ACCESS only provides access to the root inode
-  _structure_. It does not provide safe access to the _contents_ of
-  that inode itself. In order to access those contents, the root inode
-  returned by ROOT-NODE-ACCESS must be further processed by {defun
-  cl-ctrie::INODE-READ} in order to still properly comply with the
-  undrlying GCAS protocol implementation for inodes."
+  update, that it will immediately invoke `ROOT-NODE-COMMIT` to act
+  on that descriptor and return an INODE struct that is the result of
+  the completed commit process. `ROOT-NODE-ACCESS` only provides access
+  to the root inode _STRUCTURE_ and in particular it does not provide
+  safe access to the _CONTENT_ of that inode. In order to access those
+  contents, the root inode returned by `ROOT-NODE-ACCESS` must be further
+  processed by `INODE-READ` in order to still properly comply with the
+  underlying GCAS protocol implementation requirements common to all
+  inodes"
   (sb-thread:barrier (:read)
     (atypecase (find-ctrie-root ctrie)
       (inode it)
