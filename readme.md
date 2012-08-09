@@ -154,11 +154,12 @@ user api:
 
 * * * * * *
 
+
 _[structure]_        `CTRIE ()`
 
-> A CTRIE root container uniquely identifies a CTRIE instance, and
-  contains the following perameters which specify the definable
-  aspects of each CTRIE:
+> A CTRIE structure is the root container that uniquely identifies a CTRIE
+  instance, and  contains the following perameters which specify the
+  definable aspects of each CTRIE:
    - `READONLY-P` if not `NIL` prohibits any future modification or
   cloning of this instance.
    - `TEST` is a designator for an equality predicate that will be
@@ -185,7 +186,7 @@ _[structure]_        `CTRIE ()`
 _[function]_         `MAKE-CTRIE  (&REST ARGS &KEY NAME ROOT (READONLY-P NIL)
                                    (TEST 'EQUAL) (HASH 'SXHASH))`
 
-> CREATE a new CTRIE instance. This is the entry-point constructor api
+> CREATE a new CTRIE instance. This is the entry-point constructor 
   intended for use by the end-user.
 
 
@@ -361,7 +362,8 @@ documentation](doc/api/index.html) of all symbols is also provided,
 and should be considered the authoratative reference to the CL-CTRIE
 implementation.
 
-* * * * * *
+* * * * * * *
+
 
 _[special-variable]_ `*CTRIE*  (NIL)`
 
@@ -420,9 +422,9 @@ _[macro]_            `CATCH-CASE  (FORM &REST CASES)`
 
 _[structure]_        `CTRIE ()`
 
-> A CTRIE root container uniquely identifies a CTRIE instance, and
-  contains the following perameters which specify the definable
-  aspects of each CTRIE:
+> A CTRIE structure is the root container that uniquely identifies a CTRIE
+  instance, and  contains the following perameters which specify the
+  definable aspects of each CTRIE:
    - `READONLY-P` if not `NIL` prohibits any future modification or
   cloning of this instance.
    - `TEST` is a designator for an equality predicate that will be
@@ -490,9 +492,9 @@ _[macro]_            `WITH-CTRIE  (&ONCE CTRIE &BODY BODY)`
   should be considered an implementation detail and not relied upon. A
   particular exception, however, is that within the dynamic extent of
   a WITH-CTRIE form, the code implementing a CTRIE operation may
-  expect that the special variable *CTRIE* will be bound to the root
+  expect that the special variable `*CTRIE*` will be bound to the root
   container of CTRIE operated upon.  See also the documentation for
-  '*CTRIE*'
+  `*CTRIE*`
 
 
 _[function]_         `FLAG  (KEY LEVEL)`
@@ -820,7 +822,7 @@ _[generic-function]_ `RESURRECT  (NODE)`
 
 _[structure]_        `CNODE ()`
 
-> Content Node
+> A CNODE, or 'Ctrie Node'
 
 
 _[function]_         `CNODE-P  (OBJECT)`
@@ -1105,6 +1107,19 @@ _[condition]_        `CTRIE-GENERATIONAL-MISMATCH (CTRIE-STRUCTURAL-ERROR)`
    outdated or inconsistent node during its attempted traversal
 
 
+_[function]_         `README  (&OPTIONAL (STREAM *STANDARD-OUTPUT*))`
+
+> Update documentation sections of the README file. When an output stream
+  is specified, the results are also echoed to that stream. To inhibit
+  output, invoke as `(readme (make-broadcast-stream))` or use `README-QUIETLY`
+
+
+_[function]_         `README-QUIETLY  ()`
+
+> Update documentation sections of the README file, inhibiting any other
+  printed output.
+
+
 _[function]_         `APIDOC  (&OPTIONAL (SCOPE :EXTERNAL))`
 
 > Collect a list of strings representing the documentation for
@@ -1117,7 +1132,7 @@ _[function]_         `APIDOC  (&OPTIONAL (SCOPE :EXTERNAL))`
 
 _[function]_         `PRINC-APIDOC  (&OPTIONAL (SCOPE :EXTERNAL))`
 
-> Print to *standard-output* the documentation for CL-CTRIE rendered
+> Print to `*STANDARD-OUTPUT*` the documentation for CL-CTRIE rendered
   in a compact format.  This is intended primarily as a convenience to
   the interactive user seeking quick reference at the REPL.  If SCOPE
   is specified it must be either :EXTERNAL. corresponding to those
@@ -1136,45 +1151,11 @@ _[function]_         `COLLECT-DOCS  (&OPTIONAL (SCOPE :EXTERNAL)
   specified SORT function.
 
 
-_[method]_           `RENDER  ((DESC CLDOC::DEFCONSTANT-DESCRIPTOR) &OPTIONAL
-                               STREAM)`
-
-_[method]_           `RENDER  ((DESC CLDOC::DEFPARAMETER-DESCRIPTOR) &OPTIONAL
-                               STREAM)`
-
-_[method]_           `RENDER  ((DESC CLDOC::DEFVAR-DESCRIPTOR) &OPTIONAL STREAM)`
-
-_[method]_           `RENDER  ((DESC CLDOC::DEFMACRO-DESCRIPTOR) &OPTIONAL
-                               STREAM)`
-
-_[method]_           `RENDER  ((DESC CLDOC::DEFMETHOD-DESCRIPTOR) &OPTIONAL
-                               STREAM)`
-
-_[method]_           `RENDER  ((DESC CLDOC::DEFGENERIC-DESCRIPTOR) &OPTIONAL
-                               STREAM)`
-
-_[method]_           `RENDER  ((DESC CLDOC::DEFUN-DESCRIPTOR) &OPTIONAL STREAM)`
-
-_[method]_           `RENDER  ((DESC CLDOC::DEFINE-CONDITION-DESCRIPTOR)
-                               &OPTIONAL STREAM)`
-
-_[method]_           `RENDER  ((DESC CLDOC::DEFSTRUCT-DESCRIPTOR) &OPTIONAL
-                               STREAM)`
-
-_[method]_           `RENDER  (DESC &OPTIONAL STREAM)`
-
-_[generic-function]_ `RENDER  (DESC &OPTIONAL STREAM)`
-
-> Output to STREAM a compact rendering of a
-   documentation-descriptor suitable for inclusion in lightweight
-   text-markup.
-
-
 _[macro]_            `DEFINE-DIAGRAM  (TYPE (&OPTIONAL CONTEXT) &BODY BODY)`
 
-> define a diagrammatic representation of TYPE, optionally specialized
+> Define a diagrammatic representation of TYPE, optionally specialized
   for a specific CONTEXT. See {defgeneric cl-ctrie::make-diagram}.
 
 
-* * * * * *
+* * * * * * *
 

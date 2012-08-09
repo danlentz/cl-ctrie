@@ -5,6 +5,62 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Specifications for automated README (re)generation  
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define-symbol-macro $readme-pathname
+  (asdf:system-relative-pathname (asdf:find-system :cl-ctrie) "readme.md"))
+
+
+(setf (get 'readme :user-marker) "* * * * * *")
+(setf (get 'readme :user-api)
+  '(ctrie make-ctrie ctrie-p ctrie-test
+     ctrie-hash ctrie-readonly-p  ctrie-put ctrie-get ctrie-drop ctrie-do
+     ctrie-map ctrie-map-keys ctrie-map-values ctrie-map-into ctrie-keys
+     ctrie-values ctrie-size ctrie-clear ctrie-pprint ctrie-error
+     ctrie-to-alist ctrie-to-hashtable ctrie-from-hashtable
+     ctrie-from-alist ctrie-empty-p ctrie-save ctrie-load ctrie-export
+     ctrie-import ctrie-snapshot ctrie-error ctrie-structural-error
+     ctrie-operational-error ctrie-operation-retries-exceeded
+     ctrie-not-implemented ctrie-not-supported
+     ctrie-invalid-dynamic-context ctrie-generational-mismatch))
+
+
+(setf (get 'readme :internal-marker) "* * * * * * *")
+(setf (get 'readme :internal-ref)  
+  '(*ctrie* *retries* *timeout*
+     multi-catch catch-case
+     ctrie ctrie-p ctrie-hash ctrie-test ctrie-readonly-p cthash ctequal
+     with-ctrie flag flag-present-p flag-arc-position flag-vector
+     ref ref-p ref-stamp ref-value ref-prev
+     failed-ref failed-ref-p failed-ref-prev
+     inode inode-p inode-gen inode-ref make-inode gcas-compare-and-set
+     inode-read inode-mutate inode-commit
+     snode snode-p snode-key snode-value
+     lnode lnode-p lnode-elt lnode-next enlist lnode-removed lnode-inserted
+     lnode-search lnode-length tnode tnode-p tnode-cell entomb resurrect
+     cnode cnode-p make-cnode cnode-extended cnode-updated
+     cnode-truncated map-cnode refresh cnode-contracted cnode-compressed
+     clean clean-parent leaf-node-key leaf-node-value find-ctrie-root   
+     rdcss-descriptor rdcss-descriptor-p rdcss-descriptor-ov
+     rdcss-descriptor-ovmain rdcss-descriptor-nv
+     rdcss-descriptor-committed root-node-access root-node-replace
+     root-node-commit
+     ctrie-snapshot ctrie-clear ctrie-put %insert ctrie-get %lookup
+     ctrie-drop %remove
+     ctrie-map ctrie-do map-node ctrie-map-keys ctrie-map-values
+     ctrie-map-into ctrie-keys ctrie-values ctrie-size ctrie-empty-p
+     ctrie-to-alist ctrie-to-hashtable ctrie-pprint ctrie-from-alist
+     ctrie-from-hashtable
+     ctrie-save ctrie-load ctrie-export ctrie-import
+     ctrie-error ctrie-structural-error ctrie-operational-error
+     ctrie-operation-retries-exceeded ctrie-not-implemented
+     ctrie-not-supported ctrie-invalid-dynamic-context
+     ctrie-generational-mismatch readme readme-quietly apidoc princ-apidoc
+     collect-docs define-diagram))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Extended Descriptor Handlers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -52,7 +108,8 @@
   (let1 dir (namestring (asdf:system-relative-pathname
                           (asdf:find-system :cl-ctrie)
                           "doc/api/"))
-    (cldoc:extract-documentation 'cldoc:html dir (asdf:find-system :cl-ctrie)))
+    (cldoc:extract-documentation 'cldoc:html dir (asdf:find-system :cl-ctrie)
+      :table-of-contents-title "CL-CTRIE"))
   (remove-if #'null
     (sort
       (ecase scope
@@ -100,7 +157,7 @@
 
 
 (defmethod render (desc &optional stream)
-  (declare (ignore desc values))
+  (declare (ignore desc stream))
   (values))
 
 
@@ -129,9 +186,9 @@
 (defmethod render ((desc cldoc::defun-descriptor) &optional stream)
   (with-slots (cldoc::name cldoc::lambda-list cldoc::doc) desc
     (if (< (length cldoc::doc) 1)
-      (format stream "~20A `~A  ~S`~%~%"
+      (format stream "~20A `~A  ~:S`~%~%"
         "_[function]_" (string-upcase cldoc::name) cldoc::lambda-list)
-      (format stream "~20A `~A  ~S`~%~%> ~A~%~%~%"
+      (format stream "~20A `~A  ~:S`~%~%> ~A~%~%~%"
         "_[function]_" (string-upcase cldoc::name) cldoc::lambda-list cldoc::doc))))
 
 
@@ -205,7 +262,7 @@
   (remove-if #'null (mapcar #'render (all-descs (collect-docs scope)))))
 
 (defun princ-apidoc (&optional (scope :external))
-  "Print to *standard-output* the documentation for CL-CTRIE rendered
+  "Print to `*STANDARD-OUTPUT*` the documentation for CL-CTRIE rendered
   in a compact format.  This is intended primarily as a convenience to
   the interactive user seeking quick reference at the REPL.  If SCOPE
   is specified it must be either :EXTERNAL. corresponding to those
@@ -213,6 +270,41 @@
   symbols defined locally in package."
   (mapc #'princ (apidoc scope))
   (values))
+
+(defun read-file-to-string-list (pathname)
+  (with-open-file (in pathname :direction :input)
+    (let ((lines '())
+           (end-of-file (gensym)))
+      (do ((line (read-line in nil end-of-file)
+             (read-line in nil end-of-file)))
+        ((eq line end-of-file))
+        (push line lines))
+      (nreverse lines))))
+
+(defun read-file-to-string (pathname)
+  (with-output-to-string (contents)
+    (with-open-file (in pathname :direction :input)
+      (let* ((buffer-size 4096)
+              (buffer (make-string buffer-size)))
+        (loop for size = (read-sequence buffer in)
+          do (write-string buffer contents :start 0 :end size)
+          while (= size buffer-size))))))
+
+(defun write-string-to-file (string pathname &key (if-exists :overwrite)
+                              (if-does-not-exist :create) (external-format :default))
+  (with-open-file (out pathname :direction :output  :if-exists if-exists
+                         :if-does-not-exist if-does-not-exist
+                         :external-format external-format)
+    (write-sequence string out)))
+
+
+(defun write-string-list-to-file (string-list pathname &key (if-exists :overwrite)
+                              (if-does-not-exist :create) (external-format :default))
+  (with-open-file (out pathname :direction :output  :if-exists if-exists
+                         :if-does-not-exist if-does-not-exist
+                    :external-format external-format)
+    (dolist (string string-list)
+      (write-line string out))))
 
 
 #+cl-ppcre
@@ -235,74 +327,51 @@
         do (setf (values line missing-newline-p) (read-line stream nil))
         while line collect (ppcre:scan-to-strings regexp line)))))
 
-#+() (print
-(regex-search-in-file "\\* \\* \\* \\* \\* \\*.*\\* \\* \\* \\* \\* \\*"
-    (asdf:system-relative-pathname (asdf:find-system :cl-ctrie) "readme.md")))
-  
-(defun readmedoc (symbol-list)  
+(defun readmedoc (docs symbol-list)  
   (apply #'concatenate 'string
-    (append (list (format nil "* * * * * *~%~%"))
+    (append
+      (list (format nil "~%~%"))
       (remove-if #'null
         (mapcar #'render
           (loop for desc in
             (loop for sym in symbol-list
-              collecting (assoc (symbol-name sym) (collect-docs :home) :test #'equalp))
-            appending (cdr desc))))
-      (list (format nil "* * * * * *~%~%")))))
+              collecting (assoc (symbol-name sym) docs :test #'equalp))
+            appending (cdr desc)))))))
 
 
-(defvar *readme-user-api-symbols*
-  '(ctrie make-ctrie ctrie-p ctrie-test
-     ctrie-hash ctrie-readonly-p  ctrie-put ctrie-get ctrie-drop ctrie-do
-     ctrie-map ctrie-map-keys ctrie-map-values ctrie-map-into ctrie-keys
-     ctrie-values ctrie-size ctrie-clear ctrie-pprint ctrie-error
-     ctrie-to-alist ctrie-to-hashtable ctrie-from-hashtable
-     ctrie-from-alist ctrie-empty-p ctrie-save ctrie-load ctrie-export
-     ctrie-import ctrie-snapshot ctrie-error ctrie-structural-error
-     ctrie-operational-error ctrie-operation-retries-exceeded
-     ctrie-not-implemented ctrie-not-supported
-     ctrie-invalid-dynamic-context ctrie-generational-mismatch))
-
-
-(defvar *readme-internal-reference-symbols*
-  '(*ctrie* *retries* *timeout*
-     multi-catch catch-case
-     ctrie ctrie-p ctrie-hash ctrie-test ctrie-readonly-p cthash ctequal
-     with-ctrie flag flag-present-p flag-arc-position flag-vector
-     ref ref-p ref-stamp ref-value ref-prev
-     failed-ref failed-ref-p failed-ref-prev
-     inode inode-p inode-gen inode-ref make-inode gcas-compare-and-set
-     inode-read inode-mutate inode-commit
-     snode snode-p snode-key snode-value
-     lnode lnode-p lnode-elt lnode-next enlist lnode-removed lnode-inserted
-     lnode-search lnode-length tnode tnode-p tnode-cell entomb resurrect
-     cnode cnode-p make-cnode cnode-extended cnode-updated
-     cnode-truncated map-cnode refresh cnode-contracted cnode-compressed
-     clean clean-parent leaf-node-key leaf-node-value find-ctrie-root   
-     rdcss-descriptor rdcss-descriptor-p rdcss-descriptor-ov
-     rdcss-descriptor-ovmain rdcss-descriptor-nv
-     rdcss-descriptor-committed root-node-access root-node-replace
-     root-node-commit
-     ctrie-snapshot ctrie-clear ctrie-put %insert ctrie-get %lookup
-     ctrie-drop %remove
-     ctrie-map ctrie-do map-node ctrie-map-keys ctrie-map-values
-     ctrie-map-into ctrie-keys ctrie-values ctrie-size ctrie-empty-p
-     ctrie-to-alist ctrie-to-hashtable ctrie-pprint ctrie-from-alist
-     ctrie-from-hashtable
-     ctrie-save ctrie-load ctrie-export ctrie-import
-     ctrie-error ctrie-structural-error ctrie-operational-error
-     ctrie-operation-retries-exceeded ctrie-not-implemented
-     ctrie-not-supported ctrie-invalid-dynamic-context
-     ctrie-generational-mismatch apidoc princ-apidoc collect-docs render
-     define-diagram))
-
-(defun readme-user-api ()
-  (princ (readmedoc *readme-user-api-symbols*))
+(defun readme (&optional (stream *standard-output*))
+  "Update documentation sections of the README file. When an output stream
+  is specified, the results are also echoed to that stream. To inhibit
+  output, invoke as `(readme (make-broadcast-stream))` or use `README-QUIETLY`"
+  (princ (let1 docs (collect-docs :home)
+      (flet ((gen (syms-prop marker-prop)  
+               (apply #'concatenate 'string 
+                 (loop with in-region with region-line = -1
+                   with syms   = (get 'readme syms-prop)
+                   with marker = (get 'readme marker-prop)
+                   for line in (read-file-to-string-list $README-PATHNAME)
+                   when (not in-region)
+                   collect (progn
+                             (when (equalp line marker)
+                               (setf in-region t))
+                             (concatenate 'string line (format nil "~%")))
+                   when in-region  do (incf region-line)
+                   when (and in-region (zerop region-line))
+                   collect (readmedoc docs syms)
+                   when (and in-region (plusp region-line) (equalp line marker))
+                   collect (progn
+                             (setf in-region nil)
+                             (concatenate 'string line (format nil "~%")))))))
+        (write-string-to-file (gen :user-api     :user-marker)     $readme-pathname)
+        (write-string-to-file (gen :internal-ref :internal-marker) $readme-pathname)))
+    stream)
   (values))
 
-(defun readme-internal-reference ()
-  (princ (readmedoc *readme-internal-reference-symbols*))
-  (values))
+
+(defun readme-quietly ()
+  "Update documentation sections of the README file, inhibiting any other
+  printed output."
+  (readme (make-broadcast-stream)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Vivisection
@@ -328,7 +397,7 @@
 
 #+donuts
 (defmacro define-diagram (type (&optional context) &body body)
-  "define a diagrammatic representation of TYPE, optionally specialized
+  "Define a diagrammatic representation of TYPE, optionally specialized
   for a specific CONTEXT. See {defgeneric cl-ctrie::make-diagram}."
   (let ((specializer (if context `(list 'eql ,context) 't)))
     (with-gensyms (spc)
