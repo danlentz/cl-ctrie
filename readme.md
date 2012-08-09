@@ -247,16 +247,6 @@ _[function]_         `CTRIE-CLEAR  (CTRIE)`
 
 _[function]_         `CTRIE-PPRINT  (CTRIE &OPTIONAL (STREAM T))`
 
-_[macro]_            `CTRIE-ERROR  (CTRIE CONDITION &REST ARGS)`
-
-> Signal a CTRIE related condition.
-
-
-_[condition]_        `CTRIE-ERROR (ERROR)`
-
-> Abstract superclass of CTRIE related conditions.
-
-
 _[function]_         `CTRIE-TO-ALIST  (CTRIE &KEY ATOMIC)`
 
 _[function]_         `CTRIE-TO-HASHTABLE  (CTRIE &KEY ATOMIC)`
@@ -822,7 +812,22 @@ _[generic-function]_ `RESURRECT  (NODE)`
 
 _[structure]_        `CNODE ()`
 
-> A CNODE, or 'Ctrie Node'
+> A CNODE, or 'Ctrie Node' is a MAIN-NODE containing a vector of up
+  to `2^W` 'arcs' -- i.e., references to either an SNODE or INODE
+  structure, collectively referred to as `BRANCH-NODES.` Each CNODE
+  also contains a (fixnum) bitmap that describes the layout of which
+  logical indices within the total capacity of `2^W` arcs are actually
+  allocated within that node with BRANCH-NODES physically present.
+  For more specific details on these BITMAP and ARC-VECTOR
+  constituents, refer to the following related functions: `FLAG`
+  `FLAG-PRESENT-P` `FLAG-VECTOR` and `FLAG-ARC-POSITION. The CNODE
+  structure is considered to be immutable and arcs may not be added or
+  removed during its lifetime.  The storage allocated within a CNODE
+  is fixed and specified at the time of its creation based on the
+  value of BITMAP during initialization
+   - `BITMAP`
+   - `FLAGS`
+   - `ARCS` 
 
 
 _[function]_         `CNODE-P  (OBJECT)`
@@ -832,9 +837,42 @@ _[function]_         `CNODE-P  (OBJECT)`
 
 _[function]_         `MAKE-CNODE  (&OPTIONAL (BITMAP 0))`
 
-_[function]_         `CNODE-EXTENDED  (CNODE FLAG POSITION VALUE)`
+> Construct a CNODE with internal storage allocated for the number of
+  arcs equal to the Hamming-Weight of the supplied BITMAP parameter.
+  If no BITMAP is provided, the CNODE created will be empty -- a state
+  which is only valid for the level 0 node referenced by the root of
+  the CTRIE.  This constructor is otherwise never called directly, but
+  is invoked during the course of higher-level operations such as
+  `CNODE-EXTENDED` `CNODE-UPDATED` `CNODE-TRUNCATED` and `MAP-CNODE`
 
-_[function]_         `CNODE-UPDATED  (CNODE POSITION VALUE)`
+
+_[function]_         `CNODE-EXTENDED  (CNODE FLAG POSITION NEW-ARC)`
+
+> Construct a new cnode that is exactly like CNODE, but additionally
+  contains the BRANCH-NODE specified by parameter NEW-ARC and logical
+  index FLAG at the physical index POSITION within its vector of
+  allocated arcs.  The BITMAP of this new CNODE will be calculated as
+  an adjustment of the prior CNODE's BITMAP to reflect the presence of
+  this additional arc.  In addition, the physical index within the
+  extended storage vector for the other arcs present may also change
+  with respect to where they were located in the prior CNODE.  In
+  other words, the physical index of a given arc within the compressed
+  CNODE storage vector should never be relied upon directly, it should
+  always be accessed by calculation based on its LOGICAL index and the
+  current CNODE BITMAP as described in more detail by the
+  documentation for the functions `FLAG` and `FLAG-ARC-POSITION`
+
+
+_[function]_         `CNODE-UPDATED  (CNODE POSITION REPLACEMENT-ARC)`
+
+> Construct a new cnode identical to CNODE, but having the
+  BRANCH-NODE physically located at index POSITION within the storage
+  vector replaced by that specified by REPLACEMENT-ARC.  Unlike
+  `CNODE-EXTENDED` and `CNODE-TRUNCATED` the allocated storage and
+  existing BITMAP of this CNODE will remain unchanged (as this is
+  simply a one-for-one replacement) and correspondingly, no reordering
+  of other nodes within the storage vector will occur
+
 
 _[function]_         `CNODE-TRUNCATED  (CNODE FLAG POS)`
 
@@ -1157,5 +1195,16 @@ _[macro]_            `DEFINE-DIAGRAM  (TYPE (&OPTIONAL CONTEXT) &BODY BODY)`
   for a specific CONTEXT. See {defgeneric cl-ctrie::make-diagram}.
 
 
+* * * * * * *
+
+GRAM  (TYPE (&OPTIONAL CONTEXT) &BODY BODY)`
+
+> Define a diagrammatic representation of TYPE, optionally specialized
+  for a specific CONTEXT. See {defgeneric cl-ctrie::make-diagram}.
+
+
+* * * * * * *
+* * * * * * *
+* * * * * * *
 * * * * * * *
 

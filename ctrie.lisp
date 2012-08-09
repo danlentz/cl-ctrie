@@ -191,7 +191,7 @@
   logical index of the arc on the path to which that key may be found.
   Note that the logical index of the arc is most likely not the same
   as the physical index where it is actually located -- for that see
-  'flag-arc-position'"
+  `FLAG-ARC-POSITION`"
   (ash 1 (logand (ash (cthash key) (- level)) #x1f)))
 
 
@@ -217,7 +217,7 @@
   included within each CNODE as a convenience because it makes it
   immediately clear from visual inspection which logical arc indexes
   are represented in the node. For example, from the bit-vector
-  #*10010000000000000000000000000000 one can easily see that the first
+  `#*10010000000000000000000000000000` one can easily see that the first
   and fourth positions are occupied, and the rest empty."
   (loop with new-vector = (make-array 32 :element-type 'bit)
     for i from 0 to 31 when (logbitp i content)
@@ -227,6 +227,7 @@
 
 (defvar %empty-map% (vector)
   "Defines the initial value of an empty CNODE arc-vector.")
+
 
 (defvar %no-flags%  (flag-vector)
   "Defines the initial value of a flag-vector representing a
@@ -239,34 +240,34 @@
 
 (defstruct (ref
              (:copier nil))
-  "Atomically Stamped Reference structure [Herlithy, TAOMP] that
-  encapsulates the mutable slots within an inode, although each ref
-  structure is, itself, never mutated.  Incorporation of the ref
-  structure provides the capability to 'bundle' additional metadata in
-  an inode while still providing atomic compare and swap based a the
-  single comparison of the aggregate ref instance.
-   - STAMP defines a slot containing implementation-specific metadata
+  "Atomically Stamped Reference structure _[Herlithy, TAOMP]_ that
+  encapsulates the mutable slots within an inode. Any specific `REF`
+  structure is, itself, never mutated.  Using the `REF` structure
+  as basis of inode implementation provides the capability to 'bundle'
+  additional metadata in an inode while still providing atomic compare
+  and swap using a single comparison of the aggregate `REF` instance.
+   - `STAMP` defines a slot containing implementation-specific metadata
      that may be maintained internally as a means of tracking inode
      modification and update behavior.  It should not be referenced by
      user code, and the format of its contents should not be relied apon.
-   - VALUE defines a slot that contains a reference to the MAIN-NODE
+   - `VALUE` defines a slot that contains a reference to the MAIN-NODE
      that the enclosing inode should be interpreted as 'pointing to'
-   - PREV defines a slot which, during the INODE-COMMIT phase of the
-     _GCAS_INODE_PROTOCOL_, maintains a reference to the last valid
+   - `PREV` defines a slot which, during the `INODE-COMMIT` phase of the
+     _GCAS INODE PROTOCOL_ maintains a reference to the last valid
      inode state, which may be restored, if necessary, during the
-     course of the INODE-READ/INODE-COMMIT arbitration."
-  (stamp (local-time:now))
-  (value t   :type t)
+     course of the `INODE-READ` / `INODE-COMMIT` arbitration process"
+  (stamp (local-time:now) :read-only t)
+  (value t   :type t      :read-only t)
   (prev  nil :type t))
 
 
 (defstruct (failed-ref
              (:include ref)
              (:copier nil))
-  "A FAILED-REF is a structure that is used to preserve the linkage to
+  "A `FAILED-REF` is a structure that is used to preserve the linkage to
   prior inode state following a failed GCAS.  Any inode access that
-  detects a FAILED-REF will immediately invoke a commit to restore the
-  inode to the state recorded in FAILED-REF-PREV.")
+  detects a `FAILED-REF` will immediately invoke a commit to restore the
+  inode to the state recorded in `FAILED-REF-PREV`")
 
 
 (defstruct (inode
@@ -276,7 +277,7 @@
   representing the link between other 'main-node' structures found in
   a ctrie.  An inode is the only type of node that may change the
   value of its content during its lifetime.  In this implementation,
-  all such values as may change are encapsulated within a REF
+  all such values as may change are encapsulated within a `REF`
   substructure.  Each inode also contains a generational descriptor
   object, comparible by identity only, which is used to identify the
   state of synchronization between the inode and the current
@@ -284,23 +285,31 @@
   CTRIE. As an inode may not change its 'gen identity' during its
   lifetime, this disparity with the generation of the root node will
   immediately result in the replacement of the inode with a new one
-  properly synchronized with the root's GEN object. In this
-  implementation, GEN objects are implemented by GENSYMS -- unique,
+  properly synchronized with the root's `GEN` object. In this
+  implementation, `GEN` objects are implemented by GENSYMS -- unique,
   uninterned symbols which inherently provide very similar symantics
-  to those required of the generational descriptor."
-  gen ref)
+  to those required of the generational descriptor.
+  - `GEN` defines a slot containing a generational descriptor object
+  - `REF` defines a slot containing a `REF` struct that encapsulates
+    the mutable content within an INODE"
+  (gen nil :read-only t)
+  (ref nil))
 
 
 (defun make-inode (link-to &optional gen stamp prev)
-  "Construct a new INODE that represents a link to LINK-TO, optionally
-  augmented with a specified generational descriptor, timestamp, and/or
-  previous state."
+  "Construct a new INODE that represents a reference to the value
+  provided by argument LINK-TO, optionally augmented with a specified
+  generational descriptor, timestamp, and/or previous state"
   (%make-inode
     :gen (or gen (gensym "ctrie"))
     :ref (make-ref :value link-to :stamp (or stamp (local-time:now)) :prev prev)))
 
 
 (defmethod print-object ((o inode) stream)
+  "Print a helpful representation of an INODE that can be easily
+  understood by quick visual inspection. This should only be used
+  during development, however, as it is not compliant with the
+  standard common-lisp specification for *PRINT-READABLY*"
   (if (ref-p (inode-ref o))
     (print-unreadable-object (o stream)
       (format stream
@@ -330,10 +339,10 @@
 
 
 (defun/inline INODE-READ (inode)
-  "INODE-READ provides the top-level interface to the inode GCAS ACCESS api,
-  which is the mechanism which must be used to gain access to the
+  "INODE-READ provides the top-level interface to the inode _GCAS ACCESS_
+  api, which is the mechanism which must be used to gain access to the
   content of any NON-ROOT inode. For access to the root inode, refer
-  to the RDCSS inode api 'ROOT-NODE-ACCESS'. Returns as four values,
+  to the RDCSS inode api `ROOT-NODE-ACCESS`. Returns as four values,
   the MAIN-NODE, the STAMP, the PREVIOUS STATE (if any), and the REF
   structure encapsulated by the inode."
   (let (ref)
@@ -352,12 +361,12 @@
 
 
 (defun/inline INODE-MUTATE (inode old-value new-value)
-  "INODE-MUTATE provides the top-level interface to the inode GCAS
-  MODIFICATION api, which is the mechanism which must be used to
+  "INODE-MUTATE provides the top-level interface to the inode _GCAS
+  MODIFICATION_ api, which is the mechanism which must be used to
   effect any change in a NON-ROOT inode.  For modification of the
-  root-inode, refer to the RDCSS inode api
-  'ROOT-NODE-REPLACE'. Returns a boolean value which indicates the
-  success or failure of the modification attempt."
+  root-inode, refer to the `ROOT-NODE-REPLACE` _RDCSS ROOT NODE
+  PROTOCOL_ Returns a boolean value which indicates the success or
+  failure of the modification attempt."
   (multiple-value-bind (val stamp prev ref) (inode-read inode)
     (declare (ignore val prev ref))
     (if (gcas-compare-and-set inode
@@ -369,12 +378,12 @@
 
 
 (defun INODE-COMMIT (inode ref)
-  "INODE-COMMIT implements the GCAS COMMIT protocol which is invoked
-  as necessary by the INODE-READ and INODE-MUTATE entry-points.  It is
+  "INODE-COMMIT implements the _GCAS COMMIT_ protocol which is invoked
+  as necessary by the `INODE-READ` and `INODE-MUTATE` entry-points.  It is
   not meant to be invoked directly, as this would most likely result
-  in corruption. Returns the REF structure representing the content of
+  in corruption. Returns the `REF` structure representing the content of
   whatever root inode wound up successfully committed -- either the
-  one requested, or one represented by a previous state."
+  one requested, or one represented by a previous valid state"
   (let1 prev (ref-prev ref)
     (typecase prev
       (null        (return-from inode-commit ref))
@@ -408,9 +417,10 @@
   "SNODE, i.e., 'Storage Node', is the LEAF-NODE structure ultimately
   used for the storage of each key/value pair contained in the CTRIE.
   An SNODE is considered to be immutable during its lifetime.
-   - KEY defines the slot containing an element of the map's domain.
-   - VALUE defines the slot containing the range-element mapped to KEY."
-  key value)
+   - `KEY` defines the slot containing an element of the map's domain.
+   - `VALUE` defines the slot containing the range-element mapped to `KEY`"
+  (key   nil  :read-only t)
+  (value nil  :read-only t))
   
 (defun snode (key value)
   "Construct a new SNODE which represents the mapping from
@@ -427,14 +437,17 @@
   "LNODE, i.e., 'List Node', is a special structure used to enclose
   SNODES in a singly-linked chain when the hash-codes of the
   respective SNODE-KEYS collide, but those keys are determined to be
-  unique by the CTRIE-TEST function defined for that ctrie. The order
-  of the list is implemented (arbitrarily) as most recently added first,
-  analogous to CL:PUSH.  An LNODE (and therefore a chain of LNODEs) is
-  considered to be immutable during its lifetime.
-   - ELT defines the slot containing an enclosed SNODE
-   - NEXT defines a slot referencing the next LNODE in the chain, or NIL
-     if no further LNODES remain."
-  elt next)
+  unique by the `CTRIE-TEST` function defined for that ctrie.  An
+  LNODE (and therefore a chain of LNODEs) is considered to be
+  immutable during its lifetime.  The order of the list is
+  implemented (arbitrarily) as most recently added first, analogous to
+  `CL:PUSH`
+   - `ELT` defines the slot containing an enclosed SNODE
+   - `NEXT` defines a slot referencing the next LNODE in the chain, or
+     `NIL` if no further LNODES remain."
+  (elt  nil :read-only t) 
+  (next nil :read-only t))
+
 
 (defun enlist (&rest rest)
   "Construct a chain of LNODE structures enclosing the values supplied.
@@ -443,6 +456,7 @@
   (unless (null rest)
     (awhen (car rest)
       (make-lnode :elt it :next (apply #'enlist (cdr rest))))))
+
 
 (defun lnode-removed (orig-lnode key test)
   "Construct a chain of LNODE structures identical to the chain starting
@@ -455,30 +469,33 @@
                collect (lnode-elt lnode))
     (apply #'enlist elts)))
 
+
 (defun lnode-inserted (orig-lnode key value test)
   "Construct a chain of LNODE structures identical to the chain starting
-  with ORIG-LNODE, but ensured to contain an LNODE enclosing an SNODE of
-  KEY and VALUE.  If the given KEY equal to a key already present somewhere
+  with ORIG-LNODE, but ensured to contain an LNODE enclosing an SNODE mapping
+  KEY to VALUE.  If the given KEY equal to a key already present somewhere
   in the chain (as compared with equality predicate TEST) it will be
   replaced.  Otherwise a new LNODE will be added. In either case, the LNODE
-  containing (SNODE KEY VAlUE) will be the first node in the resulting
-  list."
+  containing `(SNODE KEY VAlUE)` will be the first node in the resulting
+  list"
   (let1 elts (loop for lnode = orig-lnode then (lnode-next lnode) while lnode
                unless (funcall test key (leaf-node-key (lnode-elt lnode)))
                collect (lnode-elt lnode))
     (apply #'enlist (push (snode key value) elts))))
 
+
 (defun lnode-search (lnode key test)
   "Within the list of lnodes beginning with LNODE, return the range value
-  mapped to by the first SNODE containing a key equal to KEY as determined
-  by equality predicate TEST, or NIL if no such key is found.  As a
-  second value, in order to support storage of NIL as a key, return T to
-  indicate that the KEY was indeed found during search, or NIL to indicate
-  that no such key was present in the list."
+  mapped by the first SNODE containing a key equal to KEY as determined
+  by equality predicate TEST, or `NIL` if no such key is found.  As a
+  second value, in order to support storage of `NIL` as a key, return `T` to
+  indicate that the KEY was indeed found during search, or `NIL` to indicate
+  that no such key was present in the list"
   (loop for current = lnode then (lnode-next current) while current
     when (funcall test key (leaf-node-key (lnode-elt current)))
     return (values (leaf-node-value (lnode-elt current)) t)
     finally (return (values nil nil))))
+
 
 (defun lnode-length (lnode)
   "Return the number of LNODES present in the chain beginning at LNODE"
@@ -494,16 +511,39 @@
 
 (defstruct (tnode
              (:copier nil))
-  "Tomb Node"
-  cell)
+  "A TNODE, or 'Tomb Node', is a special node structure used to preserve
+  ordering during `CTRIE-DROP` (`%remove`) operations.
+  Any time a TNODE is encountered during the course of a `CTRIE-GET` (`%lookup`)
+  operation, the operative thread is required to invoke a `CLEAN` operation
+  on the TNODE it has encountered and throw to `:RESTART` its lookup activity
+  over again.  A TNODE is considered to be immutable and may not change its
+  value during its lifetime.
+   - `CELL` defines a slot which contains the entombed node structure.
+      Only LNODE and SNODE type nodes are ever entombed"
+  (cell nil :type (or snode lnode) :read-only t))
+
 
 (defgeneric entomb (node)
+  (:documentation "Return a newly constructed TNODE enclosing the argument
+  LEAF-NODE structure `NODE`")
   (:method (node)
+    "Unless the provided argument is of a type for which an entombment
+    specialization has been defined, signal an error, as we have arrived
+    at an undefined state and cannot continue processing."
     (error "Entombment of ~A (type ~S) is undefined." node (type-of node)))
-  (:method ((lnode lnode)) (make-tnode :cell lnode))
-  (:method ((snode snode)) (make-tnode :cell snode)))
+  (:method ((lnode lnode))
+    "Entomb an LNODE in a newly created TNODE"
+    (make-tnode :cell lnode))
+  (:method ((snode snode))
+    "Entomb an SNODE in a newly created TNODE"
+    (make-tnode :cell snode)))
+
 
 (defgeneric resurrect (node)
+  (:documentation "Return the 'resurection' of the NODE argument.  The
+  resurrection of an INODE that references a TNODE is the
+  LEAF-NODE structure entombed by that TNODE.  The resurrection of
+  any other node is simply itself.")
   (:method (node)
     node)
   (:method ((node inode))
@@ -519,32 +559,78 @@
 (defstruct (cnode
              (:constructor %make-cnode)
              (:copier nil))
-  "Content Node"
-  (bitmap 0)
-  (flags  %no-flags%)
-  (arcs   %empty-map%))
+  "A CNODE, or 'Ctrie Node' is a MAIN-NODE containing a vector of up
+  to `2^W` 'arcs' -- i.e., references to either an SNODE or INODE
+  structure, collectively referred to as `BRANCH-NODES.` Each CNODE
+  also contains a (fixnum) bitmap that describes the layout of which
+  logical indices within the total capacity of `2^W` arcs are actually
+  allocated within that node with BRANCH-NODES physically present.
+  For more specific details on these BITMAP and ARC-VECTOR
+  constituents, refer to the following related functions: `FLAG`
+  `FLAG-PRESENT-P` `FLAG-VECTOR` and `FLAG-ARC-POSITION. The CNODE
+  structure is considered to be immutable and arcs may not be added or
+  removed during its lifetime.  The storage allocated within a CNODE
+  is fixed and specified at the time of its creation based on the
+  value of BITMAP during initialization
+   - `BITMAP`
+   - `FLAGS`
+   - `ARCS` "
+  (bitmap 0           :read-only t)
+  (flags  %no-flags%  :read-only t)
+  (arcs   %empty-map% :read-only t))
+
 
 (defun make-cnode (&optional (bitmap 0))
+  "Construct a CNODE with internal storage allocated for the number of
+  arcs equal to the Hamming-Weight of the supplied BITMAP parameter.
+  If no BITMAP is provided, the CNODE created will be empty -- a state
+  which is only valid for the level 0 node referenced by the root of
+  the CTRIE.  This constructor is otherwise never called directly, but
+  is invoked during the course of higher-level operations such as
+  `CNODE-EXTENDED` `CNODE-UPDATED` `CNODE-TRUNCATED` and `MAP-CNODE`"
   (%make-cnode
     :bitmap bitmap
     :flags (flag-vector bitmap)
     :arcs  (make-array (logcount bitmap))))
 
-(defun cnode-extended (cnode flag position value)
+
+(defun cnode-extended (cnode flag position new-arc)
+  "Construct a new cnode that is exactly like CNODE, but additionally
+  contains the BRANCH-NODE specified by parameter NEW-ARC and logical
+  index FLAG at the physical index POSITION within its vector of
+  allocated arcs.  The BITMAP of this new CNODE will be calculated as
+  an adjustment of the prior CNODE's BITMAP to reflect the presence of
+  this additional arc.  In addition, the physical index within the
+  extended storage vector for the other arcs present may also change
+  with respect to where they were located in the prior CNODE.  In
+  other words, the physical index of a given arc within the compressed
+  CNODE storage vector should never be relied upon directly, it should
+  always be accessed by calculation based on its LOGICAL index and the
+  current CNODE BITMAP as described in more detail by the
+  documentation for the functions `FLAG` and `FLAG-ARC-POSITION`"
   (let* ((new-bitmap (logior flag (cnode-bitmap cnode)))
           (new-cnode  (make-cnode new-bitmap)))
     (prog1 new-cnode
       (map-into (cnode-arcs new-cnode) #'identity (cnode-arcs cnode))
-      (setf (svref (cnode-arcs new-cnode) position) value)
+      (setf (svref (cnode-arcs new-cnode) position) new-arc)
       (unless (> position (length (cnode-arcs cnode)))
         (replace (cnode-arcs new-cnode) (cnode-arcs cnode)
           :start1 (+ position 1) :start2 position)))))
 
-(defun cnode-updated (cnode position value)
+
+(defun cnode-updated (cnode position replacement-arc)
+  "Construct a new cnode identical to CNODE, but having the
+  BRANCH-NODE physically located at index POSITION within the storage
+  vector replaced by that specified by REPLACEMENT-ARC.  Unlike
+  `CNODE-EXTENDED` and `CNODE-TRUNCATED` the allocated storage and
+  existing BITMAP of this CNODE will remain unchanged (as this is
+  simply a one-for-one replacement) and correspondingly, no reordering
+  of other nodes within the storage vector will occur"
   (let ((new-cnode (make-cnode (cnode-bitmap cnode))))
     (prog1 new-cnode
       (replace (cnode-arcs new-cnode) (cnode-arcs cnode))
-      (setf (svref (cnode-arcs new-cnode) position) value))))
+      (setf (svref (cnode-arcs new-cnode) position) replacement-arc))))
+
 
 (defun cnode-truncated (cnode flag pos)
   (let* ((new-bitmap (logxor flag (cnode-bitmap cnode)))
@@ -557,11 +643,13 @@
         do (setf (svref (cnode-arcs new-cnode) dest-index)
              (svref (cnode-arcs cnode) (post-incf src-index)))))))
 
+
 (defun map-cnode (fn cnode)
   (check-type fn function)
   (check-type cnode cnode)
   (aprog1 (make-cnode (cnode-bitmap cnode))
     (map-into (cnode-arcs it) fn (cnode-arcs cnode))))
+
 
 (defgeneric refresh (place gen)
   (:method ((cnode cnode) gen)
@@ -572,6 +660,7 @@
       (make-inode val gen (local-time:now))))
   (:method ((snode snode) gen)
     snode))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Compression Operations
@@ -585,9 +674,11 @@
         (t     cnode))
       cnode)))
 
+
 (defun cnode-compressed (cnode level)
   (check-type cnode cnode)
   (cnode-contracted (map-cnode #'resurrect cnode) level))
+
 
 (defun clean (inode level)
   (check-type inode inode)
@@ -596,6 +687,7 @@
                 (if (cnode-p node)
                   (inode-mutate inode node (cnode-compressed node level))
                   t))))
+
 
 (defun clean-parent (parent-inode target-inode key level)
   (check-type parent-inode (or null inode))
@@ -611,10 +703,12 @@
                             (pos  (flag-arc-position flag bmp)))
                       (when (and (flag-present-p flag bmp) (tnode-p target-ref)
                               (eq target-inode (svref (cnode-arcs parent-ref) pos))
-                              (let1 new-cnode (cnode-updated parent-ref pos (resurrect target-inode))
+                              (let1 new-cnode (cnode-updated parent-ref pos
+                                                (resurrect target-inode))
                                 (not (inode-mutate parent-inode parent-ref
                                        (cnode-contracted new-cnode level))))))))))))
-                         
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; node type abstractions
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -625,11 +719,14 @@
   storage; For example, an SNODE contains a key/value pair."
   `(or snode tnode))
 
+
 (deftype branch-node ()
   `(or inode snode))
 
+
 (deftype main-node ()
   `(or cnode lnode tnode))
+
 
 (defgeneric leaf-node-key (resource)
   (:method ((snode snode))
@@ -637,49 +734,52 @@
   (:method ((tnode tnode))
     (leaf-node-key (tnode-cell tnode))))
 
+
 (defgeneric leaf-node-value (resource)
   (:method ((snode snode))
     (snode-value snode))
   (:method ((tnode tnode))
     (leaf-node-value (tnode-cell tnode))))
 
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; CTRIE Root Container
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defstruct (ctrie (:constructor %make-ctrie))
-  "A CTRIE root container uniquely identifies a CTRIE instance, and
-  contains the following perameters which specify the customizable
-  aspects of each CTRIE instance:
-   - READONLY-P, if true, prohibits any future modification or
+  "A CTRIE structure is the root container that uniquely identifies a CTRIE
+  instance, and  contains the following perameters which specify the
+  definable aspects of each CTRIE:
+   - `READONLY-P` if not `NIL` prohibits any future modification or
   cloning of this instance.
-   - TEST is a designator for an equality predicate that will be applied to
-  determine the disambiguation of any two keys. It is recommened that
-  this value be a symbol that is fboundp, to retain capability of
-  externalization (save/restore). At present, though, this is not
-  enforced and a function object or lambda expression will also be
-  accepted, albeit without the ability of save/restore.
-   - HASH is a designator for a hash function, which may be desirable to
-  customize when one has specific knowledge about the set of keys
-  which will populate the table.  At this time, a 32-bit hash is
-  recommended as this is what has been used for development and
+   - `TEST` is a designator for an equality predicate that will be
+  applied to disambiguate and determine the equality of any two
+  keys. It is recommened that this value be a symbol that is fboundp,
+  to retain capability of externalization (save/restore). At present,
+  though, this is not enforced and a function object or lambda
+  expression will also be accepted, albeit without the ability of
+  save/restore.
+   - `HASH` is a designator for a hash function, which may be
+  desirable to customize when one has specific knowledge about the set
+  of keys which will populate the table.  At this time, a 32-bit hash
+  is recommended as this is what has been used for development and
   testing and has been shown to provide good performance in
-  practice. As with TEST, it is recommended that HASH be specified
+  practice. As with `TEST` it is recommended that `HASH` be specified
   by a symbol that is fboundp.
-   - ROOT is the slot used internally for storage of the root inode
+   - `ROOT` is the slot used internally for storage of the root inode
   structure that maintains the reference to the contents of the ctrie
-  proper.  The ctrie-root must only be accessed using the RDCSS root
-  node protocol defined by the end-user entrypoints ROOT-NODE-ACCESS
-  and ROOT-NODE-COMMIT."
+  proper.  The ctrie-root must only be accessed using the _RDCSS ROOT
+  NODE PROTOCOL_ defined by the top-level entry-points `ROOT-NODE-ACCESS`
+  and `ROOT-NODE-REPLACE`"
   (readonly-p  nil)
-  (test       'equal)
-  (hash       'sxhash)
+  (test       'equal  :read-only t)
+  (hash       'sxhash :read-only t)
   (root       (make-inode (make-cnode) (gensym "ctrie"))))
 
 
 (defun make-ctrie (&rest args &key name root (readonly-p nil)
                     (test 'equal) (hash 'sxhash))
-  "CREATE a new CTRIE instance. This is the entry-point constructor api
+  "CREATE a new CTRIE instance. This is the entry-point constructor 
   intended for use by the end-user."
   (declare (ignorable name readonly-p test hash root))
   (apply #'%make-ctrie args))
@@ -693,9 +793,9 @@
   should be considered an implementation detail and not relied upon. A
   particular exception, however, is that within the dynamic extent of
   a WITH-CTRIE form, the code implementing a CTRIE operation may
-  expect that the special variable *CTRIE* will be bound to the root
+  expect that the special variable `*CTRIE*` will be bound to the root
   container of CTRIE operated upon.  See also the documentation for
-  '*CTRIE*'"
+  `*CTRIE*`"
   `(let* ((*ctrie* ,ctrie))
      (sb-ext:with-timeout *timeout*     
        ,@body)))
@@ -750,7 +850,10 @@
    - COMMITTED  designates a flag which, when not NIL, indicates that the
                 RDCSS plan defined by this descriptor has completed
                 successfully."
-  ov ovmain nv committed)
+  (ov        nil :read-only t)
+  (ovmain    nil :read-only t)
+  (nv        nil :read-only t)
+  (committed nil))
 
 
 (defun/inline root-node-access (ctrie &optional abort)
@@ -918,11 +1021,31 @@
                             (format t  "~8S  done .~%~S~%" it *ctrie*)))))
         return it)))
 
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; GET/LOOKUP
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
   
 (defun %lookup (inode key level parent startgen)
+  "The general concept of the procedure for finding a given key within
+  a simplified SEQUENTIAL model of a CTRIE can be summarized as
+  follows: If the internal node is at level `L` then the W bits of the
+  hashcode starting from position `W * L` are used as a logical index
+  into the vector of `2^W` arcs that can possibly be represented
+  within that node (see `FLAG` and `FLAG-VECTOR`). This logical index
+  is then transformed into a physical index that denotes a specific
+  position locating this arc relative to all other arcs currently
+  present in the node (see `FLAG-ARC-POSITION`.  In this way, storage
+  within the node need not be allocated for representation of empty
+  arc positions. At all times the invariant is maintained that the
+  number of arcs allocated within a given CNODE is equal to the
+  Hamming-Weight of its BITMAP -- i.e., the number of nonzero bits
+  present (see `CL:LOGCOUNT`). The arc at this calculated relative
+  position is then followed, and the process repeated until arrival at
+  a leaf-node or empty arc position.
+
+    Locating a given key becomes substantially more complicated in
+  the actual lock-free concurrent ctrie algorithm.  "
   (let1 node (inode-read inode)
     (typecase node
       (tnode (throw :restart (clean parent (- level 5))))
@@ -948,6 +1071,7 @@
 
 
 (defun ctrie-get (ctrie key)
+
   (check-type ctrie ctrie)
     (with-ctrie ctrie
       (flet ((attempt-get (root key level parent gen try)
@@ -968,10 +1092,10 @@
     (multiple-value-prog1 (values value key ctrie)
       (ctrie-put ctrie key value)))
 
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; DROP/REMOVE
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-         
          
 (defun %remove (inode key level parent startgen)
   (atypecase (inode-read inode)
@@ -1030,6 +1154,7 @@
 
 (defgeneric map-node (node fn))
 
+
 (defun ctrie-map (ctrie fn &key atomic &aux accum)
   (declare (special accum))
   (check-type ctrie ctrie)
@@ -1038,6 +1163,7 @@
       (map-node root fn))
     accum))
 
+
 (defmacro ctrie-do ((key value ctrie &key atomic) &body body)
   "Iterate over (key . value) in ctrie in the manner of dolist.
    EXAMPLE: (ctrie-do (k v ctrie)
@@ -1045,32 +1171,40 @@
   `(ctrie-map ,ctrie #'(lambda (,key ,value) ,@body)
      :atomic ,atomic))
 
+
 (defmethod map-node ((node inode) fn)
   (map-node (inode-read node) fn))
+
 
 (defmethod map-node ((node snode) fn)
   (funcall fn (snode-key node) (snode-value node)))
 
+
 (defmethod map-node ((node tnode) fn)
   (map-node (tnode-cell node) fn))
+
 
 (defmethod map-node ((node lnode) fn)
   (loop for node = node then (lnode-next node)
     while node do (map-node (lnode-elt node) fn)))
 
+
 (defmethod map-node ((node cnode) fn)
   (loop for arc across (cnode-arcs node)
     do (map-node arc fn)))
+
 
 (defun ctrie-map-keys (ctrie fn &key atomic)
   (ctrie-map ctrie
     (lambda (k v) (declare (ignore v))
       (funcall fn k)) :atomic atomic))
 
+
 (defun ctrie-map-values (ctrie fn &key atomic)
   (ctrie-map ctrie
     (lambda (k v) (declare (ignore k))
       (funcall fn v)) :atomic atomic))
+
 
 (defgeneric ctrie-map-into (ctrie place fn)
   (:method ((ctrie ctrie) (place ctrie) fn)
@@ -1078,26 +1212,33 @@
         (lambda (k v) 
           (apply #'ctrie-put place (funcall fn k v))))))
 
+
 (defun print2 (x y &optional (stream t))
   (format stream " (~W . ~W) " x y))
+
 
 (defun collect2 (x y)
   (declare (special accum))
   (push (cons x y) accum))
 
+
 (defun collect-keys (x y)
   (declare (special accum) (ignore y))
   (push x accum))
+
 
 (defun collect-values (x y)
   (declare (special accum) (ignore x))
   (push y accum))
 
+
 (defun ctrie-keys (ctrie &key atomic)
   (ctrie-map ctrie #'collect-keys :atomic atomic))
 
+
 (defun ctrie-values (ctrie &key atomic)
   (ctrie-map ctrie #'collect-values :atomic atomic))
+
 
 (defun ctrie-size (ctrie &aux (accum 0))
   (ctrie-map-keys ctrie
@@ -1105,10 +1246,12 @@
       (incf accum)))
   accum)
 
+
 (defun ctrie-empty-p (ctrie)
   (check-type ctrie ctrie)
   (with-ctrie ctrie
     (= 0 (cnode-bitmap (inode-read (root-node-access ctrie))))))
+
 
 (defun ctrie-ensure-get (ctrie key default)
   "Like CTRIE-GET, but if KEY is not found in CTRIE, automatically adds 
@@ -1119,21 +1262,26 @@
         (values val t)
         (values (ctrie-put ctrie key default) nil))))
 
+
 (defun ctrie-to-alist (ctrie &key atomic)
   (ctrie-map ctrie #'collect2 :atomic atomic))
+
 
 (defun ctrie-pprint (ctrie &optional (stream t))
   (pprint-tabular stream (ctrie-to-alist ctrie)))
 
+
 (defun ctrie-to-hashtable (ctrie &key atomic)
   (alexandria:alist-hash-table
     (ctrie-map ctrie #'collect2 :atomic atomic)))
+
 
 (defun ctrie-from-alist (alist)
   (let ((ctrie (make-ctrie)))
     (prog1 ctrie
       (mapc (lambda (pair) (ctrie-put ctrie (car pair) (cdr pair)))
         alist))))
+
 
 (defun ctrie-from-hashtable (hashtable)
   "create a new ctrie containing the same (k . v) pairs and equivalent
@@ -1151,8 +1299,10 @@
   (when (find-package :cl-store)
     (pushnew :cl-store *features*)))
 
+
 (defgeneric ctrie-save (ctrie place &key &allow-other-keys)
   (:documentation ""))
+
 
 #+cl-store
 (defmethod  ctrie-save ((ctrie ctrie) (place pathname) &key)
@@ -1161,26 +1311,33 @@
 
 (defgeneric ctrie-load (place &key &allow-other-keys))
 
+
 #+cl-store
 (defmethod  ctrie-load ((place pathname) &key)
   (cl-store:restore place))
 
+
 (defgeneric ctrie-export (ctrie place &key &allow-other-keys)
   (:documentation ""))
+
 
 #+cl-store 
 (defmethod  ctrie-export ((ctrie ctrie) (place pathname) &key)
   (prog1 place (cl-store:store (ctrie-to-alist ctrie) place)))
 
+
 (defmethod  ctrie-export ((ctrie ctrie) (place hash-table) &key)
   (ctrie-map ctrie (lambda (k v) (setf (gethash place k) v))))
+
 
 (defgeneric ctrie-import (place &key &allow-other-keys)
   (:documentation ""))
 
+
 #+cl-store
 (defmethod  ctrie-import ((place pathname) &key)
   (ctrie-from-alist (cl-store:restore place)))
+
 
 (defmethod  ctrie-import ((place hash-table) &key)
   (ctrie-from-hashtable place))
