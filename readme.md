@@ -796,6 +796,23 @@ _[function]_         `TNODE-CELL  (TNODE)`
 
 
 
+_[method]_           `ENTOMB  ((SNODE SNODE))`
+
+> Entomb an SNODE in a newly created TNODE
+
+
+_[method]_           `ENTOMB  ((LNODE LNODE))`
+
+> Entomb an LNODE in a newly created TNODE
+
+
+_[method]_           `ENTOMB  (NODE)`
+
+> Unless the provided argument is of a type for which an entombment
+    specialization has been defined, signal an error, as we have arrived
+    at an undefined state and cannot continue processing.
+
+
 _[generic-function]_ `ENTOMB  (NODE)`
 
 > Return a newly constructed TNODE enclosing the argument
@@ -897,6 +914,32 @@ _[function]_         `MAP-CNODE  (FN CNODE)`
   BITMAP of the resulting CNODE will remain unchanged from the
   original, and no physical reordering of nodes within the storage
   vector will occur
+
+
+_[method]_           `REFRESH  ((SNODE SNODE) GEN)`
+
+> An SNODE represents a LEAF storage cell and does not require
+    any coordination with generational descriptors, and so is simply
+    returned as-is. 
+
+
+_[method]_           `REFRESH  ((INODE INODE) GEN)`
+
+> Generate a replacement for inode that continues to reference the
+    same MAIN-NODE as before, but otherwise contains the new generational
+    descriptor GEN, and a new REF substructure initialized
+    with freshly generated metadata, unconditionally discarding the old.
+    Note that the refresh of an inode is not transitive to the nodes contained
+    in the portion of the CTRIE that it references.  I.e., the process does
+    not eagerly descend and propagate until needed, eliminating the
+    overhead incurred by full traversals which, in many situations, turn out
+    to be not even necessary.
+
+
+_[method]_           `REFRESH  ((CNODE CNODE) GEN)`
+
+> Return a new cnode structure identical to CNODE, but with any
+    arcs that are INODES refreshed to generational descriptor GEN
 
 
 _[generic-function]_ `REFRESH  (PLACE GEN)`

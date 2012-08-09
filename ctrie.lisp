@@ -525,18 +525,21 @@
 
 (defgeneric entomb (node)
   (:documentation "Return a newly constructed TNODE enclosing the argument
-  LEAF-NODE structure `NODE`")
-  (:method (node)
-    "Unless the provided argument is of a type for which an entombment
+  LEAF-NODE structure `NODE`"))
+
+(defmethod entomb (node)
+  "Unless the provided argument is of a type for which an entombment
     specialization has been defined, signal an error, as we have arrived
     at an undefined state and cannot continue processing."
-    (error "Entombment of ~A (type ~S) is undefined." node (type-of node)))
-  (:method ((lnode lnode))
-    "Entomb an LNODE in a newly created TNODE"
-    (make-tnode :cell lnode))
-  (:method ((snode snode))
-    "Entomb an SNODE in a newly created TNODE"
-    (make-tnode :cell snode)))
+  (error "Entombment of ~A (type ~S) is undefined." node (type-of node)))
+
+(defmethod entomb ((lnode lnode))
+  "Entomb an LNODE in a newly created TNODE"
+  (make-tnode :cell lnode))
+
+(defmethod entomb ((snode snode))
+  "Entomb an SNODE in a newly created TNODE"
+  (make-tnode :cell snode))
 
 
 (defgeneric resurrect (node)
@@ -672,13 +675,15 @@
   (:documentation "Reconcile the node specified by PLACE with an
   updated generational descriptor object, GEN. The actions required
   for this reconciliation vary according to the node type and 
-  specializations are defined on a casewise basis.")
-  (:method ((cnode cnode) gen)
-    "Return a new cnode structure identical to CNODE, but with any
+  specializations are defined on a casewise basis."))
+
+(defmethod refresh ((cnode cnode) gen)
+  "Return a new cnode structure identical to CNODE, but with any
     arcs that are INODES refreshed to generational descriptor GEN"
-    (map-cnode (lambda (arc) (refresh arc gen)) cnode))
-  (:method ((inode inode) gen)
-    "Generate a replacement for inode that continues to reference the
+  (map-cnode (lambda (arc) (refresh arc gen)) cnode))
+
+(defmethod refresh ((inode inode) gen)
+  "Generate a replacement for inode that continues to reference the
     same MAIN-NODE as before, but otherwise contains the new generational
     descriptor GEN, and a new REF substructure initialized
     with freshly generated metadata, unconditionally discarding the old.
@@ -687,14 +692,15 @@
     not eagerly descend and propagate until needed, eliminating the
     overhead incurred by full traversals which, in many situations, turn out
     to be not even necessary."    
-    (multiple-value-bind (val stamp) (inode-read inode)
-      (declare (ignore stamp))
-      (make-inode val gen (local-time:now))))
-  (:method ((snode snode) gen)
-    "An SNODE represents a LEAF storage cell and does not require
+  (multiple-value-bind (val stamp) (inode-read inode)
+    (declare (ignore stamp))
+    (make-inode val gen (local-time:now))))
+
+(defmethod refresh ((snode snode) gen)
+  "An SNODE represents a LEAF storage cell and does not require
     any coordination with generational descriptors, and so is simply
     returned as-is. "
-    snode))
+  snode)
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
