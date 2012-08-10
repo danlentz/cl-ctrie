@@ -78,7 +78,7 @@
 
 (asdf:defsystem :cl-ctrie-test
   :serial t
-  :depends-on (:cl-ctrie :lparallel)
+  :depends-on (:cl-ctrie :lparallel :cl-skip-list)
   :components ((:file "ctrie-test")))
 
 

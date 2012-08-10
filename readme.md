@@ -683,7 +683,12 @@ _[function]_         `INODE-COMMIT  (INODE REF)`
   not meant to be invoked directly, as this would most likely result
   in corruption. Returns the `REF` structure representing the content of
   whatever root inode wound up successfully committed -- either the
-  one requested, or one represented by a previous valid state
+  one requested, or one represented by a previous valid state.  In order
+  to coexist with the _RDCSS ROOT NODE PROTOCOL_ this GCAS COMMIT
+  implementation is augmented with RDCSS ABORTABLE READ semantics
+  by a forward reference to a RDCSS-aware `ROOT-NODE-ACCESS` in order
+  to safely compare INODE's generational descriptor with the one found
+  in the root inode of the subject CTRIE.
 
 
 _[function]_         `SNODE  (KEY VALUE)`

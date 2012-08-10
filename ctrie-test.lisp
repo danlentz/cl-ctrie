@@ -37,6 +37,21 @@
 ;; Scaffolding
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defmacro with-skiplist-tables (&body body)
+  `(flet ((make-table (&key (test #'eql))
+            (cl-skip-list:make-skip-list :key-equal test :value-equal test))
+           (table-clear (tbl)
+             (error "not supported"))
+           (table-get (tbl k)
+             (cl-skip-list:skip-list-lookup tbl k))
+           (table-put (tbl k v)
+             (cl-skip-list:skip-list-add tbl k v))
+           (table-drop (tbl k)
+             (cl-skip-list:skip-list-delete tbl k))
+           (table-map (fn tbl)
+             (cl-skip-list:map-skip-list fn tbl)))
+     ,@body))
+
 
 (defmacro with-hash-tables (&body body)
   `(flet ((make-table (&key (test #'eql))
@@ -76,12 +91,17 @@
 (define-test check-table-abstraction-fixtures
   (assert-equalp (values "1" t)
     (with-hash-tables
-      (let1 ht (make-table) x
+      (let1 ht (make-table) 
+        (table-put ht 1 "1")
+        (table-get ht 1))))
+  (assert-equalp (values "1")
+    (with-skiplist-tables
+      (let1 ht (make-table) 
         (table-put ht 1 "1")
         (table-get ht 1))))
   (assert-equalp (values "1" t)
     (with-ctrie-tables
-      (let1 ct (make-table) x
+      (let1 ct (make-table) 
         (table-put ct 1 "1")
         (table-get ct 1)))))
 

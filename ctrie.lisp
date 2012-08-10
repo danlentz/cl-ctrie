@@ -360,18 +360,17 @@
   the MAIN-NODE, the STAMP, the PREVIOUS STATE (if any), and the REF
   structure encapsulated by the inode."
   (let (ref)
-    (sb-thread:barrier (:read)
-      (setf ref (inode-ref inode))
-      (multiple-value-bind (val stamp prev)
-        (values (ref-value ref) (ref-stamp ref) (ref-prev ref))
-        (if (null prev)
-          (return-from inode-read (values val stamp prev ref))
-          (let1 result (inode-commit inode ref)
-            (return-from inode-read (values
-                                      (ref-value result)
-                                      (ref-stamp result)
-                                      (ref-prev result)
-                                      result))))))))
+    (setf ref (inode-ref inode))
+    (multiple-value-bind (val stamp prev)
+      (values (ref-value ref) (ref-stamp ref) (ref-prev ref))
+      (if (null prev)
+        (return-from inode-read (values val stamp prev ref))
+        (let1 result (inode-commit inode ref)
+          (return-from inode-read (values
+                                    (ref-value result)
+                                    (ref-stamp result)
+                                    (ref-prev result)
+                                    result)))))))
 
 
 (defun/inline INODE-MUTATE (inode old-value new-value)
@@ -390,6 +389,10 @@
       (return-from inode-mutate
         nil))))
 
+;;; declaim the forward-reference to avoid compiler-warnings
+#+()
+(declaim (ftype (function (ctrie &optional boolean) inode)
+           root-node-access))
 
 (defun INODE-COMMIT (inode ref)
   "INODE-COMMIT implements the _GCAS COMMIT_ protocol which is invoked
@@ -397,29 +400,36 @@
   not meant to be invoked directly, as this would most likely result
   in corruption. Returns the `REF` structure representing the content of
   whatever root inode wound up successfully committed -- either the
-  one requested, or one represented by a previous valid state"
-  (let1 prev (ref-prev ref)
-    (typecase prev
-      (null        (return-from inode-commit ref))
-      (failed-ref  (if (cas (inode-ref inode) ref (failed-ref-prev prev))
-                     (return-from inode-commit
-                       (failed-ref-prev prev))
-                     (return-from inode-commit
-                       (inode-commit inode (inode-ref inode)))))
-      (t            (if (and (not (ctrie-readonly-p *ctrie*))
-                          (eql (inode-gen (find-ctrie-root *ctrie*))
-                            (inode-gen inode)))
-                      (if (cas (ref-prev ref) prev nil)
-                        (return-from inode-commit ref)
-                        (return-from inode-commit
-                          (inode-commit inode ref)))
-                      (progn (cas (ref-prev ref) prev
-                               (make-failed-ref
-                                 :value (ref-value prev)
-                                 :stamp (ref-stamp prev)
-                                 :prev  (ref-prev  prev)))
-                        (return-from inode-commit
-                          (inode-commit inode (inode-ref inode)))))))))
+  one requested, or one represented by a previous valid state.  In order
+  to coexist with the _RDCSS ROOT NODE PROTOCOL_ this GCAS COMMIT
+  implementation is augmented with RDCSS ABORTABLE READ semantics
+  by a forward reference to a RDCSS-aware `ROOT-NODE-ACCESS` in order
+  to safely compare INODE's generational descriptor with the one found
+  in the root inode of the subject CTRIE."
+  (flet ((ABORTABLE-READ (ctrie)
+           (root-node-access ctrie t)))
+    (let1 prev (ref-prev ref)
+      (typecase prev
+        (null        (return-from inode-commit ref))
+        (failed-ref  (if (cas (inode-ref inode) ref (failed-ref-prev prev))
+                       (return-from inode-commit
+                         (failed-ref-prev prev))
+                       (return-from inode-commit
+                         (inode-commit inode (inode-ref inode)))))
+        (t            (if (and (not (ctrie-readonly-p *ctrie*))
+                            (eql (inode-gen (ABORTABLE-READ *ctrie*))
+                              (inode-gen inode)))
+                        (if (cas (ref-prev ref) prev nil)
+                          (return-from inode-commit ref)
+                          (return-from inode-commit
+                            (inode-commit inode ref)))
+                        (progn (cas (ref-prev ref) prev
+                                 (make-failed-ref
+                                   :value (ref-value prev)
+                                   :stamp (ref-stamp prev)
+                                   :prev  (ref-prev  prev)))
+                          (return-from inode-commit
+                            (inode-commit inode (inode-ref inode))))))))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -921,7 +931,7 @@
   (:method ((ctrie ctrie))
     (ctrie-root ctrie)))
 
-
+#+()
 (defgeneric (cas find-ctrie-root) (ctrie-designator old new)
   (:documentation "(CAS FIND-CTRIE-ROOT) implements the atomic
   compare-and swap subprimitive that is the operational analogue to
@@ -974,10 +984,9 @@
   processed by `INODE-READ` in order to still properly comply with the
   underlying GCAS protocol implementation requirements common to all
   inodes"
-  (sb-thread:barrier (:read)
-    (atypecase (find-ctrie-root ctrie)
-      (inode it)
-      (t (root-node-commit ctrie abort)))))
+  (atypecase (find-ctrie-root ctrie)
+    (inode it)
+    (t (root-node-commit ctrie abort))))
 
 
 (defun/inline root-node-replace (ctrie ov ovmain nv)
@@ -1008,7 +1017,7 @@
   guaranteeing nonblocking access to a valid root node by any concurrent
   thread"
   (let1 desc (make-rdcss-descriptor :ov ov :ovmain ovmain :nv nv)
-    (if (cas (find-ctrie-root ctrie) ov desc)
+    (if (cas (ctrie-root ctrie) ov desc)
       (prog2 (root-node-commit ctrie nil)
         (rdcss-descriptor-committed desc))
       nil)))
@@ -1016,22 +1025,21 @@
 
 (defun root-node-commit (ctrie &optional abort)
   "rdcss api to complete a root-node transaction"
-  (sb-thread:barrier (:read)
-    (atypecase (find-ctrie-root ctrie)
-      (inode it)
-      (rdcss-descriptor (if abort
-                          (if (cas (find-ctrie-root ctrie) it (rdcss-descriptor-ov it))
-                            (rdcss-descriptor-ov it)
-                            (root-node-commit ctrie abort))
-                          (let1 oldmain (inode-read (rdcss-descriptor-ov it))
-                            (if (eq oldmain (rdcss-descriptor-ovmain it))
-                              (if (cas (find-ctrie-root ctrie) it (rdcss-descriptor-nv it))
-                                (prog1 (rdcss-descriptor-nv it)
-                                  (setf (rdcss-descriptor-committed it) t))
-                                (root-node-commit ctrie abort))
-                              (if (cas (find-ctrie-root ctrie) it (rdcss-descriptor-ov it))
-                                (rdcss-descriptor-ov it)
-                                (root-node-commit ctrie abort)))))))))
+  (atypecase (find-ctrie-root ctrie)
+    (inode it)
+    (rdcss-descriptor (if abort
+                        (if (cas (ctrie-root ctrie) it (rdcss-descriptor-ov it))
+                          (rdcss-descriptor-ov it)
+                          (root-node-commit ctrie abort))
+                        (let1 oldmain (inode-read (rdcss-descriptor-ov it))
+                          (if (eq oldmain (rdcss-descriptor-ovmain it))
+                            (if (cas (ctrie-root ctrie) it (rdcss-descriptor-nv it))
+                              (prog1 (rdcss-descriptor-nv it)
+                                (setf (rdcss-descriptor-committed it) t))
+                              (root-node-commit ctrie abort))
+                            (if (cas (ctrie-root ctrie) it (rdcss-descriptor-ov it))
+                              (rdcss-descriptor-ov it)
+                              (root-node-commit ctrie abort))))))))
   
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1042,25 +1050,23 @@
   ""
   (loop until
     (let (root main)
-      (sb-thread:barrier (:read)
-        (setf root (root-node-access ctrie))
-        (setf main (inode-read root))
-        (when (root-node-replace ctrie root main (make-inode main (gensym "ctrie")))
-          (return-from ctrie-snapshot
-            (if read-only
-              (make-ctrie :readonly-p t :root root)
-              (make-ctrie :root (make-inode main (gensym "ctrie"))))))))))
+      (setf root (root-node-access ctrie))
+      (setf main (inode-read root))
+      (when (root-node-replace ctrie root main (make-inode main (gensym "ctrie")))
+        (return-from ctrie-snapshot
+          (if read-only
+            (make-ctrie :readonly-p t :root root)
+            (make-ctrie :root (make-inode main (gensym "ctrie")))))))))
 
 
 (defun ctrie-clear (ctrie)
   ""
   (loop until
-    (let (root main)
-      (sb-thread:barrier (:read)
-        (setf root (root-node-access ctrie))
-        (setf main (inode-read root))
-        (when (root-node-replace ctrie root main (make-inode (make-cnode) (gensym "ctrie")))
-          (return-from ctrie-clear ctrie))))))
+    (let (root main)      
+      (setf root (root-node-access ctrie))
+      (setf main (inode-read root))
+      (when (root-node-replace ctrie root main (make-inode (make-cnode) (gensym "ctrie")))
+        (return-from ctrie-clear ctrie)))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1121,20 +1127,28 @@
                               (if (inode-mutate inode cnode new-cnode)
                                 (return-from %insert value)
                                 (throw :restart present)))
-                            (let* ((new-flag-this (flag key (+ level 5)))
-                                    (new-flag-other (flag (snode-key present) (+ level 5)))
-                                    (new-bitmap (logior new-flag-this new-flag-other))
-                                    (new-cnode (make-cnode new-bitmap))
-                                    (new-inode (make-inode new-cnode startgen)))
-                              (setf
-                                (svref (cnode-arcs new-cnode) (flag-arc-position new-flag-this new-bitmap))
-                                (snode key value))
-                              (setf
-                                (svref (cnode-arcs new-cnode) (flag-arc-position new-flag-other new-bitmap))
-                                present)
-                              (if (inode-mutate inode cnode (cnode-updated cnode pos new-inode))
-                                (return-from %insert value)
-                                (throw :restart present))))))))))))
+                            (if (>= level 30)
+                              (let* ((new-snode (snode key value))
+                                      (lnode-chain (enlist new-snode present))
+                                      (new-inode (make-inode lnode-chain startgen))
+                                      (new-cnode (cnode-updated cnode pos new-inode)))
+                                (if (inode-mutate inode cnode new-cnode)
+                                  (return-from %insert value)
+                                  (throw :restart lnode-chain)))
+                              (let* ((new-flag-this (flag key (+ level 5)))
+                                      (new-flag-other (flag (snode-key present) (+ level 5)))
+                                      (new-bitmap (logior new-flag-this new-flag-other))
+                                      (new-cnode (make-cnode new-bitmap))
+                                      (new-inode (make-inode new-cnode startgen)))
+                                (setf (svref (cnode-arcs new-cnode)
+                                        (flag-arc-position new-flag-this new-bitmap))
+                                  (snode key value))
+                                (setf (svref (cnode-arcs new-cnode)
+                                        (flag-arc-position new-flag-other new-bitmap))
+                                  present)
+                                (if (inode-mutate inode cnode (cnode-updated cnode pos new-inode))
+                                  (return-from %insert value)
+                                  (throw :restart present)))))))))))))
 
 
 (defun ctrie-put (ctrie key value)
