@@ -66,8 +66,30 @@
 
 (define-condition ctrie-operational-error (ctrie-error)
   ((op :initarg :op :reader op-of))
-  (:documentation "Conditixon for when an operational failure or
+  (:documentation "Condition for when an operational failure or
   inconsistency has occurred."))
+
+
+(define-condition ctrie-modification-failed  (ctrie-operational-error)
+  ((place   :initarg :place  :reader place-of)
+    (reason :initarg :reason :reader reason-of))
+  (:report
+    (lambda (condition stream)
+      (with-slots (ctrie op place reason) condition
+        (format stream "CTRIE MODIFICATION FAILED~%")
+        (format stream "-------------------------~%~%")
+        (format stream "FAILURE: Operation ~S failed to modify ~S in CTRIE at #x~X~%~%"
+          op place (if ctrie (sb-kernel:get-lisp-obj-address ctrie) 0))
+        (format stream "CAUSE:   ~A~%~%" reason)
+        (format stream "ABOUT:   ~A~%~%"
+          (documentation (type-of condition) 'type)))))
+  (:documentation
+        "This condition indicates an unhandled failure of an attempt to
+         perform stateful modification to CTRIE.  The most common case in
+         which this might occur is when such an attempt is mode on a CTRIE
+         designated as READONLY-P.  In any case, this condition represents an
+         exception from which processing cannot continue and requires
+         interactive user intervention in order to recover."))
 
 
 (define-condition ctrie-invalid-dynamic-context (ctrie-operational-error)
@@ -101,9 +123,14 @@
   deliberately not supported."))
 
 
-(defmacro ctrie-error (ctrie condition &rest args)
+(defmacro ctrie-error (condition &rest args)
   "Signal a CTRIE related condition."
-  `(error (make-condition ',condition :ctrie ,ctrie ,@args)))
+  `(error ',condition :ctrie *ctrie* ,@args))
+
+
+(defun ctrie-modification-failed (reason &key op place)
+  "Signal a modification failure with the appropriate attendant metadata."
+  (ctrie-error ctrie-modification-failed :op op :place place :reason reason))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -380,6 +407,9 @@
   root-inode, refer to the `ROOT-NODE-REPLACE` _RDCSS ROOT NODE
   PROTOCOL_ Returns a boolean value which indicates the success or
   failure of the modification attempt."
+  (when (ctrie-readonly-p *ctrie*)
+    (ctrie-modification-failed "This CTRIE is READ-ONLY"
+      :op 'inode-mutate :place (describe-object inode nil)))
   (multiple-value-bind (val stamp prev ref) (inode-read inode)
     (declare (ignore val prev ref))
     (if (gcas-compare-and-set inode
@@ -389,10 +419,6 @@
       (return-from inode-mutate
         nil))))
 
-;;; declaim the forward-reference to avoid compiler-warnings
-#+()
-(declaim (ftype (function (ctrie &optional boolean) inode)
-           root-node-access))
 
 (defun INODE-COMMIT (inode ref)
   "INODE-COMMIT implements the _GCAS COMMIT_ protocol which is invoked
@@ -406,6 +432,9 @@
   by a forward reference to a RDCSS-aware `ROOT-NODE-ACCESS` in order
   to safely compare INODE's generational descriptor with the one found
   in the root inode of the subject CTRIE."
+  (when (ctrie-readonly-p *ctrie*)
+    (ctrie-modification-failed "This CTRIE is READ-ONLY"
+      :op 'inode-commit :place (describe-object inode nil)))
   (flet ((ABORTABLE-READ (ctrie)
            (root-node-access ctrie t)))
     (let1 prev (ref-prev ref)
@@ -445,7 +474,8 @@
    - `VALUE` defines the slot containing the range-element mapped to `KEY`"
   (key   nil  :read-only t)
   (value nil  :read-only t))
-  
+
+
 (defun snode (key value)
   "Construct a new SNODE which represents the mapping from
   domain-element KEY to range-element VALUE."
@@ -1016,6 +1046,9 @@
   `ROOT-NODE-COMMIT` itself, possibly prempting our own attempt, but
   guaranteeing nonblocking access to a valid root node by any concurrent
   thread"
+   (when (ctrie-readonly-p *ctrie*)
+    (ctrie-modification-failed "This CTRIE is READ-ONLY"
+      :op 'root-node-replace :place (list :ov ov :nv nv)))
   (let1 desc (make-rdcss-descriptor :ov ov :ovmain ovmain :nv nv)
     (if (cas (ctrie-root ctrie) ov desc)
       (prog2 (root-node-commit ctrie nil)
@@ -1094,6 +1127,7 @@
                             (return-from cas-ctrie-root current)
                            (try n))))))))
     (try 10)))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; PUT/INSERT
@@ -1185,10 +1219,9 @@
   Hamming-Weight of its BITMAP -- i.e., the number of nonzero bits
   present (see `CL:LOGCOUNT`). The arc at this calculated relative
   position is then followed, and the process repeated until arrival at
-  a leaf-node or empty arc position.
-
-    Locating a given key becomes substantially more complicated in
-  the actual lock-free concurrent ctrie algorithm.  "
+  a leaf-node or empty arc position.  Locating a given key becomes
+  substantially more complicated in the actual lock-free concurrent
+  ctrie algorithm.  "
   (let1 node (inode-read inode)
     (typecase node
       (tnode (throw :restart (clean parent (- level 5))))

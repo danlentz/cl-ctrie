@@ -39,8 +39,7 @@
     :ctrie-to-hashtable
     :ctrie-from-hashtable
     :ctrie-from-alist
-    :ctrie-empty-p
-    ;; :ctrie-ensure-get
+    :ctrie-empty-p   
     :ctrie-save
     :ctrie-load
     :ctrie-export
@@ -53,5 +52,6 @@
     :ctrie-not-implemented
     :ctrie-not-supported
     :ctrie-invalid-dynamic-context
-    :ctrie-generational-mismatch))
+    :ctrie-generational-mismatch
+    :ctrie-modification-failed))
   

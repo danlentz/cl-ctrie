@@ -283,7 +283,7 @@ _[generic-function]_ `CTRIE-IMPORT  (PLACE &KEY &ALLOW-OTHER-KEYS)`
 
 _[function]_         `CTRIE-SNAPSHOT  (CTRIE &KEY READ-ONLY)`
 
-_[macro]_            `CTRIE-ERROR  (CTRIE CONDITION &REST ARGS)`
+_[macro]_            `CTRIE-ERROR  (CONDITION &REST ARGS)`
 
 > Signal a CTRIE related condition.
 
@@ -301,7 +301,7 @@ _[condition]_        `CTRIE-STRUCTURAL-ERROR (CTRIE-ERROR)`
 
 _[condition]_        `CTRIE-OPERATIONAL-ERROR (CTRIE-ERROR)`
 
-> Conditixon for when an operational failure or
+> Condition for when an operational failure or
   inconsistency has occurred.
 
 
@@ -1178,10 +1178,9 @@ _[function]_         `%LOOKUP  (INODE KEY LEVEL PARENT STARTGEN)`
   Hamming-Weight of its BITMAP -- i.e., the number of nonzero bits
   present (see `CL:LOGCOUNT`). The arc at this calculated relative
   position is then followed, and the process repeated until arrival at
-  a leaf-node or empty arc position.
-
-    Locating a given key becomes substantially more complicated in
-  the actual lock-free concurrent ctrie algorithm.  
+  a leaf-node or empty arc position.  Locating a given key becomes
+  substantially more complicated in the actual lock-free concurrent
+  ctrie algorithm.  
 
 
 _[function]_         `CTRIE-DROP  (CTRIE KEY)`
@@ -1260,7 +1259,7 @@ _[method]_           `CTRIE-IMPORT  ((PLACE PATHNAME) &KEY)`
 
 _[generic-function]_ `CTRIE-IMPORT  (PLACE &KEY &ALLOW-OTHER-KEYS)`
 
-_[macro]_            `CTRIE-ERROR  (CTRIE CONDITION &REST ARGS)`
+_[macro]_            `CTRIE-ERROR  (CONDITION &REST ARGS)`
 
 > Signal a CTRIE related condition.
 
@@ -1278,7 +1277,7 @@ _[condition]_        `CTRIE-STRUCTURAL-ERROR (CTRIE-ERROR)`
 
 _[condition]_        `CTRIE-OPERATIONAL-ERROR (CTRIE-ERROR)`
 
-> Conditixon for when an operational failure or
+> Condition for when an operational failure or
   inconsistency has occurred.
 
 
@@ -1365,4 +1364,10 @@ _[macro]_            `DEFINE-DIAGRAM  (TYPE (&OPTIONAL CONTEXT) &BODY BODY)`
 
 
 * * * * * * *
+
+* * *
+
+
+
+* * *
 
