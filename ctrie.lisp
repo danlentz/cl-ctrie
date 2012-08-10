@@ -309,7 +309,21 @@
   "Print a helpful representation of an INODE that can be easily
   understood by quick visual inspection. This should only be used
   during development, however, as it is not compliant with the
-  standard common-lisp specification for *PRINT-READABLY*"
+  standard common-lisp specification for *PRINT-READABLY*. A
+  trivial example of the printed representation might appear as
+  follows:
+  ;;;
+  ;;;    #S(CTRIE
+  ;;;       :READONLY-P NIL
+  ;;;       :TEST EQUAL
+  ;;;       :HASH SXHASH
+  ;;;       :ROOT #<INODE ctrie654349 @2012-08-09T19:31:01.686562-04:00
+  ;;;               (HAS-PREV? NIL)
+  ;;;               :=> #S(CNODE
+  ;;;                      :BITMAP 67108864
+  ;;;                      :FLAGS #*00000000000000000000000000100000
+  ;;;                      :ARCS #(#S(SNODE :KEY 1 :VALUE 2)))>)
+  ;;;"
   (if (ref-p (inode-ref o))
     (print-unreadable-object (o stream)
       (format stream
@@ -991,8 +1005,8 @@
   concurrently attempts access to a root node holding an
   RDCSS-DESCRIPTOR object rather than an INODE, it will invoke
   `ROOT-NODE-COMMIT` itself, possibly prempting our own attempt, but
-  guaranteeing wait-free access to a valid root node to all concurrent
-  threads."
+  guaranteeing nonblocking access to a valid root node by any concurrent
+  thread"
   (let1 desc (make-rdcss-descriptor :ov ov :ovmain ovmain :nv nv)
     (if (cas (find-ctrie-root ctrie) ov desc)
       (prog2 (root-node-commit ctrie nil)

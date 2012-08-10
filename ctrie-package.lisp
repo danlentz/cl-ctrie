@@ -5,7 +5,7 @@
 #-sbcl (cl:error "~A not supportred" (cl:lisp-implementation-type))
 
 (defpackage :cl-ctrie
-  (:nicknames :ctrie)
+  ;; (:nicknames :ctrie)
   (:documentation "This is a common-lisp implementation of the CTrie
      unordered map data-structure described in the paper 'Concurrent
      Tries with Efficient Non-Blocking Snapshots, (c) ACM 2-25-2012'
@@ -55,4 +55,3 @@
     :ctrie-invalid-dynamic-context
     :ctrie-generational-mismatch))
   
-

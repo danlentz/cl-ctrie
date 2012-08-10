@@ -34,6 +34,7 @@
      with-ctrie flag flag-present-p flag-arc-position flag-vector
      ref ref-p ref-stamp ref-value ref-prev
      failed-ref failed-ref-p failed-ref-prev
+     leaf-node branch-node main-node
      inode inode-p inode-gen inode-ref make-inode gcas-compare-and-set
      inode-read inode-mutate inode-commit
      snode snode-p snode-key snode-value
@@ -219,6 +220,15 @@
         "_[macro]_" (string-upcase cldoc::name) cldoc::lambda-list)
       (format stream "~20A `~A  ~S`~%~%> ~A~%~%~%"
         "_[macro]_" (string-upcase cldoc::name) cldoc::lambda-list cldoc::doc))))
+
+
+(defmethod render ((desc cldoc::deftype-descriptor) &optional stream)
+  (with-slots (cldoc::name cldoc::args cldoc::doc) desc
+    (if (< (length cldoc::doc) 1)    
+      (format stream "~20A `~A  ~S`~%~%"
+        "_[type]_" (string-upcase cldoc::name) cldoc::args)
+      (format stream "~20A `~A  ~S`~%~%> ~A~%~%~%"
+        "_[type]_" (string-upcase cldoc::name) cldoc::args cldoc::doc))))
 
 
 (defmethod render ((desc cldoc::defvar-descriptor) &optional stream)

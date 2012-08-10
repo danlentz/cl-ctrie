@@ -5,6 +5,31 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Constructor for experimental alternative package interface
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defparameter *alternative-package-exports*
+  '(:get :put :drop :make :do :keys :values :size :test :hash :readonly-p
+     :map :map-keys :map-values :map-into :clear :pprint :error :to-alist :to-hashtable
+     :from-hashtable :from-alist :empty-p :save :load :export :import :snapshot)
+  "defines the symbols exported by the alternative packaging style experiment")
+
+
+(defun generate-alternative-package ()
+  "a simple hack to experiment with alternative packaging style"
+  (delete-package :ctrie)
+  (make-package :ctrie :use nil)
+  (mapc (lambda (sym) (export (intern (string sym) :ctrie) :ctrie))
+    *alternative-package-exports*)      
+  (loop for alt being the :external-symbols of :ctrie
+    for sym = (symbolicate "CTRIE-" alt)
+    for xsym = (symbolicate alt "-CTRIE")
+    if (fboundp sym) do (setf (fdefinition alt) (fdefinition sym))
+    else do (when (fboundp xsym) (setf (fdefinition alt) (fdefinition xsym)))
+    when #1=(macro-function sym) do (setf (macro-function alt) #1#)))
+   
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Some Helpful Utility Functions and Macros
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -36,6 +61,24 @@
       (setf *break* t)))
   (values-list values))
 
+;; Steve Goss's experimental "threading" macro
+;; http://blog.thezerobit.com/2012/07/21/immutable-persistent-data-structures-in-common-lisp.html
+
+(defmacro -> (x &optional (form nil form-supplied-p) &rest more)
+  "* EXAMPLE
+   ;;; (-> (empty-map)
+   ;;;   (with :a 100)
+   ;;;   (with :b 200)
+   ;;;   (less :a))
+   ;;;
+   ;;; #{| (:B 200) |}"
+  (if form-supplied-p
+    (if more
+      `(-> (-> ,x ,form) ,@more)
+      (if (listp form)
+        `(,(car form) ,x ,@(cdr form))
+        (list form x)))
+    x))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; 'Unique Value' Utilities
