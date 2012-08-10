@@ -116,14 +116,14 @@
       (ecase scope
         (:external (loop for item in
                      (let (syms)
-                       (do-external-symbols (s (find-package :ctrie))
+                       (do-external-symbols (s (find-package :cl-ctrie))
                          (push s syms))
                        (mapcar #'string-downcase (mapcar #'symbol-name syms)))
                      collect (cons item (mapcar #'cldoc::meta-descriptor-desc
                                           (gethash item cldoc::*name->meta-decriptors*)))))
         (:home (loop for item in
                  (let (syms)
-                   (do-symbols (s #1=(find-package :ctrie))
+                   (do-symbols (s #1=(find-package :cl-ctrie))
                      (when (eq (symbol-package s) #1#)
                        (push s syms)))
                    (mapcar #'string-downcase (mapcar #'symbol-name syms)))
