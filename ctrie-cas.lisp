@@ -11,29 +11,29 @@
 (handler-bind ((simple-error
                  (lambda (condition) (declare (ignore condition))
                    (invoke-restart 'continue))))
-  (sb-c:defknown ctrie::spin-hint
+  (sb-c:defknown cl-ctrie::spin-hint
     ()
     (values))
-  (sb-c:defknown ctrie::xadd-word-sap
+  (sb-c:defknown cl-ctrie::xadd-word-sap
     (system-area-pointer word)
     word)
-  (sb-c:defknown ctrie::cas-word-sap
+  (sb-c:defknown cl-ctrie::cas-word-sap
     (system-area-pointer word word)
     word)   
-  (sb-c:defknown ctrie::cas-byte-sap
+  (sb-c:defknown cl-ctrie::cas-byte-sap
     (system-area-pointer (unsigned-byte 8) (unsigned-byte 8))
     (unsigned-byte 8)))
 
   
-(sb-c:define-vop (ctrie::spin-hint)
-  (:translate ctrie::spin-hint)
+(sb-c:define-vop (cl-ctrie::spin-hint)
+  (:translate cl-ctrie::spin-hint)
   (:policy :fast-safe)
   (:generator 5
     (sb-assem:inst sb-vm::pause)))
 
 
-(sb-c:define-vop (ctrie::cas-byte-sap)
-  (:translate ctrie::cas-byte-sap)
+(sb-c:define-vop (cl-ctrie::cas-byte-sap)
+  (:translate cl-ctrie::cas-byte-sap)
   (:policy :fast-safe)
   (:args (sap :scs (sb-vm::sap-reg) :to :eval)
          (old :scs (sb-vm::unsigned-reg) :target rax)
@@ -50,8 +50,8 @@
      (sb-vm::inst sb-vm::movzx result al-tn)))
 
 
-(sb-c:define-vop (ctrie::cas-word-sap)
-  (:translate ctrie::cas-word-sap)
+(sb-c:define-vop (cl-ctrie::cas-word-sap)
+  (:translate cl-ctrie::cas-word-sap)
   (:policy :fast-safe)
   (:args (sap :scs (sb-vm::sap-reg) :to :eval)
          (old :scs (sb-vm::unsigned-reg) :target eax)
@@ -67,8 +67,8 @@
     (sb-vm::move r eax)))
 
 
-(define-vop (ctrie::xadd-word-sap)
-  (:translate ctrie::xadd-word-sap)
+(define-vop (cl-ctrie::xadd-word-sap)
+  (:translate cl-ctrie::xadd-word-sap)
   (:policy :fast-safe)
   (:args (sap :scs (sap-reg) :to :eval)
          (inc :scs (unsigned-reg) :target result))
@@ -81,29 +81,29 @@
     (move result inc)))
 
 
-(defun ctrie::spin-hint ()
-  (ctrie::spin-hint))
+(defun cl-ctrie::spin-hint ()
+  (cl-ctrie::spin-hint))
 
 
-(defun ctrie::cas-word-sap (sap old new)
+(defun cl-ctrie::cas-word-sap (sap old new)
   (declare (type system-area-pointer sap)
            (word old new))
-  (ctrie::cas-word-sap sap old new))
+  (cl-ctrie::cas-word-sap sap old new))
 
 
-(defun ctrie::cas-byte-sap (sap old new)
+(defun cl-ctrie::cas-byte-sap (sap old new)
   (declare (type system-area-pointer sap)
     (type (unsigned-byte 8) old new))
-  (ctrie::cas-byte-sap sap old new))
+  (cl-ctrie::cas-byte-sap sap old new))
 
 
-(defun ctrie::xadd-word-sap (sap word)
+(defun cl-ctrie::xadd-word-sap (sap word)
   (declare (type system-area-pointer sap)
            (type sb-vm:word word))
-  (ctrie::xadd-word-sap sap word))
+  (cl-ctrie::xadd-word-sap sap word))
 
 
-(defun ctrie::get-vector-addr (vector)
+(defun cl-ctrie::get-vector-addr (vector)
   (logandc2 (sb-kernel:get-lisp-obj-address vector) sb-vm:lowtag-mask))
 
 
