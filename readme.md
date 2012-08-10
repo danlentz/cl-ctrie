@@ -141,11 +141,12 @@ hand.  A basic profiling exercise of the following activities is
 reported below.
 
     1. construct a new ctrie instance
-    2. one-million insertions of (fixnum) key/value pairs
-    3. one-million lookups verifying retrieval of every value
-    4. one-million removals verifying proper contraction of the structure
+    2. perform one-million insertions of (fixnum) key/value pairs
+    3. perform one-million lookups verifying retrieval of every value
+    4. perform one-million removals verifying proper contraction of the structure
     5. verify the resulting ctrie is identical to when initially created.
 
+    
 ```
   seconds  |     gc     |     consed    |    calls   |  sec/call  |  name  
 ----------------------------------------------------------------
