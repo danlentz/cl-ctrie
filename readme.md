@@ -130,6 +130,66 @@ and analysis facilities supporting the development of CL-CTRIE.
 - `ctrie-doc.lisp:`   Automated Documentation Support
 - `ctrie-test.lisp:`  Test and Performance Measurement
 
+### Performance
+
+To date, the principal concern has been to fully achieve a working
+and robust implementation of the CTRIE algorithm, with only the
+occaisional profiling run from time to time in order to at least
+get a general sense of where the hot-spots are and peace of mind
+that there are at least no glaring bottlenecks that seem out of
+hand.  A basic profiling exercise of the following activities is
+reported below.
+
+    1. construct a new ctrie instance
+    2. one-million insertions of (fixnum) key/value pairs
+    3. one-million lookups verifying retrieval of every value
+    4. one-million removals verifying proper contraction of the structure
+    5. verify the resulting ctrie is identical to when initially created.
+
+```
+  seconds  |     gc     |     consed    |    calls   |  sec/call  |  name  
+----------------------------------------------------------------
+     3.810 |      0.000 |           384 | 12,000,000 |   0.000000 | CTHASH
+     1.770 |      0.000 |         1,040 | 12,000,000 |   0.000000 | FLAG
+     1.332 |      0.925 |   261,160,000 |  1,000,000 |   0.000001 | CTRIE-PUT
+     0.955 |      0.000 |             0 |  5,101,473 |   0.000000 | FIND-CTRIE-ROOT
+     0.654 |      0.071 |   357,490,000 |  2,101,473 |   0.000000 | MAKE-CNODE
+     0.600 |      0.000 |            48 |  2,067,648 |   0.000000 | INODE-COMMIT
+     0.543 |      0.040 |    85,981,184 |  2,101,473 |   0.000000 | %MAKE-CNODE
+     0.521 |      0.000 |           176 |  2,033,824 |   0.000000 | CTEQUAL
+     0.494 |      0.000 |             0 | 12,000,000 |   0.000000 | FLAG-ARC-POSITION
+     0.400 |      0.237 |    20,388,048 |  1,000,000 |   0.000000 | MAKE-SNODE
+     0.369 |      0.054 |   143,871,728 |  2,101,473 |   0.000000 | MAKE-REF
+     0.350 |      0.000 |             0 | 11,966,176 |   0.000000 | FLAG-PRESENT-P
+     0.319 |      0.000 |            48 |  2,000,000 |   0.000000 | LEAF-NODE-KEY
+     0.197 |      0.000 |           112 |  1,000,000 |   0.000000 | SNODE
+     0.172 |      0.000 |             0 |  2,000,000 |   0.000000 | LEAF-NODE-VALUE
+     0.147 |      0.000 |            32 |  2,101,473 |   0.000000 | CTSTAMP
+     0.066 |      0.000 |             0 |  2,101,473 |   0.000000 | FLAG-VECTOR
+     0.032 |      0.000 |           112 |     33,825 |   0.000001 | MAKE-INODE
+     0.015 |      0.000 |           208 |     33,824 |   0.000000 | ENTOMB
+     0.008 |      0.000 |             0 |     33,824 |   0.000000 | RESURRECT
+     0.000 |      0.000 |        65,504 |     33,824 |   0.000000 | MAKE-TNODE
+     0.000 |      0.000 |             0 |          2 |   0.000000 | MAP-NODE
+     0.000 |      0.000 |    42,082,064 |  1,000,000 |   0.000000 | CNODE-EXTENDED
+     0.000 |      0.000 |            64 |     67,648 |   0.000000 | CNODE-UPDATED
+     0.000 |      0.000 |           256 |  1,000,000 |   0.000000 | CNODE-TRUNCATED
+     0.000 |      0.000 |             0 |     33,825 |   0.000000 | %MAKE-INODE
+     0.000 |      0.000 |             0 |          1 |   0.000000 | %MAKE-CTRIE
+     0.000 |      0.000 |             0 |     33,824 |   0.000000 | CLEAN-PARENT
+     0.000 |      0.000 |         1,536 |  4,000,000 |   0.000000 | %LOOKUP
+     0.000 |      0.000 |         1,376 |  3,966,176 |   0.000000 | %REMOVE
+     0.000 |      0.000 |             0 |          1 |   0.000000 | MAKE-CTRIE
+     0.000 |      0.000 |             0 |          1 |   0.000000 | CTRIE-MAP-KEYS
+     0.000 |      0.000 |             0 |          1 |   0.000000 | CTRIE-MAP
+     0.000 |      0.232 |   320,038,576 |  1,000,000 |   0.000000 | CTRIE-GET
+     0.000 |      0.000 |             0 |          1 |   0.000000 | CTRIE-SIZE
+     0.000 |      0.601 |   229,090,464 |  1,000,000 |   0.000000 | CTRIE-DROP
+----------------------------------------------------------------
+    12.750 |      2.160 | 1,460,172,960 | 86,913,263 |            | Total
+
+```
+
 ### Documentation
 
 Comprehensive, HTML based [documentation](doc/api/index.html) may be
