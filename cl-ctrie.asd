@@ -72,6 +72,7 @@
                 (:file "ctrie-cas")
                 (:file "ctrie-util")
                 (:file "ctrie")
+                (:file "ctrie-lambda")
         #+cldoc (:file "ctrie-doc")))
 
 
