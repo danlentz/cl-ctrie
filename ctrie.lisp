@@ -1152,7 +1152,7 @@
   properly document the process -- not to encourage anyone to fiddle
   with it...
 
-  1.  A given call to %insert carries with it no guarantee that it will
+   1.  A given call to %insert carries with it no guarantee that it will
   actually succeed.  Further, there is no guarantee it will do anything
   at all -- including ever returning to the caller having invoked it.
   This is because there are a number of circumstances that may possibly
@@ -1169,7 +1169,7 @@
   of extension points provided.  For more details refer to the
   `MULTI-CATCH` and `CATCH-CASE` control structure documentation.
 
-  2.  %insert ALWAYS begins at an INODE.  This is not surprising, of
+   2.  %insert ALWAYS begins at an INODE.  This is not surprising, of
   course, since the root of the tree (where all inserts begin) is an
   INODE, and because INODES are the only nodes that provide
   mutability. When we which to effect change to the CTRIE regardless of
@@ -1184,20 +1184,20 @@
   collectively refer to as MAIN-NODES.  These are the three potential
   cases which we will consider next.
 
-  3.  Consider first the TNODE. If indeed we follow an INODE and
+   3.  Consider first the TNODE. If indeed we follow an INODE and
   discover it directly leads us to a TNODE, or 'Tomb Node'. This tells
   us, first, that we have arrived at a dead-end, second that we must
   assist with the 'compression' of this arc by invoking the `CLEAN`
   operation on the tombed INODE's parent.  Finally, there is nothing
   further we can do so we THROW to :RESTART.
 
-  4.  If traverse the INODE and arrive at an LNODE, we are also at the
+   4.  If traverse the INODE and arrive at an LNODE, we are also at the
   end of the ARC, but if it is due to hash collision then the algorithm
   then indeed it may be correct.  In this case we attempt to 'insert'
   ourself in te LNODE chain and then invoke INODE mutate to atomic
   commit and then THROW to :RESTART
 
-  5.  As a simple instance of the general case, we may arrive at a CNODE
+   5.  As a simple instance of the general case, we may arrive at a CNODE
   with vacant arc that represents the index specified by the bits of our
   KEY's hash code that are active for this level within the ctrie.  When
   this is the case, we construct a replacement CNODE augmented with our
@@ -1210,7 +1210,7 @@
   the range value now successfully mapped by KEY in order to indicate
   our success.  Otherwise we THROW to :RESTART.
 
-  6.  If we find the logical index of our 'arc' in this CNODE is not
+   6.  If we find the logical index of our 'arc' in this CNODE is not
   empty and available as we did above, there are exactly two other
   possibly find there; we know this because it is required to be a
   BRANCH-NODE -- either an snode leaf storage or an inode referencing a
@@ -1218,7 +1218,7 @@
   various posible cases and the define a procedure specified for each
   below.
 
-  7.  If we find that the node PRESENT at this index is an INODE, then
+   7.  If we find that the node PRESENT at this index is an INODE, then
   this is the simplest of the possible cases.  Conceptually, what we
   intend to do is continue to follow our arc, descending to the next
   level of the CTRIE structure that is referenced by that inode.  In
