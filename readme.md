@@ -1221,111 +1221,111 @@ _[function]_         `CTRIE-PUT  (CTRIE KEY VALUE)`
 _[function]_         `%INSERT  (INODE KEY VALUE LEVEL PARENT STARTGEN)`
 
 > 0.  The detailed specifics required to perform an insertion into a
-CTRIE map are defined by and contained within the `%INSERT` function,
-which is not part of the USER API and should never be invoked
-directly.  The procedures required for interaction with `%INSERT` are
-managed entirely by the upper layer entry-points and should be
-entirely invisible to the developer using CL-CTRIE.  The alogorithm is
-intricate and requires quite some effort to figure out based on the
-papers and documentation. For that reason this attempt is made to
-properly document the process -- not to encourage anyone to fiddle
-with it...
+  CTRIE map are defined by and contained within the `%INSERT` function,
+  which is not part of the USER API and should never be invoked
+  directly.  The procedures required for interaction with `%INSERT` are
+  managed entirely by the upper layer entry-points and should be
+  entirely invisible to the developer using CL-CTRIE.  The alogorithm is
+  intricate and requires quite some effort to figure out based on the
+  papers and documentation. For that reason this attempt is made to
+  properly document the process -- not to encourage anyone to fiddle
+  with it...
 
-1.  A given call to %insert carries with it no guarantee that it will
-actually succeed.  Further, there is no guarantee it will do anything
-at all -- including ever returning to the caller having invoked it.
-This is because there are a number of circumstances that may possibly
-interfere with insertion in a lock-free concurrent data-structure and
-in order to minimize the cost incurred by aborted attempts and
-restarts, there is no effort wasted on careful condition handling or
-recovery.  Instead, as soon as it is recognised that a particular
-attempt will not succeed, Control is thrown via non-local exit
-unceremoneously the entire call stack and restarting each time from
-the very beginning. There are quite a few places within the process
-where you will find these nonlocal exits. Originally I had in mind to
-incorporate some additional insrumentation to track and gather
-statistics the log the specifics of all this, and there are a number
-of extension points provided.  For more details refer to the
-`MULTI-CATCH` and `CATCH-CASE` control structure documentation.
+  > 1.  A given call to %insert carries with it no guarantee that it will
+  actually succeed.  Further, there is no guarantee it will do anything
+  at all -- including ever returning to the caller having invoked it.
+  This is because there are a number of circumstances that may possibly
+  interfere with insertion in a lock-free concurrent data-structure and
+  in order to minimize the cost incurred by aborted attempts and
+  restarts, there is no effort wasted on careful condition handling or
+  recovery.  Instead, as soon as it is recognised that a particular
+  attempt will not succeed, Control is thrown via non-local exit
+  unceremoneously the entire call stack and restarting each time from
+  the very beginning. There are quite a few places within the process
+  where you will find these nonlocal exits. Originally I had in mind to
+  incorporate some additional insrumentation to track and gather
+  statistics the log the specifics of all this, and there are a number
+  of extension points provided.  For more details refer to the
+  `MULTI-CATCH` and `CATCH-CASE` control structure documentation.
 
-2.  %insert ALWAYS begins at an INODE.  This is not surprising, of
-course, since the root of the tree (where all inserts begin) is an
-INODE, and because INODES are the only nodes that provide
-mutability. When we which to effect change to the CTRIE regardless of
-where or what type, It may only be accomplished by mutating the parent
-INODE immediately above it to reference content that must be freshly
-regenerated each time changes are required.  Once it is established
-that the %insert always begins at an inode, we can reason further
-about the sequence of events that follow by considering some of the
-node oriented invariants for CTRIEs specified variously in the
-academic literature.  First, it has been clearly defined that an INODE
-structure may only reference three kinds of structure that we
-collectively refer to as MAIN-NODES.  These are the three potential
-cases which we will consider next.
+  > 2.  %insert ALWAYS begins at an INODE.  This is not surprising, of
+  course, since the root of the tree (where all inserts begin) is an
+  INODE, and because INODES are the only nodes that provide
+  mutability. When we which to effect change to the CTRIE regardless of
+  where or what type, It may only be accomplished by mutating the parent
+  INODE immediately above it to reference content that must be freshly
+  regenerated each time changes are required.  Once it is established
+  that the %insert always begins at an inode, we can reason further
+  about the sequence of events that follow by considering some of the
+  node oriented invariants for CTRIEs specified variously in the
+  academic literature.  First, it has been clearly defined that an INODE
+  structure may only reference three kinds of structure that we
+  collectively refer to as MAIN-NODES.  These are the three potential
+  cases which we will consider next.
 
-3.  Consider first the TNODE. If indeed we follow an INODE and
-discover it directly leads us to a TNODE, or 'Tomb Node'. This tells
-us, first, that we have arrived at a dead-end, second that we must
-assist with the 'compression' of this arc by invoking the `CLEAN`
-operation on the tombed INODE's parent.  Finally, there is nothing
-further we can do so we THROW to :RESTART.
+  > 3.  Consider first the TNODE. If indeed we follow an INODE and
+  discover it directly leads us to a TNODE, or 'Tomb Node'. This tells
+  us, first, that we have arrived at a dead-end, second that we must
+  assist with the 'compression' of this arc by invoking the `CLEAN`
+  operation on the tombed INODE's parent.  Finally, there is nothing
+  further we can do so we THROW to :RESTART.
 
-4.  If traverse the INODE and arrive at an LNODE, we are also at the
-end of the ARC, but if it is due to hash collision then the algorithm
-then indeed it may be correct.  In this case we attempt to 'insert'
-ourself in te LNODE chain and then invoke INODE mutate to atomic
-commit and then THROW to :RESTART
+  > 4.  If traverse the INODE and arrive at an LNODE, we are also at the
+  end of the ARC, but if it is due to hash collision then the algorithm
+  then indeed it may be correct.  In this case we attempt to 'insert'
+  ourself in te LNODE chain and then invoke INODE mutate to atomic
+  commit and then THROW to :RESTART
 
-5.  As a simple instance of the general case, we may arrive at a CNODE
-with vacant arc that represents the index specified by the bits of our
-KEY's hash code that are active for this level within the ctrie.  When
-this is the case, we construct a replacement CNODE augmented with our
-key/value pair as an SNODE LEAF at the physical position within the
-CNODES storage vector appropriately translated from the logical arc
-index as described by the documentation of the functions
-`FLAG-ARC-POSITION` and `FLAG-VECTOR` If we successfully mutate the
-parent inode by completing an atomic replacement of the old cnode with
-the one we constructed, then our insertion has succeeded and we return
-the range value now successfully mapped by KEY in order to indicate
-our success.  Otherwise we THROW to :RESTART.
+  > 5.  As a simple instance of the general case, we may arrive at a CNODE
+  with vacant arc that represents the index specified by the bits of our
+  KEY's hash code that are active for this level within the ctrie.  When
+  this is the case, we construct a replacement CNODE augmented with our
+  key/value pair as an SNODE LEAF at the physical position within the
+  CNODES storage vector appropriately translated from the logical arc
+  index as described by the documentation of the functions
+  `FLAG-ARC-POSITION` and `FLAG-VECTOR` If we successfully mutate the
+  parent inode by completing an atomic replacement of the old cnode with
+  the one we constructed, then our insertion has succeeded and we return
+  the range value now successfully mapped by KEY in order to indicate
+  our success.  Otherwise we THROW to :RESTART.
 
-6.  If we find the logical index of our 'arc' in this CNODE is not
-empty and available as we did above, there are exactly two other
-possibly find there; we know this because it is required to be a
-BRANCH-NODE -- either an snode leaf storage or an inode referencing a
-MAIN-NODE that represents the next layer of the CTRIE.  We describe
-various posible cases and the define a procedure specified for each
-below.
+  > 6.  If we find the logical index of our 'arc' in this CNODE is not
+  empty and available as we did above, there are exactly two other
+  possibly find there; we know this because it is required to be a
+  BRANCH-NODE -- either an snode leaf storage or an inode referencing a
+  MAIN-NODE that represents the next layer of the CTRIE.  We describe
+  various posible cases and the define a procedure specified for each
+  below.
 
-7.  If we find that the node PRESENT at this index is an INODE, then
-this is the simplest of the possible cases.  Conceptually, what we
-intend to do is continue to follow our arc, descending to the next
-level of the CTRIE structure that is referenced by that inode.  In
-practice, however, we are required to consider the possibility that
-the generational descriptor object the inode contains may not be
-consistent with STARTGEN, which is the one current in the root INODE
-of this CTRIE.  This may be the case, for example, as the result of
-some past cloning/snapshot operation if we are the first since then to
-traverse this inode. (Remember that the refresh of generational
-descriptor occurs lazily on an as-needed basis in order to avoid
-overhead incurred by eager traversals which often turn out to have
-been unnecessary.  In consideration of this we proceeed as follows: -
-If the inode generational descriptor is consistent with STARTGEN, we
-simply continue along our arc by recursively invoking `%insert` on
-that INODE.  If that function call returns successfully with a VALUE,
-then the insertion was successful, and we also then return, passing
-along that value.  Thus the result is communicated back through the
-caller chain, eventually arriving back as the result of the original
-CTRIE-PUT entry-point.  - Otherwise if the generational descriptor is
-not consistent with STARTGEN we attempt an atomic `INODE-MUTATE` on
-the PARENT INODE of this CNODE that effects the replacement of that
-inode within it by one FRESHLY CREATED by `REFRESH` and ensured to be
-consistent with STARTGEN.  If this succeeds, we invoke %insert
-recusively and proceed in the same manner, since, effectively, we are
-now in a state equivalent to the one described above.  - If the
-INODE-MUTATE of the prior step did NOT succeed, then we are out of
-options and throw to :RESTART the insertion process from the beginning
-all over again.  
+  > 7.  If we find that the node PRESENT at this index is an INODE, then
+  this is the simplest of the possible cases.  Conceptually, what we
+  intend to do is continue to follow our arc, descending to the next
+  level of the CTRIE structure that is referenced by that inode.  In
+  practice, however, we are required to consider the possibility that
+  the generational descriptor object the inode contains may not be
+  consistent with STARTGEN, which is the one current in the root INODE
+  of this CTRIE.  This may be the case, for example, as the result of
+  some past cloning/snapshot operation if we are the first since then to
+  traverse this inode. (Remember that the refresh of generational
+  descriptor occurs lazily on an as-needed basis in order to avoid
+  overhead incurred by eager traversals which often turn out to have
+  been unnecessary.  In consideration of this we proceeed as follows: -
+  If the inode generational descriptor is consistent with STARTGEN, we
+  simply continue along our arc by recursively invoking `%insert` on
+  that INODE.  If that function call returns successfully with a VALUE,
+  then the insertion was successful, and we also then return, passing
+  along that value.  Thus the result is communicated back through the
+  caller chain, eventually arriving back as the result of the original
+  CTRIE-PUT entry-point.  - Otherwise if the generational descriptor is
+  not consistent with STARTGEN we attempt an atomic `INODE-MUTATE` on
+  the PARENT INODE of this CNODE that effects the replacement of that
+  inode within it by one FRESHLY CREATED by `REFRESH` and ensured to be
+  consistent with STARTGEN.  If this succeeds, we invoke %insert
+  recusively and proceed in the same manner, since, effectively, we are
+  now in a state equivalent to the one described above.  - If the
+  INODE-MUTATE of the prior step did NOT succeed, then we are out of
+  options and throw to :RESTART the insertion process from the beginning
+  all over again.  
 
 
 _[function]_         `CTRIE-GET  (CTRIE KEY)`
@@ -1532,5 +1532,7 @@ _[macro]_            `DEFINE-DIAGRAM  (TYPE (&OPTIONAL CONTEXT) &BODY BODY)`
 
 > Define a diagrammatic representation of TYPE, optionally specialized
   for a specific CONTEXT. See {defgeneric cl-ctrie::make-diagram}.
+
+
 
 
