@@ -540,3 +540,41 @@
       do (assert-eql (values i t) (ctrie-drop c i)))
     (assert-true (ctrie-empty-p c))
     c))
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Cursor and Supporting Facilities
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+(define-test check-fbind
+  (fbind (foo (lambda (x) (list 'foo x)))
+    (assert-equalp (foo 1)  '(foo 1))
+    (assert-equalp (foo :x) '(foo :x))
+    (assert-equalp (foo (foo t)) '(foo (foo t))))) 
+
+
+(define-test check-alet-fsm
+  (flet ((make-test-fsm ()
+           (alet ((acc 0))
+             (alet-fsm
+               (going-up (n)
+                 (if (eq n 'invert)
+                   (state going-down)
+                   (incf acc n)))
+               (going-down (n)
+                 (if (eq n 'invert)
+                   (state going-up)
+                   (decf acc n)))))))
+    (fbind (fsm (make-test-fsm))
+      (assert-eql  0 (fsm 0))
+      (assert-eql  5 (fsm 5))
+      (assert-eql  5 (fsm 0))
+      (assert-eql  6 (fsm 1))
+      (fsm 'invert)
+      (assert-eql  0 (fsm 6))
+      (assert-eql -5 (fsm 5))
+      (fsm 'invert)
+      (assert-eql  0 (fsm 5)))))
+
