@@ -188,20 +188,87 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; CTRIE-CURSOR
+;; CTRIE-LAMBDA
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defun make-ctrie-cursor (ctrie &key (read-only t))
+(defun make-ctrie-lambda (ctrie &key (read-only t) kernel)
+  "Construct a cursor instance providing point-in-time consistent
+  stateful traversal of CTRIE"
+  (declare (ignorable kernel))
   (let* ((top     (ctrie-snapshot ctrie :read-only read-only))
           (master ctrie)
           (meta   (list :timestamp (local-time:now)))
           (at     (root-node-access top))
           (up     top)
+          (me     nil)
           (path   nil))
-    (plambda (arg) (top at up path meta master)
+    (plambda (arg) (top at up path meta me master)
+      (unless me (setf me this))
       (typecase arg
-        (null (describe this))
-        (t    at)))))
+        (function (funcall arg top))
+        (t    (ctrie-get top arg))))))
+          
+(defmacro define-ctrie (name &rest args &key test hash stamp)
+  "Define a 'functional' __CTRIE-LAMBDA__ that combines all the the
+  capabilities of the raw data structure with behavior and semantics
+  one would expect of any other ordinary common-lisp function.  The
+  resulting symbol defined as 'name will be bound in three distinct
+  namespaces: the `SYMBOL-VALUE` will be bound to the LAMBDA CLOSURE
+  object, `SYMBOL-FUNCTION` (fdefinition) will be FBOUND to the
+  compiled function, and the corresponding '(SETF NAME) form will be
+  SETF-BOUND.  the syntax for invoking NAME is as in a LISP1; i.e., no
+  'funcall' is required (but still works if you prefer).
+  Calling `(NAME key)` returns the value mapped to key, or `NIL` just
+  as if by `(CTRIE-GET ctrie-name key).` Analogously when used as a
+  setf-able place such as by `(setf (NAME key) value)` it has the
+  equivalent behavior to the operation `(CTRIE-PUT ctrie-name key
+  value).` Use of this type of binding technique has some really
+  convenient effects that I've quickly started to become quite fond
+  of.  One such idiom, for example, `(mapcar MY-CTRIE '(key1 key2 key3
+  key4 ...))` returns a list contaaining all the mapped values
+  corresponding to the respective keys.  One additional feature that
+  I've found extremely useful is included _under the hood:_ Invoking
+  MY-CTRIE on an object of type FUNCTION will not search the ctrie for
+  an entry having that function ast its key, but will instead APPLY
+  that function to the actual CTRIE structure wrapped within the
+  closure.  Thus, `(MY-CTRIE #'identity)` will return the underlying
+  ctrie as just an ordinary instance of a CTRIE STRUCTURE.  
+  There are many other functions this is handy with, like
+  `(MY-CTRIE #'ctrie-size)` `(MY-CTRIE #'ctrie-to-hashtable)`
+  etc.  Some additional examples are provided below. 
+     ;;;
+     ;;;  (define-ctrie my-ctrie)
+     ;;;    =>  MY-CTRIE
+     ;;;
+     ;;;  (describe 'my-ctrie)
+     ;;;
+     ;;;     CL-CTRIE::MY-CTRIE
+     ;;;       [symbol]
+     ;;;    
+     ;;;     MY-CTRIE names a special variable:
+     ;;;       Value: #<CLOSURE (LAMBDA # :IN MAKE-CTRIE-LAMBDA) {100F73261B}>
+     ;;;    
+     ;;;     MY-CTRIE names a compiled function:
+     ;;;       Lambda-list: (&REST ARGS1)
+     ;;;       Derived type: FUNCTION
+     ;;;    
+     ;;;     (SETF MY-CTRIE) names a compiled function:
+     ;;;       Lambda-list: (VALUE KEY)
+     ;;;       Derived type: (FUNCTION (T T) *)
+     ;;;"
+  (declare (ignorable test hash stamp))
+  `(let1 ctrie-lambda (make-ctrie-lambda
+                        (apply #'make-ctrie ,args)
+                        :read-only nil)
+     (proclaim '(special ,name))
+     (setf (symbol-value ',name) ctrie-lambda) 
+     (setf (fdefinition  ',name) ctrie-lambda)
+     (setf (fdefinition  '(setf ,name))
+       #'(lambda (value key)
+           (let ((ctrie (funcall ctrie-lambda #'identity)))
+             (ctrie-put ctrie key value))))
+     ',name))
+
 
 
 (define-pandoric-function ctrie-cursor-reset (at top up path)
@@ -219,11 +286,37 @@
   top)
 
 (define-pandoric-function ctrie-cursor-looking-at (at)
-  at)
+  (type-of at))
 
 (define-pandoric-function ctrie-cursor-at-top-p (up top)
   (eq up top))
 
+(define-pandoric-function ctrie-cursor-up (at up path)
+  nil)
+
+(define-pandoric-function ctrie-cursor-down (at up path)
+  (when (inode-p at)
+    (push (cons at up) path)
+    (setf up at)
+    (setf at (inode-read at))))
+
+(define-pandoric-function ctrie-cursor-next (at up path)
+  nil)
+
+(define-pandoric-function ctrie-cursor-has-next-p (at up path)
+  nil)
+
+(define-pandoric-function ctrie-cursor-prev (at up path)
+  nil)
+
+(define-pandoric-function ctrie-cursor-has-prev-p (at up path)
+  nil)
+
+
+
+;; (when (cnode-p at)
+;;     (push (cons at up) path)
+    
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

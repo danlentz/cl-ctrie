@@ -59,5 +59,7 @@
     :ctrie-cursor-timestamp
     :ctrie-cursor-ctrie
     :ctrie-cursor-looking-at
-    :ctrie-cursor-at-top-p))
+    :ctrie-cursor-at-top-p
+    :make-ctrie-lambda
+    :define-ctrie))
   

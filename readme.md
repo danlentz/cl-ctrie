@@ -117,10 +117,10 @@ respective purpose.
 The following files are the core sources currently necessary
 for correct ctrie operation. 
 
-- __`ctrie-package.lisp:`__  Package definition
-- __`ctrie.lisp:`__          Ctrie implementation
+- __`ctrie-package.lisp:`__  Package Definition
+- __`ctrie.lisp:`__          Structural Implementation
+- __`ctrie-lambda.lisp:`__   Stateful Protocols
 - __`ctrie-util.lisp:`__     Supporting Utilities
-- __`ctrie-lambda.lisp:`__   Stateful Protocol development
 
 #### Supplemental
 
@@ -345,7 +345,62 @@ _[generic-function]_ `CTRIE-IMPORT  (PLACE &KEY &ALLOW-OTHER-KEYS)`
 
 _[function]_         `CTRIE-SNAPSHOT  (CTRIE &KEY READ-ONLY)`
 
-_[function]_         `MAKE-CTRIE-CURSOR  (CTRIE &KEY (READ-ONLY T))`
+_[macro]_            `DEFINE-CTRIE  (NAME &REST ARGS &KEY TEST HASH STAMP)`
+
+> Define a 'functional' __CTRIE-LAMBDA__ that combines all the the
+  capabilities of the raw data structure with behavior and semantics
+  one would expect of any other ordinary common-lisp function.  The
+  resulting symbol defined as 'name will be bound in three distinct
+  namespaces: the `SYMBOL-VALUE` will be bound to the LAMBDA CLOSURE
+  object, `SYMBOL-FUNCTION` (fdefinition) will be FBOUND to the
+  compiled function, and the corresponding '(SETF NAME) form will be
+  SETF-BOUND.  the syntax for invoking NAME is as in a LISP1; i.e., no
+  'funcall' is required (but still works if you prefer).
+  Calling `(NAME key)` returns the value mapped to key, or `NIL` just
+  as if by `(CTRIE-GET ctrie-name key).` Analogously when used as a
+  setf-able place such as by `(setf (NAME key) value)` it has the
+  equivalent behavior to the operation `(CTRIE-PUT ctrie-name key
+  value).` Use of this type of binding technique has some really
+  convenient effects that I've quickly started to become quite fond
+  of.  One such idiom, for example, `(mapcar MY-CTRIE '(key1 key2 key3
+  key4 ...))` returns a list contaaining all the mapped values
+  corresponding to the respective keys.  One additional feature that
+  I've found extremely useful is included _under the hood:_ Invoking
+  MY-CTRIE on an object of type FUNCTION will not search the ctrie for
+  an entry having that function ast its key, but will instead APPLY
+  that function to the actual CTRIE structure wrapped within the
+  closure.  Thus, `(MY-CTRIE #'identity)` will return the underlying
+  ctrie as just an ordinary instance of a CTRIE STRUCTURE.  
+  There are many other functions this is handy with, like
+  `(MY-CTRIE #'ctrie-size)` `(MY-CTRIE #'ctrie-to-hashtable)`
+  etc.  Some additional examples are provided below. 
+     ;;;
+     ;;;  (define-ctrie my-ctrie)
+     ;;;    =>  MY-CTRIE
+     ;;;
+     ;;;  (describe 'my-ctrie)
+     ;;;
+     ;;;     CL-CTRIE::MY-CTRIE
+     ;;;       [symbol]
+     ;;;    
+     ;;;     MY-CTRIE names a special variable:
+     ;;;       Value: #<CLOSURE (LAMBDA # :IN MAKE-CTRIE-LAMBDA) {100F73261B}>
+     ;;;    
+     ;;;     MY-CTRIE names a compiled function:
+     ;;;       Lambda-list: (&REST ARGS1)
+     ;;;       Derived type: FUNCTION
+     ;;;    
+     ;;;     (SETF MY-CTRIE) names a compiled function:
+     ;;;       Lambda-list: (VALUE KEY)
+     ;;;       Derived type: (FUNCTION (T T) *)
+     ;;;
+
+
+_[function]_         `MAKE-CTRIE-LAMBDA  (CTRIE &KEY (READ-ONLY T) KERNEL)`
+
+> Construct a cursor instance providing point-in-time consistent
+  stateful traversal of CTRIE
+
 
 _[function]_         `CTRIE-CURSOR-RESET  (SELF)`
 
@@ -1468,7 +1523,62 @@ _[method]_           `CTRIE-IMPORT  ((PLACE PATHNAME) &KEY)`
 
 _[generic-function]_ `CTRIE-IMPORT  (PLACE &KEY &ALLOW-OTHER-KEYS)`
 
-_[function]_         `MAKE-CTRIE-CURSOR  (CTRIE &KEY (READ-ONLY T))`
+_[macro]_            `DEFINE-CTRIE  (NAME &REST ARGS &KEY TEST HASH STAMP)`
+
+> Define a 'functional' __CTRIE-LAMBDA__ that combines all the the
+  capabilities of the raw data structure with behavior and semantics
+  one would expect of any other ordinary common-lisp function.  The
+  resulting symbol defined as 'name will be bound in three distinct
+  namespaces: the `SYMBOL-VALUE` will be bound to the LAMBDA CLOSURE
+  object, `SYMBOL-FUNCTION` (fdefinition) will be FBOUND to the
+  compiled function, and the corresponding '(SETF NAME) form will be
+  SETF-BOUND.  the syntax for invoking NAME is as in a LISP1; i.e., no
+  'funcall' is required (but still works if you prefer).
+  Calling `(NAME key)` returns the value mapped to key, or `NIL` just
+  as if by `(CTRIE-GET ctrie-name key).` Analogously when used as a
+  setf-able place such as by `(setf (NAME key) value)` it has the
+  equivalent behavior to the operation `(CTRIE-PUT ctrie-name key
+  value).` Use of this type of binding technique has some really
+  convenient effects that I've quickly started to become quite fond
+  of.  One such idiom, for example, `(mapcar MY-CTRIE '(key1 key2 key3
+  key4 ...))` returns a list contaaining all the mapped values
+  corresponding to the respective keys.  One additional feature that
+  I've found extremely useful is included _under the hood:_ Invoking
+  MY-CTRIE on an object of type FUNCTION will not search the ctrie for
+  an entry having that function ast its key, but will instead APPLY
+  that function to the actual CTRIE structure wrapped within the
+  closure.  Thus, `(MY-CTRIE #'identity)` will return the underlying
+  ctrie as just an ordinary instance of a CTRIE STRUCTURE.  
+  There are many other functions this is handy with, like
+  `(MY-CTRIE #'ctrie-size)` `(MY-CTRIE #'ctrie-to-hashtable)`
+  etc.  Some additional examples are provided below. 
+     ;;;
+     ;;;  (define-ctrie my-ctrie)
+     ;;;    =>  MY-CTRIE
+     ;;;
+     ;;;  (describe 'my-ctrie)
+     ;;;
+     ;;;     CL-CTRIE::MY-CTRIE
+     ;;;       [symbol]
+     ;;;    
+     ;;;     MY-CTRIE names a special variable:
+     ;;;       Value: #<CLOSURE (LAMBDA # :IN MAKE-CTRIE-LAMBDA) {100F73261B}>
+     ;;;    
+     ;;;     MY-CTRIE names a compiled function:
+     ;;;       Lambda-list: (&REST ARGS1)
+     ;;;       Derived type: FUNCTION
+     ;;;    
+     ;;;     (SETF MY-CTRIE) names a compiled function:
+     ;;;       Lambda-list: (VALUE KEY)
+     ;;;       Derived type: (FUNCTION (T T) *)
+     ;;;
+
+
+_[function]_         `MAKE-CTRIE-LAMBDA  (CTRIE &KEY (READ-ONLY T) KERNEL)`
+
+> Construct a cursor instance providing point-in-time consistent
+  stateful traversal of CTRIE
+
 
 _[function]_         `CTRIE-CURSOR-RESET  (SELF)`
 

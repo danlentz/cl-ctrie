@@ -20,8 +20,9 @@
      ctrie-values ctrie-size ctrie-clear ctrie-pprint 
      ctrie-to-alist ctrie-to-hashtable ctrie-from-hashtable
      ctrie-from-alist ctrie-empty-p ctrie-save ctrie-load ctrie-export
-     ctrie-import ctrie-snapshot 
-     make-ctrie-cursor
+     ctrie-import ctrie-snapshot
+     define-ctrie
+     make-ctrie-lambda
      ctrie-cursor-reset
      ctrie-cursor-timestamp
      ctrie-cursor-ctrie
@@ -63,7 +64,8 @@
      ctrie-to-alist ctrie-to-hashtable ctrie-pprint ctrie-from-alist
      ctrie-from-hashtable
      ctrie-save ctrie-load ctrie-export ctrie-import
-     make-ctrie-cursor
+     define-ctrie
+     make-ctrie-lambda
      ctrie-cursor-reset
      ctrie-cursor-timestamp
      ctrie-cursor-ctrie
