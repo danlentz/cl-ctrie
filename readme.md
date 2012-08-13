@@ -373,7 +373,8 @@ _[macro]_            `DEFINE-CTRIE  (NAME &REST ARGS &KEY TEST HASH STAMP)`
   ctrie as just an ordinary instance of a CTRIE STRUCTURE.  
   There are many other functions this is handy with, like
   `(MY-CTRIE #'ctrie-size)` `(MY-CTRIE #'ctrie-to-hashtable)`
-  etc.  Some additional examples are provided below. 
+  etc.  Some additional examples are provided below.
+  ```
      ;;;
      ;;;  (define-ctrie my-ctrie)
      ;;;    =>  MY-CTRIE
@@ -394,6 +395,7 @@ _[macro]_            `DEFINE-CTRIE  (NAME &REST ARGS &KEY TEST HASH STAMP)`
      ;;;       Lambda-list: (VALUE KEY)
      ;;;       Derived type: (FUNCTION (T T) *)
      ;;;
+  ```
 
 
 _[function]_         `MAKE-CTRIE-LAMBDA  (CTRIE &KEY (READ-ONLY T) KERNEL)`
@@ -1551,7 +1553,8 @@ _[macro]_            `DEFINE-CTRIE  (NAME &REST ARGS &KEY TEST HASH STAMP)`
   ctrie as just an ordinary instance of a CTRIE STRUCTURE.  
   There are many other functions this is handy with, like
   `(MY-CTRIE #'ctrie-size)` `(MY-CTRIE #'ctrie-to-hashtable)`
-  etc.  Some additional examples are provided below. 
+  etc.  Some additional examples are provided below.
+  ```
      ;;;
      ;;;  (define-ctrie my-ctrie)
      ;;;    =>  MY-CTRIE
@@ -1572,6 +1575,7 @@ _[macro]_            `DEFINE-CTRIE  (NAME &REST ARGS &KEY TEST HASH STAMP)`
      ;;;       Lambda-list: (VALUE KEY)
      ;;;       Derived type: (FUNCTION (T T) *)
      ;;;
+  ```
 
 
 _[function]_         `MAKE-CTRIE-LAMBDA  (CTRIE &KEY (READ-ONLY T) KERNEL)`

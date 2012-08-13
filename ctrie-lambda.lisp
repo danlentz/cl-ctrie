@@ -235,7 +235,8 @@
   ctrie as just an ordinary instance of a CTRIE STRUCTURE.  
   There are many other functions this is handy with, like
   `(MY-CTRIE #'ctrie-size)` `(MY-CTRIE #'ctrie-to-hashtable)`
-  etc.  Some additional examples are provided below. 
+  etc.  Some additional examples are provided below.
+  ```
      ;;;
      ;;;  (define-ctrie my-ctrie)
      ;;;    =>  MY-CTRIE
@@ -255,7 +256,8 @@
      ;;;     (SETF MY-CTRIE) names a compiled function:
      ;;;       Lambda-list: (VALUE KEY)
      ;;;       Derived type: (FUNCTION (T T) *)
-     ;;;"
+     ;;;
+  ```"
   (declare (ignorable test hash stamp))
   `(let1 ctrie-lambda (make-ctrie-lambda
                         (apply #'make-ctrie ,args)
