@@ -8,7 +8,7 @@
   :description      "CTrie: a lock-free, concurrent, key/value map"
   :author           "Dan Lentz <danlentz@gmail.com>"
   :license          "MIT"
-  :version          "0.0.5"
+  :version          "0.0.8"
   
   :long-description "This is a common-lisp implementation of the CTrie unordered map
                      data-structure described in the paper 'Concurrent Tries with

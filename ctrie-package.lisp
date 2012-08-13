@@ -53,5 +53,11 @@
     :ctrie-not-supported
     :ctrie-invalid-dynamic-context
     :ctrie-generational-mismatch
-    :ctrie-modification-failed))
+    :ctrie-modification-failed
+    :make-ctrie-cursor
+    :ctrie-cursor-reset
+    :ctrie-cursor-timestamp
+    :ctrie-cursor-ctrie
+    :ctrie-cursor-looking-at
+    :ctrie-cursor-at-top-p))
   

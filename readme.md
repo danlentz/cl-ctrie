@@ -120,6 +120,7 @@ for correct ctrie operation.
 - __`ctrie-package.lisp:`__  Package definition
 - __`ctrie.lisp:`__          Ctrie implementation
 - __`ctrie-util.lisp:`__     Supporting Utilities
+- __`ctrie-lambda.lisp:`__   Stateful Protocol development
 
 #### Supplemental
 
@@ -344,6 +345,18 @@ _[generic-function]_ `CTRIE-IMPORT  (PLACE &KEY &ALLOW-OTHER-KEYS)`
 
 _[function]_         `CTRIE-SNAPSHOT  (CTRIE &KEY READ-ONLY)`
 
+_[function]_         `MAKE-CTRIE-CURSOR  (CTRIE &KEY (READ-ONLY T))`
+
+_[function]_         `CTRIE-CURSOR-RESET  (SELF)`
+
+_[function]_         `CTRIE-CURSOR-TIMESTAMP  (SELF)`
+
+_[function]_         `CTRIE-CURSOR-CTRIE  (SELF)`
+
+_[function]_         `CTRIE-CURSOR-LOOKING-AT  (SELF)`
+
+_[function]_         `CTRIE-CURSOR-AT-TOP-P  (SELF)`
+
 _[macro]_            `CTRIE-ERROR  (CONDITION &REST ARGS)`
 
 > Signal a CTRIE related condition.
@@ -396,6 +409,21 @@ _[condition]_        `CTRIE-GENERATIONAL-MISMATCH (CTRIE-STRUCTURAL-ERROR)`
 
 > Condition indicating an operation encountered an
    outdated or inconsistent node during its attempted traversal
+
+
+_[function]_         `CTRIE-MODIFICATION-FAILED  (REASON &KEY OP PLACE)`
+
+> Signal a modification failure with the appropriate attendant metadata.
+
+
+_[condition]_        `CTRIE-MODIFICATION-FAILED (CTRIE-OPERATIONAL-ERROR)`
+
+> This condition indicates an unhandled failure of an attempt to
+         perform stateful modification to CTRIE.  The most common case in
+         which this might occur is when such an attempt is mode on a CTRIE
+         designated as READONLY-P.  In any case, this condition represents an
+         exception from which processing cannot continue and requires
+         interactive user intervention in order to recover.
 
 
 * * * * * *
@@ -1220,7 +1248,7 @@ _[function]_         `CTRIE-PUT  (CTRIE KEY VALUE)`
 
 _[function]_         `%INSERT  (INODE KEY VALUE LEVEL PARENT STARTGEN)`
 
-> 0.  The detailed specifics required to perform an insertion into a
+>   > 0.  The detailed specifics required to perform an insertion into a
   CTRIE map are defined by and contained within the `%INSERT` function,
   which is not part of the USER API and should never be invoked
   directly.  The procedures required for interaction with `%INSERT` are
@@ -1309,7 +1337,7 @@ _[function]_         `%INSERT  (INODE KEY VALUE LEVEL PARENT STARTGEN)`
   traverse this inode. (Remember that the refresh of generational
   descriptor occurs lazily on an as-needed basis in order to avoid
   overhead incurred by eager traversals which often turn out to have
-  been unnecessary.  In consideration of this we proceeed as follows: -
+  been unnecessary).  In consideration of this we proceeed as follows: -
   If the inode generational descriptor is consistent with STARTGEN, we
   simply continue along our arc by recursively invoking `%insert` on
   that INODE.  If that function call returns successfully with a VALUE,
@@ -1325,7 +1353,17 @@ _[function]_         `%INSERT  (INODE KEY VALUE LEVEL PARENT STARTGEN)`
   now in a state equivalent to the one described above.  - If the
   INODE-MUTATE of the prior step did NOT succeed, then we are out of
   options and throw to :RESTART the insertion process from the beginning
-  all over again.  
+  all over again.
+
+  > 8.  If we find that the node PRESENT at this index is an SNODE,
+  then our situation becomes a little bit more complex and
+  there are a few more contingencies we must be prepared to
+  address.
+
+  > 9.  Once again, looking at the simplest first,
+  when an insert operation encounters a key with valid equality
+  predicate, An attempt should be made to commit the updated
+  mapping of key/value.  
 
 
 _[function]_         `CTRIE-GET  (CTRIE KEY)`
@@ -1430,6 +1468,18 @@ _[method]_           `CTRIE-IMPORT  ((PLACE PATHNAME) &KEY)`
 
 _[generic-function]_ `CTRIE-IMPORT  (PLACE &KEY &ALLOW-OTHER-KEYS)`
 
+_[function]_         `MAKE-CTRIE-CURSOR  (CTRIE &KEY (READ-ONLY T))`
+
+_[function]_         `CTRIE-CURSOR-RESET  (SELF)`
+
+_[function]_         `CTRIE-CURSOR-TIMESTAMP  (SELF)`
+
+_[function]_         `CTRIE-CURSOR-CTRIE  (SELF)`
+
+_[function]_         `CTRIE-CURSOR-LOOKING-AT  (SELF)`
+
+_[function]_         `CTRIE-CURSOR-AT-TOP-P  (SELF)`
+
 _[macro]_            `CTRIE-ERROR  (CONDITION &REST ARGS)`
 
 > Signal a CTRIE related condition.
@@ -1450,6 +1500,21 @@ _[condition]_        `CTRIE-OPERATIONAL-ERROR (CTRIE-ERROR)`
 
 > Condition for when an operational failure or
   inconsistency has occurred.
+
+
+_[function]_         `CTRIE-MODIFICATION-FAILED  (REASON &KEY OP PLACE)`
+
+> Signal a modification failure with the appropriate attendant metadata.
+
+
+_[condition]_        `CTRIE-MODIFICATION-FAILED (CTRIE-OPERATIONAL-ERROR)`
+
+> This condition indicates an unhandled failure of an attempt to
+         perform stateful modification to CTRIE.  The most common case in
+         which this might occur is when such an attempt is mode on a CTRIE
+         designated as READONLY-P.  In any case, this condition represents an
+         exception from which processing cannot continue and requires
+         interactive user intervention in order to recover.
 
 
 _[condition]_        `CTRIE-OPERATION-RETRIES-EXCEEDED (CTRIE-OPERATIONAL-ERROR)`
@@ -1534,5 +1599,6 @@ _[macro]_            `DEFINE-DIAGRAM  (TYPE (&OPTIONAL CONTEXT) &BODY BODY)`
   for a specific CONTEXT. See {defgeneric cl-ctrie::make-diagram}.
 
 
+* * * * * * *
 
 

@@ -34,7 +34,7 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Scaffolding
+;; Table Abstraction Scaffolding
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defmacro with-skiplist-tables (&body body)
@@ -106,31 +106,32 @@
         (table-get ct 1)))))
 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Performance Measurement and Instrumentation
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (defun collect-timing (thunk)
   "Executes THUNK and returns a timing-info object specifying how long
   execution took and how much memory was used. Implementation of
   collect-timing for SBCL. This code is a cut and paste adoption from
   from sbcl/src/code/time.lisp"
-  (declare (type function thunk))
-  
+  (declare (type function thunk)) 
   (let (old-run-utime       new-run-utime       old-run-stime
          new-run-stime       old-real-time       new-real-time
          old-page-faults     new-page-faults     real-time-overhead
          run-utime-overhead  run-stime-overhead  page-faults-overhead
-         old-bytes-consed    new-bytes-consed    cons-overhead)
-    
+         old-bytes-consed    new-bytes-consed    cons-overhead)    
+
     (multiple-value-setq                ;; Calculate the overhead...
       (old-run-utime old-run-stime old-page-faults old-bytes-consed)
       (sb-impl::time-get-sys-info))
-
     (multiple-value-setq                ;; Do it a second time
       (old-run-utime old-run-stime old-page-faults old-bytes-consed)
       (sb-impl::time-get-sys-info))    
-
     (multiple-value-setq
       (new-run-utime new-run-stime new-page-faults new-bytes-consed)
-      (sb-impl::time-get-sys-info))
-    
+      (sb-impl::time-get-sys-info))    
+
     (setq run-utime-overhead   (- new-run-utime old-run-utime))
     (setq run-stime-overhead   (- new-run-stime old-run-stime))
     (setq page-faults-overhead (- new-page-faults old-page-faults))
@@ -143,10 +144,9 @@
     (multiple-value-setq                ;; Now get the initial times.
       (old-run-utime old-run-stime old-page-faults old-bytes-consed)
       (sb-impl::time-get-sys-info))    
-    (setq old-real-time (get-internal-real-time))
-    
-    (let ((start-gc-run-time sb-impl::*gc-run-time*)
-           result timing)
+
+    (setq old-real-time (get-internal-real-time))    
+    (let ((start-gc-run-time sb-impl::*gc-run-time*) result timing)
       (progn
         (setq result (multiple-value-list (funcall thunk)))
         (multiple-value-setq
@@ -174,6 +174,7 @@
 
 
 (defun collate-timing (result-list)
+  "Process and aggregate a collection of timing run statistics"
   (loop
     with iter = (length result-list)
     for run in result-list
@@ -232,24 +233,8 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Tests
+;; CATCH-CASE
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-
-(define-test check-atomic-update
-  ;; Guaranteed to be (:COUNT . 1000000) -- if you replace
-  ;; atomic update with (INCF (CDR X)), the result becomes
-  ;; unpredictable.
-  (let ((x (cons :count 0)))
-    (mapc #'sb-thread:join-thread
-      (loop repeat 512
-        collect (sb-thread:make-thread
-                  (lambda ()
-                    (loop repeat 512
-                      do (atomic-update (cdr x) #'1+)
-                      (sleep 0.00001))))))
-    (assert-eql (* 512 512) (cdr x))))
-
 
 (define-test check-catch-case
   (flet ((test-catch-case (&optional (iterations 10))
@@ -281,6 +266,11 @@
 ;;      (:A 7 :B 2 :C 6 :D 5)
 ;;      (:A 4 :B 7 :C 4 :D 5))
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; ARCS, FLAGS, HASHING and BITMAPS
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (define-test check-flag-computation
   (assert-eql 2048     (flag nil 0))
   (assert-eql 1        (flag nil 5))
@@ -295,6 +285,7 @@
   (assert-eql 2048     (flag 1 10))
   (assert-eql 8388608  (flag 1 15)))
 
+
 (define-test check-flag-arc-position
   (loop for power from 0 to 32 do
     (assert-eql 0 (flag-arc-position (expt 2 power) 0))
@@ -302,6 +293,27 @@
     (assert-eql 1 (flag-arc-position (mod (expt 2 (+ power 2)) #x10000000) 2))
     (assert-eql 2 (flag-arc-position (mod (expt 2 (+ power 2)) #x10000000) 3))
     (assert-eql 1 (flag-arc-position (mod (expt 2 (+ power 3)) #x10000000) 4))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; INODES
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+(define-test check-atomic-update
+  ;; Guaranteed to be (:COUNT . 1000000) -- if you replace
+  ;; atomic update with (INCF (CDR X)), the result becomes
+  ;; unpredictable.
+  (let ((x (cons :count 0)))
+    (mapc #'sb-thread:join-thread
+      (loop repeat 512
+        collect (sb-thread:make-thread
+                  (lambda ()
+                    (loop repeat 512
+                      do (atomic-update (cdr x) #'1+)
+                      (sleep 0.00001))))))
+    (assert-eql (* 512 512) (cdr x))))
+
 
 (define-test check-atomic-inode-mutation
   (dotimes (rep 8)
@@ -317,6 +329,12 @@
         (assert-eql (* 256 1024) val)
         (assert-eql val stamp)))))
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; LNODES
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
 (define-test check-lnode-search
   (let1 ln (enlist (snode 1 :one) (snode 2 :two) (snode 3 :three))
     (assert-eq (values :one t)   (lnode-search ln 1 'eql))
@@ -324,10 +342,12 @@
     (assert-eq (values :three t) (lnode-search ln 3 'eql))
     (assert-eq (values nil nil)  (lnode-search ln 4 'eql))))
 
+
 (define-test check-lnode-length/enlist
   (dotimes (rep 8)
     (let1 len (random 32)
       (assert-eql len (lnode-length (apply #'enlist (alexandria:iota len)))))))
+
 
 (define-test check-lnode-inserted/removed
   (dotimes (rep 8)
@@ -342,43 +362,21 @@
       (loop for i in ints for remain from (1- len) downto 0
         for rest = (lnode-removed ln i 'eql) then (lnode-removed rest i 'eql)
         do (assert-eql remain (lnode-length rest))))))
-  
-;; #+()
-;;           ;; alloc     stream-length          :extend nil           
-;;           (open-mmap-stream file *mmap-size* :element-type element-type :extend nil))
-;; (defun test-cas-ctrie-root (&optional (iterations 10))
-;;   (assert (notany #'null (loop for ct in
-;;                            (list (make-ctrie) (make-ctrie :root (make-inode 0))
-;;                              (make-ctrie
-;;                                :root (make-inode
-;;                                        :ref (%make-cnode
-;;                                               :bitmap (random 32)
-;;                                               :arcs (iota (random 32))))))
-;;                            do (cas-ctrie-root ct (make-inode :ref 42))
-;;                            collect (inode-ref (ctrie-root ct)))))
-;;   (loop repeat iterations
-;;     with value-cases = (list
-;;                          nil
-;;                          (make-inode :ref (gensym))
-;;                          (make-inode :ref (make-cnode))
-;;                          (make-inode :ref (%make-cnode :arcs (make-gensym-list (random 32)))))
-;;     with ctrie-cases = (list
-;;                         (make-ctrie)
-;;                         (make-ctrie :root (make-inode 0))
-;;                         (make-ctrie :root (make-inode :ref (random 255)))
-;;                         (make-ctrie :root (make-inode :ref (%make-cnode :arcs (iota (random 32))))))
-;;     for ct = (random-elt ctrie-cases) then (random-elt ctrie-cases)
-;;     for vt = (random-elt value-cases) then (random-elt value-cases)
-;;     collect ct into test-cases
-;;     do (cas-ctrie-root ct vt)
-;;     collect (ctrie-root ct) into test-results
-;;     finally (assert (length= test-cases test-results))  
-;;     (return (values test-cases test-results))))
+
+
+(defmacro with-worlds-worst-hash-functions (&body body)
+  `(flet ((mod2 (n)   (mod n 2))
+           (mod3 (n)  (mod n 3))
+           (mod4 (n)  (mod n 4))
+           (self (n)  (logand n #xFFFFFFFF))
+           (fixed (n) (constantly n)))
+     ,@body))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Basic Insertion and Retrieval Tests
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 
 (define-test check-ctrie-smoke-test
   (let1 c (make-ctrie)
@@ -432,58 +430,6 @@
     (assert-true (funcall (ctrie-test c) (ctrie-drop c "yow") "wee"))
     (assert-true (ctrie-empty-p c))
     (values :pass c)))
-
-;;;;;
-;;
-;; (time (test-ctrie-simple-smoke-check))
-;;
-;; Evaluation took:
-;;   0.000 seconds of real time
-;;   0.000239 seconds of total run time (0.000238 user, 0.000001 system)
-;;   100.00% CPU
-;;   660,296 processor cycles
-;;   32,768 bytes consed
-;;
-;; :PASS
-;; #S(CTRIE
-;;    :TEST EQUAL
-;;    :ROOT #<INODE :STAMP 33 :VALUE #S(CNODE
-;;                                      :BITMAP 0
-;;                                      :FLAGS #*00000000000000000000000000000000
-;;                                      :ARCS #())>)
-;;;;;
-;;
-;; ctrie as it should have appeared before drops in above test:
-;;
-;; #S(CTRIE
-;;    :TEST EQUAL
-;;    :ROOT #<INODE :STAMP 17 :VALUE #S(CNODE
-;;                                      :BITMAP 571150067
-;;                                      :FLAGS #*11001111011100001101000001000100
-;;                                      :ARCS #(#S(SNODE :KEY "yow"  :VALUE "wee")
-;;                                              #S(SNODE :KEY "wow"  :VALUE "man")
-;;                                              #S(SNODE :KEY "whiz" :VALUE "bang")
-;;                                              #S(SNODE :KEY "hey"  :VALUE "dude")
-;;                                              #<INODE :STAMP 1
-;;                                                      :VALUE #S(CNODE :BITMAP 9
-;;                                                                      :FLAGS #*10010000000000000000000000000000
-;;                                                                      :ARCS #(#S(SNODE :KEY "whats" :VALUE "up")
-;;                                                                              #S(SNODE :KEY "cool" :VALUE "kitten")))>
-;;                                              #S(SNODE :KEY "key"   :VALUE "value")
-;;                                              #S(SNODE :KEY "bad"   :VALUE "ass")
-;;                                              #S(SNODE :KEY "dabba" :VALUE "barney")
-;;                                              #S(SNODE :KEY "yabba" :VALUE "fred")
-;;                                              #<INODE :STAMP 0
-;;                                                      :VALUE #S(CNODE :BITMAP 1610612736
-;;                                                                      :FLAGS #*00000000000000000000000000000110
-;;                                                                      :ARCS #(#S(SNODE :KEY "bibble" :VALUE "babble")
-;;                                                                              #S(SNODE :KEY "doo" :VALUE "wilma")))>
-;;                                              #S(SNODE :KEY "snip" :VALUE "snap")
-;;                                              #S(SNODE :KEY "bam"  :VALUE "bam")
-;;                                              #S(SNODE :KEY "zip"  :VALUE "pop")
-;;                                              #S(SNODE :KEY "foo"  :VALUE "bar")))>)
-
-
 
 
 (define-test check-simple-insert/lookup ()
@@ -544,18 +490,34 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Snapshot Related Features
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define-test check-atomic-clear ()
+  (let ((c (make-ctrie)))
+    (assert-true (ctrie-empty-p c))
+    (assert-eql 0 (ctrie-size c))
+    (ctrie-put c "foo" "bar")
+    (assert-false (ctrie-empty-p c))
+    (assert-eql 1 (ctrie-size c))
+    (ctrie-clear c)
+    (assert-true (ctrie-empty-p c))
+    (assert-eql 0 (ctrie-size c))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Cursor and Supporting Facilities
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-(define-test check-fbind
+(define-test check-fbind ()
   (fbind (foo (lambda (x) (list 'foo x)))
     (assert-equalp (foo 1)  '(foo 1))
     (assert-equalp (foo :x) '(foo :x))
     (assert-equalp (foo (foo t)) '(foo (foo t))))) 
 
 
-(define-test check-alet-fsm
+(define-test check-alet-fsm ()
   (flet ((make-test-fsm ()
            (alet ((acc 0))
              (alet-fsm

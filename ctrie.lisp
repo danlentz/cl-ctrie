@@ -3,7 +3,6 @@
 
 (in-package :cl-ctrie)
 
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Special Variables
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1121,20 +1120,28 @@
   "Perform operation on root-inode of ctrie, potentially applying the specified
   'null-root-inode' normalization steps first, if required."
   (labels ((try (n)
-           (when (minusp (decf n)) (error "cas failed"))
-           (let ((current (ctrie-root ctrie)))
-             (etypecase current
-               (null   (or (awhen (cas (ctrie-root ctrie) nil new-value)
-                             (if (not (null new-value))
-                               (return-from cas-ctrie-root it)
-                               (return-from cas-ctrie-root nil)))
-                             (try n)))
-               (inode  (if (null (inode-read current))
-                         (if (eq current (cas (ctrie-root ctrie) current new-value))
-                            (return-from cas-ctrie-root current)
-                           (try n))))))))
+             (when (minusp (decf n)) (error "cas failed"))
+             (let ((current (ctrie-root ctrie)))
+               (etypecase current
+                 (null   (or (awhen (cas (ctrie-root ctrie) nil new-value)
+                               (if (not (null new-value))
+                                 (return-from cas-ctrie-root it)
+                                 (return-from cas-ctrie-root nil)))
+                           (try n)))
+                 (inode  (if (null (inode-read current))
+                           (if (eq current (cas (ctrie-root ctrie) current new-value))
+                             (return-from cas-ctrie-root current)
+                             (try n))))))))
     (try 10)))
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;                                                                         ;;;;
+;;;;              THE BIG THREE:  INSERT / LOOKUP / REMOVE                   ;;;;
+;;;;                                                                         ;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; PUT/INSERT
@@ -1230,7 +1237,7 @@
   traverse this inode. (Remember that the refresh of generational
   descriptor occurs lazily on an as-needed basis in order to avoid
   overhead incurred by eager traversals which often turn out to have
-  been unnecessary.  In consideration of this we proceeed as follows: -
+  been unnecessary).  In consideration of this we proceeed as follows: -
   If the inode generational descriptor is consistent with STARTGEN, we
   simply continue along our arc by recursively invoking `%insert` on
   that INODE.  If that function call returns successfully with a VALUE,
@@ -1246,23 +1253,50 @@
   now in a state equivalent to the one described above.  - If the
   INODE-MUTATE of the prior step did NOT succeed, then we are out of
   options and throw to :RESTART the insertion process from the beginning
-  all over again.  "
-      
+  all over again.
+
+  > 8.  If we find that the node PRESENT at this index is an SNODE,
+  then our situation becomes a little bit more complex and
+  there are a few more contingencies we must be prepared to
+  address.
+
+  > 9.  Once again, looking at the simplest first,
+  when an insert operation encounters a key with valid equality
+  predicate, An attempt should be made to commit the updated
+  mapping of key/value.  "
+  
+  ;;;;;;;;;;;;;;;;;;;;;;;;
+  ;; 0.  INODE (start)  ;;   
+  ;;;;;;;;;;;;;;;;;;;;;;;;
+
   (atypecase (inode-read inode)
+    
+    ;;;;;;;;;;;;;;;;;;;;;;;;
+    ;; 3.  INODE -> TNODE ;;   
+    ;;;;;;;;;;;;;;;;;;;;;;;;
+    
+    (TNODE (throw :restart (clean parent (- level 5))))
 
-    ;; 3.  TNODE     
-    ;; 4.  LNODE
+    ;;;;;;;;;;;;;;;;;;;;;;;;
+    ;; 4.  INODE -> LNODE ;;
+    ;;;;;;;;;;;;;;;;;;;;;;;;
 
-    (tnode (throw :restart (clean parent (- level 5))))          
-    (lnode (unless (inode-mutate inode it (lnode-inserted it key value #'ctequal))
+    (LNODE (unless (inode-mutate inode it
+                     (lnode-inserted it key value #'ctequal))
              (throw :restart it)))
-    (cnode (let* ((cnode it)
+
+    ;;;;;;;;;;;;;;;;;;;;;;;;
+    ;; 5.  INODE -> CNODE ;;
+    ;;;;;;;;;;;;;;;;;;;;;;;;
+    
+    (CNODE (let* ((cnode it)
                    (bmp  (cnode-bitmap cnode))
                    (flag (flag key level))
                    (pos  (flag-arc-position flag bmp)))
-             ;;
-             ;; 5.  CNODE easy 
-             ;;
+             
+             ;;;;;;;;;;;;;;;;;;;;;;;;
+             ;; 5.  CNODE -> empty ;;
+             ;;;;;;;;;;;;;;;;;;;;;;;;
              
              (if (not (flag-present-p flag bmp))
                (let ((new-cnode (cnode-extended cnode flag pos (snode key value))))
@@ -1273,39 +1307,41 @@
                (let ((present (svref (cnode-arcs cnode) pos)))    
                  (etypecase present
 
-                   ;;
-                   ;; 6.  CNODE inode 
-                   ;;
+                   ;;;;;;;;;;;;;;;;;;;;;;;;
+                   ;; 6.  CNODE -> INODE ;;
+                   ;;;;;;;;;;;;;;;;;;;;;;;;
                    
-                   (inode (if (eq startgen (inode-gen present))
+                   (INODE (if (eq startgen (inode-gen present))
                             (return-from %insert
                               (%insert present key value (+ level 5) inode startgen))
                             (if (inode-mutate inode it (refresh it startgen))
                               (%insert inode key value level parent startgen)
                               (throw :restart startgen))))
 
-                   ;; If we find that the node PRESENT at this index is an SNODE,
-                   ;; then our situation becomes a little bit more complex and
-                   ;; there are a few more contingencies we must be prepared to
-                   ;; address.
+                   ;;;;;;;;;;;;;;;;;;;;;;;;
+                   ;; 8.  CNODE -> SNODE ;; 
+                   ;;;;;;;;;;;;;;;;;;;;;;;;
                    
-                   (snode (if (ctequal key (snode-key present))
+                   (SNODE (if (ctequal key (snode-key present))
                             (let ((new-cnode (cnode-updated cnode pos (snode key value))))
-                              
-                              ;;                     (log:sexp  :ctequal key (snode-key present))
+
+                            ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                              ;; 9.  SNODE -> SNODE / REPLACE (updated range value) ;;
+                            ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
                               (if (inode-mutate inode cnode new-cnode)
                                 (return-from %insert value)
-                                (throw :restart present)))
+                                (throw :restart present)))                          
                             
                             (if (>= level 30)
                               (let* ((new-snode (snode key value))
                                       (lnode-chain (enlist new-snode present))
                                       (new-inode (make-inode lnode-chain startgen))
                                       (new-cnode (cnode-updated cnode pos new-inode)))
-                                
-                                ;;                      (log:sexp :level level :new-snode new-snode :lnode-chain lnode-chain
-                                ;;                       :new-inode new-inode :new-cnode new-cnode)
+
+                                ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                                ;; 10.  SNODE -> SNODE / new INODE->LNODE (hash collision) ;;
+                                ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
                                 (if (inode-mutate inode cnode new-cnode)
                                   (return-from %insert value)
@@ -1316,14 +1352,15 @@
                                       (new-cnode (make-cnode new-bitmap))
                                       (new-inode (make-inode new-cnode startgen)))
 
-                                (setf (svref (cnode-arcs new-cnode)
-                                        (flag-arc-position new-flag-other new-bitmap))
+                                ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                                ;; 11.  SNODE-> SNODE / new INODE->CNODE (ctrie growth) ;;
+                                ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+                                (setf (svref (cnode-arcs new-cnode) (flag-arc-position
+                                                                      new-flag-other
+                                                                      new-bitmap))
                                   present)
-
-                                ;;                   (log:sexp :level level :new-flag-this new-flag-this
-                                ;;                     :new-flag-other new-flag-other :new-bitmap new-bitmap
-                                ;;                     :new-cnode new-cnode :new-inode new-inode) 
-
+                                
                                 (%insert new-inode key value (+ level 5) inode startgen)
                                 
                                 (if (inode-mutate inode cnode (cnode-updated cnode pos new-inode))
@@ -1344,10 +1381,6 @@
                             (format t  "~8S  done .~%~S~%" it *ctrie*)))))
         return it)))
 
-
-#+()
-(setf (svref (cnode-arcs new-cnode)(flag-arc-position new-flag-this new-bitmap))
-  (snode key value)) ;;(new-flag-this (flag key (+ level 5)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1475,9 +1508,75 @@
             (:notfound (values val nil))
             (t         (values val t)))))))
 
-                              
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; CTRIE-MAP & Friends
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Sketch of Alternative Approach using FSM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; something like this could be a lot easier (with a little macrology to
+;; eliminate the boilerplate) but probably hard to do without introdcing
+;; some inefficiencies. at the moment i'm not inspired to start redoing
+;; code working already anyway
+
+;; (defun make-start-state (&optional at &aux (edge-types '(tnode lnode cnode)))
+;;   (alet (started-at looking-at edge)
+;;     (funcall this :reset at)
+;;     (dlambda
+;;       (:?      () (describe this))
+;;       (:reset (&optional (start at))
+;;         (setf started-at start)
+;;         (setf edge nil looking-at nil)
+;;         this)
+;;       (:check-preconditions ()
+;;         (inode-p started-at))
+;;       (:initialize ()
+;;         (and
+;;           (funcall this :check-preconditions)
+;;           (setf looking-at started-at)
+;;           (setf edge (inode-read looking-at))
+;;           t))
+;;       (:check-invariants ()
+;;         (and
+;;           (inode-p started-at)
+;;           (inode-p looking-at)
+;;           (find (type-of edge) edge-types)))
+;;       (:edge-type ()
+;;         (type-of edge))
+;;       (:look-at-next ()
+;;         edge)
+;;       (t () (funcall this :?)))))
+;;
+;; (defun make-main-node-state ()
+;;   (alet (started-at looking-at edge-type edge)
+;;     (dlambda
+;;       (:?      () (describe this))
+;;       (:initialize (start look)
+;;         (setf started-at start)
+;;         (setf looking-at look))
+;;       (t () (funcall this :?)))))
+;;
+;; (defun make-insert-fsm ()
+;;   (alet (start-state looking-at edge-type edge)
+;;     (alet-fsm
+;;       (start (&rest args)
+;;         (or start-state (apply #'make-start-state args))
+;;         (funcall start-state :check-preconditions)
+;;         (funcall start-state :initialize)
+;;         (funcall start-state :check-invariants)
+;;         (multiple-value-prog1 (values
+;;                                 (setf edge (funcall start-state :edge))
+;;                                 (setf edge-type (funcall start-state :edge-type)))
+;;           (state (fdefinition (funcall start-state :edge-type)))))
+;;       (cnode (&rest args)
+;;         (declare (ignore args))
+;;         :cnode))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Mapping Operators
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defgeneric map-node (node fn))
@@ -1672,3 +1771,6 @@
 
 (defmethod  ctrie-import ((place hash-table) &key)
   (ctrie-from-hashtable place))
+
+
+

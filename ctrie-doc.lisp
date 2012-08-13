@@ -20,10 +20,19 @@
      ctrie-values ctrie-size ctrie-clear ctrie-pprint 
      ctrie-to-alist ctrie-to-hashtable ctrie-from-hashtable
      ctrie-from-alist ctrie-empty-p ctrie-save ctrie-load ctrie-export
-     ctrie-import ctrie-snapshot ctrie-error ctrie-structural-error
+     ctrie-import ctrie-snapshot 
+     make-ctrie-cursor
+     ctrie-cursor-reset
+     ctrie-cursor-timestamp
+     ctrie-cursor-ctrie
+     ctrie-cursor-looking-at
+     ctrie-cursor-at-top-p
+     ctrie-error ctrie-structural-error
      ctrie-operational-error ctrie-operation-retries-exceeded
      ctrie-not-implemented ctrie-not-supported
-     ctrie-invalid-dynamic-context ctrie-generational-mismatch))
+     ctrie-invalid-dynamic-context ctrie-generational-mismatch
+     ctrie-modification-failed
+     ))
 
 
 (setf (get 'readme :internal-marker) "* * * * * * *")
@@ -54,7 +63,14 @@
      ctrie-to-alist ctrie-to-hashtable ctrie-pprint ctrie-from-alist
      ctrie-from-hashtable
      ctrie-save ctrie-load ctrie-export ctrie-import
+     make-ctrie-cursor
+     ctrie-cursor-reset
+     ctrie-cursor-timestamp
+     ctrie-cursor-ctrie
+     ctrie-cursor-looking-at
+     ctrie-cursor-at-top-p
      ctrie-error ctrie-structural-error ctrie-operational-error
+     ctrie-modification-failed
      ctrie-operation-retries-exceeded ctrie-not-implemented
      ctrie-not-supported ctrie-invalid-dynamic-context
      ctrie-generational-mismatch readme readme-quietly apidoc princ-apidoc
@@ -74,6 +90,15 @@
             (format nil "~s" (second form)))
     :lambda-list (third form)
     :doc (cldoc::extract-doc (cdddr form))))
+
+
+(cldoc:define-descriptor-handler DEFINE-PANDORIC-FUNCTION (form)
+  "Function with lexical enviornment defined by Pandoric Closure "
+  (make-instance 'cldoc::defun-descriptor
+    :type (format nil "~s" (first form))
+    :name (format nil "~s" (second form))
+    :lambda-list '(self)
+    :doc (documentation (second form) 'function)))
 
 
 (cldoc:define-descriptor-handler DEFUN/INLINE (form)

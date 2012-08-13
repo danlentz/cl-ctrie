@@ -39,7 +39,6 @@
        (flet ((,name (&rest args) (apply ,gname args)))
          ,@body))))
 
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Pandoric Object Protocol 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -176,13 +175,91 @@
 
 
 (defmacro define-pandoric-function (name args &body body)
-  `(defun ,name (self)
+  `(progn
+     (defun ,name (self)
      ,(if args
         `(with-pandoric-slots ,args self ,@body)
-        `(progn ,@body))))
+        `(progn ,@body)))))
+
+
+     ;; ,(awhen (and (consp body) (stringp (first body)))
+     ;;    `(setf (documentation ',name 'function) (first ,body)))))
 
 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; CTRIE-CURSOR
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun make-ctrie-cursor (ctrie &key (read-only t))
+  (let* ((top     (ctrie-snapshot ctrie :read-only read-only))
+          (master ctrie)
+          (meta   (list :timestamp (local-time:now)))
+          (at     (root-node-access top))
+          (up     top)
+          (path   nil))
+    (plambda (arg) (top at up path meta master)
+      (typecase arg
+        (null (describe this))
+        (t    at)))))
+
+
+(define-pandoric-function ctrie-cursor-reset (at top up path)
+  (prog1 self
+    (setf at (root-node-access top))
+    (setf up top)
+    (setf path nil)))
+
+;; "Returns the timestamp of initial cursor creation"
+
+(define-pandoric-function ctrie-cursor-timestamp (meta)
+  (getf meta :timestamp))
+
+(define-pandoric-function ctrie-cursor-ctrie (top)
+  top)
+
+(define-pandoric-function ctrie-cursor-looking-at (at)
+  at)
+
+(define-pandoric-function ctrie-cursor-at-top-p (up top)
+  (eq up top))
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Unit/Regression Test
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+(define-test check-fbind
+  (fbind (foo (lambda (x) (list 'foo x)))
+    (assert-equalp (foo 1)  '(foo 1))
+    (assert-equalp (foo :x) '(foo :x))
+    (assert-equalp (foo (foo t)) '(foo (foo t))))) 
+
+
+(define-test check-alet-fsm
+  (flet ((make-test-fsm ()
+           (alet ((acc 0))
+             (alet-fsm
+               (going-up (n)
+                 (if (eq n 'invert)
+                   (state going-down)
+                   (incf acc n)))
+               (going-down (n)
+                 (if (eq n 'invert)
+                   (state going-up)
+                   (decf acc n)))))))
+    (fbind (fsm (make-test-fsm))
+      (assert-eql  0 (fsm 0))
+      (assert-eql  5 (fsm 5))
+      (assert-eql  5 (fsm 0))
+      (assert-eql  6 (fsm 1))
+      (fsm 'invert)
+      (assert-eql  0 (fsm 6))
+      (assert-eql -5 (fsm 5))
+      (fsm 'invert)
+      (assert-eql  0 (fsm 5)))))
 
 
 
