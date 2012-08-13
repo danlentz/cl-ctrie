@@ -1593,8 +1593,8 @@
 
 (defmacro ctrie-do ((key value ctrie &key atomic) &body body)
   "Iterate over (key . value) in ctrie in the manner of dolist.
-   EXAMPLE: (ctrie-do (k v ctrie)
-              (format t \"~&~8S => ~10S~%\" k v))"
+  ;;;  EXAMPLE: (ctrie-do (k v ctrie)
+  ;;;             (format t \"~&~8S => ~10S~%\" k v))"
   `(ctrie-map ,ctrie #'(lambda (,key ,value) ,@body)
      :atomic ,atomic))
 

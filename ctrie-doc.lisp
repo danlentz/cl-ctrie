@@ -23,6 +23,8 @@
      ctrie-import ctrie-snapshot
      define-ctrie
      make-ctrie-lambda
+     ctrie-lambda-dispatch
+     +simple-dispatch+
      ctrie-cursor-reset
      ctrie-cursor-timestamp
      ctrie-cursor-ctrie
@@ -66,6 +68,8 @@
      ctrie-save ctrie-load ctrie-export ctrie-import
      define-ctrie
      make-ctrie-lambda
+     ctrie-lambda-dispatch
+     +simple-dispatch+
      ctrie-cursor-reset
      ctrie-cursor-timestamp
      ctrie-cursor-ctrie

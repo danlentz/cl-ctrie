@@ -287,8 +287,8 @@ _[function]_         `CTRIE-DROP  (CTRIE KEY)`
 _[macro]_            `CTRIE-DO  ((KEY VALUE CTRIE &KEY ATOMIC) &BODY BODY)`
 
 > Iterate over (key . value) in ctrie in the manner of dolist.
-   EXAMPLE: (ctrie-do (k v ctrie)
-              (format t "~&~8S => ~10S~%" k v))
+  ;;;  EXAMPLE: (ctrie-do (k v ctrie)
+  ;;;             (format t "~&~8S => ~10S~%" k v))
 
 
 _[function]_         `CTRIE-MAP  (CTRIE FN &KEY ATOMIC &AUX ACCUM)`
@@ -363,7 +363,7 @@ _[macro]_            `DEFINE-CTRIE  (NAME &REST ARGS &KEY TEST HASH STAMP)`
   value).` Use of this type of binding technique has some really
   convenient effects that I've quickly started to become quite fond
   of.  One such idiom, for example, `(mapcar MY-CTRIE '(key1 key2 key3
-  key4 ...))` returns a list contaaining all the mapped values
+  key4 ...))` returns a list containing all the mapped values
   corresponding to the respective keys.  One additional feature that
   I've found extremely useful is included _under the hood:_ Invoking
   MY-CTRIE on an object of type FUNCTION will not search the ctrie for
@@ -398,11 +398,20 @@ _[macro]_            `DEFINE-CTRIE  (NAME &REST ARGS &KEY TEST HASH STAMP)`
   ```
 
 
-_[function]_         `MAKE-CTRIE-LAMBDA  (CTRIE &KEY (READ-ONLY T) KERNEL)`
+_[function]_         `MAKE-CTRIE-LAMBDA  (&KEY CTRIE
+                                          (DISPATCH-TABLE +SIMPLE-DISPATCH+)
+                                          (READ-ONLY T))`
 
 > Construct a cursor instance providing point-in-time consistent
   stateful traversal of CTRIE
 
+
+_[function]_         `CTRIE-LAMBDA-DISPATCH  (SELF)`
+
+_[special-variable]_ `+SIMPLE-DISPATCH+  ((DLAMBDA (:FROM (ARG) ARG)
+                                                   (:TO (ARG) ARG)
+                                                   (:DOMAIN (ARG) ARG)
+                                                   (:RANGE (ARG) ARG)))`
 
 _[function]_         `CTRIE-CURSOR-RESET  (SELF)`
 
@@ -1459,8 +1468,8 @@ _[function]_         `CTRIE-MAP  (CTRIE FN &KEY ATOMIC &AUX ACCUM)`
 _[macro]_            `CTRIE-DO  ((KEY VALUE CTRIE &KEY ATOMIC) &BODY BODY)`
 
 > Iterate over (key . value) in ctrie in the manner of dolist.
-   EXAMPLE: (ctrie-do (k v ctrie)
-              (format t "~&~8S => ~10S~%" k v))
+  ;;;  EXAMPLE: (ctrie-do (k v ctrie)
+  ;;;             (format t "~&~8S => ~10S~%" k v))
 
 
 _[method]_           `MAP-NODE  ((NODE CNODE) FN)`
@@ -1543,7 +1552,7 @@ _[macro]_            `DEFINE-CTRIE  (NAME &REST ARGS &KEY TEST HASH STAMP)`
   value).` Use of this type of binding technique has some really
   convenient effects that I've quickly started to become quite fond
   of.  One such idiom, for example, `(mapcar MY-CTRIE '(key1 key2 key3
-  key4 ...))` returns a list contaaining all the mapped values
+  key4 ...))` returns a list containing all the mapped values
   corresponding to the respective keys.  One additional feature that
   I've found extremely useful is included _under the hood:_ Invoking
   MY-CTRIE on an object of type FUNCTION will not search the ctrie for
@@ -1578,11 +1587,20 @@ _[macro]_            `DEFINE-CTRIE  (NAME &REST ARGS &KEY TEST HASH STAMP)`
   ```
 
 
-_[function]_         `MAKE-CTRIE-LAMBDA  (CTRIE &KEY (READ-ONLY T) KERNEL)`
+_[function]_         `MAKE-CTRIE-LAMBDA  (&KEY CTRIE
+                                          (DISPATCH-TABLE +SIMPLE-DISPATCH+)
+                                          (READ-ONLY T))`
 
 > Construct a cursor instance providing point-in-time consistent
   stateful traversal of CTRIE
 
+
+_[function]_         `CTRIE-LAMBDA-DISPATCH  (SELF)`
+
+_[special-variable]_ `+SIMPLE-DISPATCH+  ((DLAMBDA (:FROM (ARG) ARG)
+                                                   (:TO (ARG) ARG)
+                                                   (:DOMAIN (ARG) ARG)
+                                                   (:RANGE (ARG) ARG)))`
 
 _[function]_         `CTRIE-CURSOR-RESET  (SELF)`
 
@@ -1711,19 +1729,6 @@ _[macro]_            `DEFINE-DIAGRAM  (TYPE (&OPTIONAL CONTEXT) &BODY BODY)`
 
 > Define a diagrammatic representation of TYPE, optionally specialized
   for a specific CONTEXT. See {defgeneric cl-ctrie::make-diagram}.
-
-
-* * * * * * *
-
-
- See {defgeneric cl-ctrie::make-diagram}.
-
-
-* * * * * * *
-* * * * * * *
-
-
-ic cl-ctrie::make-diagram}.
 
 
 * * * * * * *

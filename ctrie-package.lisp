@@ -61,5 +61,7 @@
     :ctrie-cursor-looking-at
     :ctrie-cursor-at-top-p
     :make-ctrie-lambda
-    :define-ctrie))
+    :define-ctrie
+    :ctrie-lambda-dispatch
+    :+simple-dispatch+))
   

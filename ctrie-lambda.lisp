@@ -64,6 +64,11 @@
              dispatch-table)))))
 
 
+(defmacro/once dlambda-bind (spec)
+  `(dlambda ,@spec))
+
+
+
 (defmacro alet (letargs &rest body)
   `(let ((this) ,@letargs)
      (setq this ,@(last body))
@@ -182,31 +187,50 @@
         `(progn ,@body)))))
 
 
-     ;; ,(awhen (and (consp body) (stringp (first body)))
-     ;;    `(setf (documentation ',name 'function) (first ,body)))))
-
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; CTRIE-LAMBDA
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defun make-ctrie-lambda (ctrie &key (read-only t) kernel)
-  "Construct a cursor instance providing point-in-time consistent
-  stateful traversal of CTRIE"
-  (declare (ignorable kernel))
-  (let* ((top     (ctrie-snapshot ctrie :read-only read-only))
+(defparameter +simple-dispatch+
+  (dlambda
+    (:from   (arg) arg)
+    (:to     (arg) arg)
+    (:domain (arg) arg)
+    (:range  (arg) arg)))
+
+(defparameter +pax-romana+
+  (dlambda
+    (:from   (arg) arg)
+    (:to     (arg) arg)
+    (:domain (arg) arg)
+    (:range  (arg)
+      (if  (and (numberp arg) (plusp arg) (< arg 2020))
+        (format nil "~@r" arg)
+        (format nil "~:r" arg)))))
+
+
+(defun make-ctrie-lambda (&key ctrie (dispatch-table +simple-dispatch+)
+                           (read-only t))
+  "Construct a new ctrie function"
+  (let* ((top     (if ctrie
+                    (ctrie-snapshot ctrie :read-only read-only)
+                    (make-ctrie)))
           (master ctrie)
+          (dispatch  dispatch-table)
           (meta   (list :timestamp (local-time:now)))
           (at     (root-node-access top))
           (up     top)
           (me     nil)
           (path   nil))
-    (plambda (arg) (top at up path meta me master)
-      (unless me (setf me this))
-      (typecase arg
-        (function (funcall arg top))
-        (t    (ctrie-get top arg))))))
+    (plambda (arg) (dispatch top at up path meta me master)
+      (flet (($ (&rest args) (apply dispatch args)))
+        (unless me (setf me this))
+        (typecase arg
+          (function (funcall arg top))
+          (t      (ctrie-get ($ :from top) ($ :domain arg))))))))
+
+
           
 (defmacro define-ctrie (name &rest args &key test hash stamp)
   "Define a 'functional' __CTRIE-LAMBDA__ that combines all the the
@@ -225,7 +249,7 @@
   value).` Use of this type of binding technique has some really
   convenient effects that I've quickly started to become quite fond
   of.  One such idiom, for example, `(mapcar MY-CTRIE '(key1 key2 key3
-  key4 ...))` returns a list contaaining all the mapped values
+  key4 ...))` returns a list containing all the mapped values
   corresponding to the respective keys.  One additional feature that
   I've found extremely useful is included _under the hood:_ Invoking
   MY-CTRIE on an object of type FUNCTION will not search the ctrie for
@@ -259,7 +283,7 @@
   ;;;
   ```"
   (declare (ignorable test hash stamp))
-  `(let1 ctrie-lambda (make-ctrie-lambda
+  `(let1 ctrie-lambda (make-ctrie-lambda :ctrie
                         (apply #'make-ctrie ,args)
                         :read-only nil)
      (proclaim '(special ,name))
@@ -267,9 +291,24 @@
      (setf (fdefinition  ',name) ctrie-lambda)
      (setf (fdefinition  '(setf ,name))
        #'(lambda (value key)
-           (let ((ctrie (funcall ctrie-lambda #'identity)))
-             (ctrie-put ctrie key value))))
+           (with-pandoric-slots (dispatch top) ctrie-lambda
+             (flet (($ (&rest args) (apply dispatch args)))
+               (ctrie-put ($ :to top) ($ :domain key) ($ :range value))))))
      ',name))
+
+
+(define-pandoric-function ctrie-lambda-dispatch (dispatch)
+  dispatch)
+
+(defun (setf ctrie-lambda-dispatch) (dispatch-table ctrie-lambda)
+  (with-pandoric-slots (dispatch) ctrie-lambda
+    (setf dispatch dispatch-table)))
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; CTRIE-CURSOR
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
 
@@ -278,8 +317,6 @@
     (setf at (root-node-access top))
     (setf up top)
     (setf path nil)))
-
-;; "Returns the timestamp of initial cursor creation"
 
 (define-pandoric-function ctrie-cursor-timestamp (meta)
   (getf meta :timestamp))
@@ -315,10 +352,6 @@
   nil)
 
 
-
-;; (when (cnode-p at)
-;;     (push (cons at up) path)
-    
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
