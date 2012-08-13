@@ -246,7 +246,8 @@ _[structure]_        `CTRIE ()`
 
 
 _[function]_         `MAKE-CTRIE  (&REST ARGS &KEY NAME ROOT (READONLY-P NIL)
-                                   (TEST 'EQUAL) (HASH 'SXHASH))`
+                                   (TEST 'EQUAL) (HASH 'SXHASH)
+                                   &ALLOW-OTHER-KEYS)`
 
 > CREATE a new CTRIE instance. This is the entry-point constructor 
   intended for use by the end-user.
@@ -345,7 +346,8 @@ _[generic-function]_ `CTRIE-IMPORT  (PLACE &KEY &ALLOW-OTHER-KEYS)`
 
 _[function]_         `CTRIE-SNAPSHOT  (CTRIE &KEY READ-ONLY)`
 
-_[macro]_            `DEFINE-CTRIE  (NAME &REST ARGS &KEY TEST HASH STAMP)`
+_[macro]_            `DEFINE-CTRIE  (NAME &REST ARGS &KEY (TEST 'EQUAL)
+                                     (HASH 'SXHASH) (STAMP (CONSTANTLY NIL)))`
 
 > Define a 'functional' __CTRIE-LAMBDA__ that combines all the the
   capabilities of the raw data structure with behavior and semantics
@@ -402,11 +404,14 @@ _[function]_         `MAKE-CTRIE-LAMBDA  (&KEY CTRIE
                                           (DISPATCH-TABLE +SIMPLE-DISPATCH+)
                                           (READ-ONLY T))`
 
-> Construct a cursor instance providing point-in-time consistent
-  stateful traversal of CTRIE
+> Construct a new ctrie function
 
 
-_[function]_         `CTRIE-LAMBDA-DISPATCH  (SELF)`
+_[generic-function]_ `CTRIE-LAMBDA-DISPATCH  (CTRIE-LAMBDA)`
+
+> Returns and (with setf) changes the dispatch of the specified ctrie-lambda
+
+
 
 _[special-variable]_ `+SIMPLE-DISPATCH+  ((DLAMBDA (:FROM (ARG) ARG)
                                                    (:TO (ARG) ARG)
@@ -1023,7 +1028,6 @@ _[structure]_        `CNODE ()`
   is fixed and specified at the time of its creation based on the
   value of BITMAP during initialization
    - `BITMAP`
-   - `FLAGS`
    - `ARCS` 
 
 
@@ -1314,7 +1318,7 @@ _[function]_         `CTRIE-PUT  (CTRIE KEY VALUE)`
 
 _[function]_         `%INSERT  (INODE KEY VALUE LEVEL PARENT STARTGEN)`
 
->   > 0.  The detailed specifics required to perform an insertion into a
+>    0.  The detailed specifics required to perform an insertion into a
   CTRIE map are defined by and contained within the `%INSERT` function,
   which is not part of the USER API and should never be invoked
   directly.  The procedures required for interaction with `%INSERT` are
@@ -1426,10 +1430,58 @@ _[function]_         `%INSERT  (INODE KEY VALUE LEVEL PARENT STARTGEN)`
   there are a few more contingencies we must be prepared to
   address.
 
-  > 9.  Once again, looking at the simplest first,
-  when an insert operation encounters a key with valid equality
-  predicate, An attempt should be made to commit the updated
-  mapping of key/value.  
+  > 9.  Once again, looking at the simplest first, when an insert
+  operation encounters a leaf-node somewhere along the descent of it's
+  'own' arc, one potential case is that it found the node it was
+  looking for -- one that contains a key that satisfies the test
+  predicate defined for the dynamic extent of the current operation,
+  `CTEQUAL,` when compared to the `KEY` currently being `%INSERTED.`
+  If the equality test is satisfied then the VALUE that node maps
+  should be updated with the one of the present insertion.  The steps
+  to effect the update are very similar to those of step 5, however We
+  construct a replacement CNODE augmented with our key/value pair as a
+  replacement SNODE in the SAME physical position as the one we have
+  found -- refer to the documentation for the function `CNODE-UPDATED`
+  for additional specifics on the internal details that describe this
+  operation.  If we successfully mutate the parent inode by completing
+  an atomic replacement of the old cnode with the one we constructed,
+  then our update has succeeded and we return the range value now
+  successfully mapped by KEY in order to indicate our success.
+  Otherwise we THROW to :RESTART.
+
+  > 10.  In some circumstances, we encounter a node on our arc whose
+  hash code bits have matched that of the current key of this
+  insertion for all of the lower order bits that have been consumed so
+  far, up to the current depth, but that (as opposed to step 9) does
+  not satisfy `CTEQUAL.` and so is NOT a candidiate for update
+  replacement.  Except in very vare circumstances, there will be some
+  depth at which the active bits of its hash code will indeed be
+  distinct from our own, and at that point a CNODE can be constructed
+  that will proprerly contain both it and an snode mapping the
+  key/value of the current insertion.  This means we must ENTEND the
+  ctrie as many layers as needed to get to that depth, inserting
+  CNODES and INODES at each step along the way.  Now, we will first
+  describe the 'edge' case where we have encounted the 'rare
+  circumstance.' If we perform this process and arrive at a depth
+  where all 32 hash code bits have been consumed and, indeed, these
+  two unequal keys are the result of a 'hash code collision' In order
+  that we preserve correct operation, we respond in this case by
+  chaining these key/value SNODES into a linked list of LNODES.
+  Therefore, they can share the same arc index and when we encounter
+  such a thing during future traversals, we can accomodate the
+  collision using simple linear search and a few basic LNODE utility
+  functions such as `LNODE-INSERTED` `LNODE-REMOVED` `LNODE-SEARCH`
+  `LNODE-LENGTH` and the list constructor `ENLIST.` Once we have
+  `ENLIST`ed the colliding SNODES, we create a new INODE pointing to
+  that list, and then attempt atomic replacement of the CNODE above
+  with one we extend to contain that INODE.  If we do successfully
+  mutate the prior CNODES parent INODE resulting in its replacement
+  with the CNODE we constructed, then our insert has succeeded and we
+  return the range value now successfully mapped by KEY in order to
+  indicate our success.  Otherwise we THROW to :RESTART.
+
+
+  
 
 
 _[function]_         `CTRIE-GET  (CTRIE KEY)`
@@ -1534,7 +1586,8 @@ _[method]_           `CTRIE-IMPORT  ((PLACE PATHNAME) &KEY)`
 
 _[generic-function]_ `CTRIE-IMPORT  (PLACE &KEY &ALLOW-OTHER-KEYS)`
 
-_[macro]_            `DEFINE-CTRIE  (NAME &REST ARGS &KEY TEST HASH STAMP)`
+_[macro]_            `DEFINE-CTRIE  (NAME &REST ARGS &KEY (TEST 'EQUAL)
+                                     (HASH 'SXHASH) (STAMP (CONSTANTLY NIL)))`
 
 > Define a 'functional' __CTRIE-LAMBDA__ that combines all the the
   capabilities of the raw data structure with behavior and semantics
@@ -1591,11 +1644,14 @@ _[function]_         `MAKE-CTRIE-LAMBDA  (&KEY CTRIE
                                           (DISPATCH-TABLE +SIMPLE-DISPATCH+)
                                           (READ-ONLY T))`
 
-> Construct a cursor instance providing point-in-time consistent
-  stateful traversal of CTRIE
+> Construct a new ctrie function
 
 
-_[function]_         `CTRIE-LAMBDA-DISPATCH  (SELF)`
+_[generic-function]_ `CTRIE-LAMBDA-DISPATCH  (CTRIE-LAMBDA)`
+
+> Returns and (with setf) changes the dispatch of the specified ctrie-lambda
+
+
 
 _[special-variable]_ `+SIMPLE-DISPATCH+  ((DLAMBDA (:FROM (ARG) ARG)
                                                    (:TO (ARG) ARG)

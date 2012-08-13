@@ -68,7 +68,6 @@
   `(dlambda ,@spec))
 
 
-
 (defmacro alet (letargs &rest body)
   `(let ((this) ,@letargs)
      (setq this ,@(last body))
@@ -122,8 +121,7 @@
 (defmacro pandoriclet (letargs &rest body)
   (let ((letargs (cons '(this) (let-binding-transform letargs))))
     `(let (,@letargs)
-       (setq this ,@(last body))
-       ,@(butlast body)
+       (setq this ,@(last body)) ,@(butlast body)
        (dlambda 
          (:pandoric-get (sym)        ,(pandoriclet-get letargs))
          (:pandoric-set (sym val)    ,(pandoriclet-set letargs))
@@ -189,7 +187,7 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; CTRIE-LAMBDA
+;; CTRIE-LAMBDA Dispatch
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defparameter +simple-dispatch+
@@ -210,6 +208,55 @@
         (format nil "~:r" arg)))))
 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; CTRIE-LAMBDA Metaclass
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+(defclass ctrie-lambda-class (sb-mop:funcallable-standard-class)
+  ())
+
+(defmethod sb-mop:validate-superclass ((sub ctrie-lambda-class)
+                                        (super sb-mop:funcallable-standard-class))
+  t)
+
+
+(defclass ctrie-lambda (sb-mop:funcallable-standard-object)
+  ((dispatch
+     :initarg :dispatch
+     :accessor ctrie-lambda-dispatch)
+    (ctrie
+      :initarg :ctrie
+      :accessor ctrie-lambda-ctrie)
+    (function
+      :initarg :function
+      :accessor ctrie-lambda-function))      
+  (:metaclass ctrie-lambda-class))
+
+
+(defmethod slot-unbound (class (instance ctrie-lambda) (slot (eql 'ctrie)))
+  (funcall instance #'identity))
+
+(defmethod slot-unbound (class (instance ctrie-lambda) (slot (eql 'dispatch)))
+  (ctrie-lambda-dispatch-table instance))
+
+(defmethod slot-unbound (class (instance ctrie-lambda) (slot (eql 'function)))
+  (ctrie-lambda-reset instance))
+
+
+;; (defmethod slot-unbound (class (instance ctrie-lambda) (slot (eql 'ctrie)))
+;;   (setf (slot-value instance 'ctrie) (funcall instance #'identity)))
+;; (defmethod slot-unbound (class (instance ctrie-lambda) (slot (eql 'dispatch)))
+;;   (setf (slot-value instance 'dispatch) (ctrie-lambda-dispatch-table instance)))
+;; (defmethod slot-unbound (class (instance ctrie-lambda) (slot (eql 'function)))
+;;   (setf (slot-value instance 'function) (ctrie-lambda-reset instance)))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; CTRIE-LAMBDA Lexical Closure
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
 (defun make-ctrie-lambda (&key ctrie (dispatch-table +simple-dispatch+)
                            (read-only t))
   "Construct a new ctrie function"
@@ -217,22 +264,28 @@
                     (ctrie-snapshot ctrie :read-only read-only)
                     (make-ctrie)))
           (master ctrie)
-          (dispatch  dispatch-table)
+          (dispatch-table  dispatch-table)
           (meta   (list :timestamp (local-time:now)))
           (at     (root-node-access top))
           (up     top)
           (me     nil)
           (path   nil))
-    (plambda (arg) (dispatch top at up path meta me master)
-      (flet (($ (&rest args) (apply dispatch args)))
+    (plambda (arg) (dispatch-table top at up path meta me master)
+      (flet (($ (&rest args) (apply dispatch-table args)))
         (unless me (setf me this))
         (typecase arg
           (function (funcall arg top))
-          (t      (ctrie-get ($ :from top) ($ :domain arg))))))))
+          (t        (ctrie-get ($ :from top) ($ :domain arg))))))))
 
 
-          
-(defmacro define-ctrie (name &rest args &key test hash stamp)
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; CTRIE-LAMBDA binding
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defmacro define-ctrie (name &rest args &key (test 'equal) (hash 'sxhash)
+                         (stamp (constantly nil)))
   "Define a 'functional' __CTRIE-LAMBDA__ that combines all the the
   capabilities of the raw data structure with behavior and semantics
   one would expect of any other ordinary common-lisp function.  The
@@ -283,27 +336,37 @@
   ;;;
   ```"
   (declare (ignorable test hash stamp))
-  `(let1 ctrie-lambda (make-ctrie-lambda :ctrie
-                        (apply #'make-ctrie ,args)
-                        :read-only nil)
+  `(let1 ctrie-lambda (make-ctrie-lambda :read-only nil
+                        :ctrie (apply #'make-ctrie ,args))
      (proclaim '(special ,name))
-     (setf (symbol-value ',name) ctrie-lambda) 
+     (setf (symbol-value ',name) (make-instance 'ctrie-lambda))
+     (sb-mop:set-funcallable-instance-function ,name ctrie-lambda)
      (setf (fdefinition  ',name) ctrie-lambda)
      (setf (fdefinition  '(setf ,name))
        #'(lambda (value key)
-           (with-pandoric-slots (dispatch top) ctrie-lambda
-             (flet (($ (&rest args) (apply dispatch args)))
+           (with-pandoric-slots (dispatch-table top) ctrie-lambda
+             (flet (($ (&rest args) (apply dispatch-table args)))
                (ctrie-put ($ :to top) ($ :domain key) ($ :range value))))))
      ',name))
 
 
-(define-pandoric-function ctrie-lambda-dispatch (dispatch)
-  dispatch)
 
-(defun (setf ctrie-lambda-dispatch) (dispatch-table ctrie-lambda)
-  (with-pandoric-slots (dispatch) ctrie-lambda
-    (setf dispatch dispatch-table)))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; CTRIE-LAMBDA Initialization
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define-pandoric-function ctrie-lambda-dispatch-table (dispatch-table)
+  dispatch-table)
+
+(defun (setf ctrie-lambda-dispatch-table) (dispatch ctrie-lambda)
+  (with-pandoric-slots (dispatch-table) ctrie-lambda
+    (setf dispatch-table dispatch)))
+
+(define-pandoric-function ctrie-lambda-reset (at top up path)
+  (prog1 self
+    (setf at (root-node-access top))
+    (setf up top)
+    (setf path nil)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -311,12 +374,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-
-(define-pandoric-function ctrie-cursor-reset (at top up path)
-  (prog1 self
-    (setf at (root-node-access top))
-    (setf up top)
-    (setf path nil)))
+(defun ctrie-cursor-reset (self)
+  (ctrie-lambda-reset self))
 
 (define-pandoric-function ctrie-cursor-timestamp (meta)
   (getf meta :timestamp))
@@ -350,7 +409,6 @@
 
 (define-pandoric-function ctrie-cursor-has-prev-p (at up path)
   nil)
-
 
 
 
