@@ -237,26 +237,26 @@
   `(MY-CTRIE #'ctrie-size)` `(MY-CTRIE #'ctrie-to-hashtable)`
   etc.  Some additional examples are provided below.
   ```
-     ;;;
-     ;;;  (define-ctrie my-ctrie)
-     ;;;    =>  MY-CTRIE
-     ;;;
-     ;;;  (describe 'my-ctrie)
-     ;;;
-     ;;;     CL-CTRIE::MY-CTRIE
-     ;;;       [symbol]
-     ;;;    
-     ;;;     MY-CTRIE names a special variable:
-     ;;;       Value: #<CLOSURE (LAMBDA # :IN MAKE-CTRIE-LAMBDA) {100F73261B}>
-     ;;;    
-     ;;;     MY-CTRIE names a compiled function:
-     ;;;       Lambda-list: (&REST ARGS1)
-     ;;;       Derived type: FUNCTION
-     ;;;    
-     ;;;     (SETF MY-CTRIE) names a compiled function:
-     ;;;       Lambda-list: (VALUE KEY)
-     ;;;       Derived type: (FUNCTION (T T) *)
-     ;;;
+  ;;;
+  ;;;  (define-ctrie my-ctrie)
+  ;;;    =>  MY-CTRIE
+  ;;;
+  ;;;  (describe 'my-ctrie)
+  ;;;
+  ;;;     CL-CTRIE::MY-CTRIE
+  ;;;       [symbol]
+  ;;;    
+  ;;;     MY-CTRIE names a special variable:
+  ;;;       Value: #<CLOSURE (LAMBDA # :IN MAKE-CTRIE-LAMBDA) {100F73261B}>
+  ;;;    
+  ;;;     MY-CTRIE names a compiled function:
+  ;;;       Lambda-list: (&REST ARGS1)
+  ;;;       Derived type: FUNCTION
+  ;;;    
+  ;;;     (SETF MY-CTRIE) names a compiled function:
+  ;;;       Lambda-list: (VALUE KEY)
+  ;;;       Derived type: (FUNCTION (T T) *)
+  ;;;
   ```"
   (declare (ignorable test hash stamp))
   `(let1 ctrie-lambda (make-ctrie-lambda
