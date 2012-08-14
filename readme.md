@@ -346,8 +346,9 @@ _[generic-function]_ `CTRIE-IMPORT  (PLACE &KEY &ALLOW-OTHER-KEYS)`
 
 _[function]_         `CTRIE-SNAPSHOT  (CTRIE &KEY READ-ONLY)`
 
-_[macro]_            `DEFINE-CTRIE  (NAME &REST ARGS &KEY (TEST 'EQUAL)
-                                     (HASH 'SXHASH) (STAMP (CONSTANTLY NIL)))`
+_[macro]_            `DEFINE-CTRIE  (NAME &REST ARGS &KEY (OBJECT T)
+                                     (TEST 'EQUAL) (HASH 'SXHASH)
+                                     (STAMP (CONSTANTLY NIL)))`
 
 > Define a 'functional' __CTRIE-LAMBDA__ that combines all the the
   capabilities of the raw data structure with behavior and semantics
@@ -377,7 +378,6 @@ _[macro]_            `DEFINE-CTRIE  (NAME &REST ARGS &KEY (TEST 'EQUAL)
   `(MY-CTRIE #'ctrie-size)` `(MY-CTRIE #'ctrie-to-hashtable)`
   etc.  Some additional examples are provided below.
   ```
-  ;;;
   ;;;  (define-ctrie my-ctrie)
   ;;;    =>  MY-CTRIE
   ;;;
@@ -397,15 +397,52 @@ _[macro]_            `DEFINE-CTRIE  (NAME &REST ARGS &KEY (TEST 'EQUAL)
   ;;;       Lambda-list: (VALUE KEY)
   ;;;       Derived type: (FUNCTION (T T) *)
   ;;;
+  ;;;
+  ;;;   (my-ctrie :HONG-KONG :FOOY)
+  ;;;     =>  :FOOY
+  ;;;
+  ;;;   (my-ctrie :HONG-KONG)
+  ;;;     =>  :FOOY ; T
+  ;;;
+  ;;;   (map 'list #'eval (mapcar #`(my-ctrie ,a1 ,a1) (iota 12)))
+  ;;;     =>  (0 1 2 3 4 5 6 7 8 9 10 11)
+  ;;;
+  ;;;   (mapcar my-ctrie (iota 12))
+  ;;;     =>  (0 1 2 3 4 5 6 7 8 9 10 11)
   ```
 
 
 _[function]_         `MAKE-CTRIE-LAMBDA  (&KEY CTRIE
-                                          (DISPATCH-TABLE +SIMPLE-DISPATCH+)
+                                          (DISPATCH +SIMPLE-DISPATCH+)
                                           (READ-ONLY T))`
 
-> Construct a new ctrie function
+> Construct a new functional ctrie and a lexical environment prepared with
+  various fixtures to support it. Supports 'normal' function interop but can
+  also provide functional map semantics
+   ```
+   ;;; (funcall v #'ctrie-put 1 1) =>  1
+   ;;; (funcall v #'ctrie-get 1)   =>  1 ; T
+   ;;;
+   ;;; (funcall v #'identity)      => #S(CTRIE :READONLY-P NIL :TEST EQUAL
+   ;;;                                   :ROOT #S(INODE :GEN #:|ctrie3177| ... )
+   ;;;
+   ;;; (funcall v 0)               => (ctrie-get ctrie 0)
+   ;;; (funcall v 0 1)             => (ctrie-put ctrie 0 1)
+   ```
 
+
+_[function]_         `CTRIE-LAMBDA-SPAWN  (SELF &KEY READ-ONLY)`
+
+> Causes the atomic clone of enclosed ctrie structure and builds a new
+  lexical closure to operate on it.  Does not bother to reproduce fancy
+  (expensive) object, class, bindings, but provides almost identical
+  functionality.  May be used to more efficintly distribute workload
+  in parallel
+
+
+_[function]_         `CTRIE-LAMBDA-RESET  (SELF)`
+
+_[function]_         `CTRIE-LAMBDA-DISPATCH-TABLE  (SELF)`
 
 _[generic-function]_ `CTRIE-LAMBDA-DISPATCH  (CTRIE-LAMBDA)`
 
@@ -1318,7 +1355,7 @@ _[function]_         `CTRIE-PUT  (CTRIE KEY VALUE)`
 
 _[function]_         `%INSERT  (INODE KEY VALUE LEVEL PARENT STARTGEN)`
 
->    0.  The detailed specifics required to perform an insertion into a
+>    -  The detailed specifics required to perform an insertion into a
   CTRIE map are defined by and contained within the `%INSERT` function,
   which is not part of the USER API and should never be invoked
   directly.  The procedures required for interaction with `%INSERT` are
@@ -1480,6 +1517,15 @@ _[function]_         `%INSERT  (INODE KEY VALUE LEVEL PARENT STARTGEN)`
   return the range value now successfully mapped by KEY in order to
   indicate our success.  Otherwise we THROW to :RESTART.
 
+  > 11.  Finally, let us return to those intermediate steps, mentioned
+  above, to specify the means by which we perform the level-by-level
+  extension of a given arc to accommodate both the above case of hash
+  collision as well as the more common one when the reason for
+  extension is simply to accomodate normal growth capacity and
+  allocation.  In both cases, though, the extensions are performed for
+  the same initiating cause -- to accomodate the collision of leaf
+  node keys resident at lower levels of the structure.
+
 
   
 
@@ -1586,8 +1632,9 @@ _[method]_           `CTRIE-IMPORT  ((PLACE PATHNAME) &KEY)`
 
 _[generic-function]_ `CTRIE-IMPORT  (PLACE &KEY &ALLOW-OTHER-KEYS)`
 
-_[macro]_            `DEFINE-CTRIE  (NAME &REST ARGS &KEY (TEST 'EQUAL)
-                                     (HASH 'SXHASH) (STAMP (CONSTANTLY NIL)))`
+_[macro]_            `DEFINE-CTRIE  (NAME &REST ARGS &KEY (OBJECT T)
+                                     (TEST 'EQUAL) (HASH 'SXHASH)
+                                     (STAMP (CONSTANTLY NIL)))`
 
 > Define a 'functional' __CTRIE-LAMBDA__ that combines all the the
   capabilities of the raw data structure with behavior and semantics
@@ -1617,7 +1664,6 @@ _[macro]_            `DEFINE-CTRIE  (NAME &REST ARGS &KEY (TEST 'EQUAL)
   `(MY-CTRIE #'ctrie-size)` `(MY-CTRIE #'ctrie-to-hashtable)`
   etc.  Some additional examples are provided below.
   ```
-  ;;;
   ;;;  (define-ctrie my-ctrie)
   ;;;    =>  MY-CTRIE
   ;;;
@@ -1637,15 +1683,58 @@ _[macro]_            `DEFINE-CTRIE  (NAME &REST ARGS &KEY (TEST 'EQUAL)
   ;;;       Lambda-list: (VALUE KEY)
   ;;;       Derived type: (FUNCTION (T T) *)
   ;;;
+  ;;;
+  ;;;   (my-ctrie :HONG-KONG :FOOY)
+  ;;;     =>  :FOOY
+  ;;;
+  ;;;   (my-ctrie :HONG-KONG)
+  ;;;     =>  :FOOY ; T
+  ;;;
+  ;;;   (map 'list #'eval (mapcar #`(my-ctrie ,a1 ,a1) (iota 12)))
+  ;;;     =>  (0 1 2 3 4 5 6 7 8 9 10 11)
+  ;;;
+  ;;;   (mapcar my-ctrie (iota 12))
+  ;;;     =>  (0 1 2 3 4 5 6 7 8 9 10 11)
   ```
 
 
 _[function]_         `MAKE-CTRIE-LAMBDA  (&KEY CTRIE
-                                          (DISPATCH-TABLE +SIMPLE-DISPATCH+)
+                                          (DISPATCH +SIMPLE-DISPATCH+)
                                           (READ-ONLY T))`
 
-> Construct a new ctrie function
+> Construct a new functional ctrie and a lexical environment prepared with
+  various fixtures to support it. Supports 'normal' function interop but can
+  also provide functional map semantics
+   ```
+   ;;; (funcall v #'ctrie-put 1 1) =>  1
+   ;;; (funcall v #'ctrie-get 1)   =>  1 ; T
+   ;;;
+   ;;; (funcall v #'identity)      => #S(CTRIE :READONLY-P NIL :TEST EQUAL
+   ;;;                                   :ROOT #S(INODE :GEN #:|ctrie3177| ... )
+   ;;;
+   ;;; (funcall v 0)               => (ctrie-get ctrie 0)
+   ;;; (funcall v 0 1)             => (ctrie-put ctrie 0 1)
+   ```
 
+
+_[generic-function]_ `CTRIE-LAMBDA-DISPATCH  (CTRIE-LAMBDA)`
+
+> Returns and (with setf) changes the dispatch of the specified ctrie-lambda
+
+
+
+_[function]_         `CTRIE-LAMBDA-SPAWN  (SELF &KEY READ-ONLY)`
+
+> Causes the atomic clone of enclosed ctrie structure and builds a new
+  lexical closure to operate on it.  Does not bother to reproduce fancy
+  (expensive) object, class, bindings, but provides almost identical
+  functionality.  May be used to more efficintly distribute workload
+  in parallel
+
+
+_[function]_         `CTRIE-LAMBDA-RESET  (SELF)`
+
+_[function]_         `CTRIE-LAMBDA-DISPATCH-TABLE  (SELF)`
 
 _[generic-function]_ `CTRIE-LAMBDA-DISPATCH  (CTRIE-LAMBDA)`
 

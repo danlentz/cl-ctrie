@@ -63,5 +63,10 @@
     :make-ctrie-lambda
     :define-ctrie
     :ctrie-lambda-dispatch
-    :+simple-dispatch+))
+    :+simple-dispatch+
+    :ctrie-lambda-spawn
+    :ctrie-lambda-class
+    :ctrie-lambda
+    :ctrie-lambda-reset
+    :ctrie-lambda-dispatch-table))
   

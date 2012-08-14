@@ -23,6 +23,11 @@
      ctrie-import ctrie-snapshot
      define-ctrie
      make-ctrie-lambda
+     ctrie-lambda-spawn
+     ctrie-lambda-class
+     ctrie-lambda
+     ctrie-lambda-reset
+     ctrie-lambda-dispatch-table
      ctrie-lambda-dispatch
      +simple-dispatch+
      ctrie-cursor-reset
@@ -68,6 +73,12 @@
      ctrie-save ctrie-load ctrie-export ctrie-import
      define-ctrie
      make-ctrie-lambda
+     ctrie-lambda-dispatch
+     ctrie-lambda-spawn
+     ctrie-lambda-class
+     ctrie-lambda
+     ctrie-lambda-reset
+     ctrie-lambda-dispatch-table
      ctrie-lambda-dispatch
      +simple-dispatch+
      ctrie-cursor-reset

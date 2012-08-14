@@ -1154,7 +1154,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
   
 (defun %insert (inode key value level parent startgen)
-  "   0.  The detailed specifics required to perform an insertion into a
+  "   -  The detailed specifics required to perform an insertion into a
   CTRIE map are defined by and contained within the `%INSERT` function,
   which is not part of the USER API and should never be invoked
   directly.  The procedures required for interaction with `%INSERT` are
@@ -1316,6 +1316,15 @@
   return the range value now successfully mapped by KEY in order to
   indicate our success.  Otherwise we THROW to :RESTART.
 
+  > 11.  Finally, let us return to those intermediate steps, mentioned
+  above, to specify the means by which we perform the level-by-level
+  extension of a given arc to accommodate both the above case of hash
+  collision as well as the more common one when the reason for
+  extension is simply to accomodate normal growth capacity and
+  allocation.  In both cases, though, the extensions are performed for
+  the same initiating cause -- to accomodate the collision of leaf
+  node keys resident at lower levels of the structure.
+
 
   "
   
@@ -1424,16 +1433,18 @@
 
 (defun ctrie-put (ctrie key value)
   (check-type ctrie ctrie)
-    (with-ctrie ctrie 
-      (loop  with d = 0 and p = nil 
-        for  root =  (root-node-access *ctrie*)
-        when (catch-case (%insert root key value d p (inode-gen root))
-               (:restart  (when nil ;;*debug*
-                            (format t  "~8A  timeout insert (~A . ~A)~%" it  key value)))
-               (t       (prog1 it
-                          (when nil ;;*debug*
-                            (format t  "~8S  done .~%~S~%" it *ctrie*)))))
-        return it)))
+  (with-ctrie ctrie 
+    (loop  with d = 0 and p = nil 
+      for  root =  (root-node-access *ctrie*)
+      when (catch-case (%insert root key value d p (inode-gen root))
+             (:restart (prog1 nil
+                         (when *debug*
+                           (format *TRACE-OUTPUT* "~8A  timeout insert (~A . ~A)~%"
+                             it key value))))
+             (t        (prog1 it
+                         (when *debug*
+                           (format *TRACE-OUTPUT* "~8S  done .~%~S~%" it *ctrie*)))))
+      return it)))
 
 
 

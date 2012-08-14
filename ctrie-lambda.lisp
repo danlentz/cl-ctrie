@@ -257,34 +257,60 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-(defun make-ctrie-lambda (&key ctrie (dispatch-table +simple-dispatch+)
-                           (read-only t))
-  "Construct a new ctrie function"
-  (let* ((top     (if ctrie
-                    (ctrie-snapshot ctrie :read-only read-only)
-                    (make-ctrie)))
-          (master ctrie)
-          (dispatch-table  dispatch-table)
-          (meta   (list :timestamp (local-time:now)))
-          (at     (root-node-access top))
-          (up     top)
-          (me     nil)
-          (path   nil))
-    (plambda (arg) (dispatch-table top at up path meta me master)
-      (flet (($ (&rest args) (apply dispatch-table args)))
-        (unless me (setf me this))
-        (typecase arg
-          (function (funcall arg top))
-          (t        (ctrie-get ($ :from top) ($ :domain arg))))))))
+(defun make-ctrie-lambda (&key ctrie (dispatch +simple-dispatch+) (read-only t))
+  "Construct a new functional ctrie and a lexical environment prepared with
+  various fixtures to support it. Supports 'normal' function interop but can
+  also provide functional map semantics
+   ```
+   ;;; (funcall v #'ctrie-put 1 1) =>  1
+   ;;; (funcall v #'ctrie-get 1)   =>  1 ; T
+   ;;;
+   ;;; (funcall v #'identity)      => #S(CTRIE :READONLY-P NIL :TEST EQUAL
+   ;;;                                   :ROOT #S(INODE :GEN #:|ctrie3177| ... )
+   ;;;
+   ;;; (funcall v 0)               => (ctrie-get ctrie 0)
+   ;;; (funcall v 0 1)             => (ctrie-put ctrie 0 1)
+   ```"
+  (alet ()
+    (let* ((top     (if ctrie
+                      (ctrie-snapshot ctrie :read-only read-only)
+                      (make-ctrie)))
+            (master ctrie)
+            (dispatch-table  dispatch)
+            (meta   (list :timestamp (local-time:now)))
+            (at     (root-node-access top))
+            (up     top)
+            (me     nil)
+            (path   nil))
+      (plambda (&rest args &aux (arg (car args))) (dispatch-table top at up path meta me master)
+        (flet ((@  (&rest args) (apply dispatch-table top args)) 
+                ($ (&rest args) (apply dispatch-table args)))
+          (unless me (setf me this))
+          (typecase arg
+            (function (apply arg top (rest args)))
+            (t
+              (if (rest args)
+                (apply #'ctrie-put ($ :from top) ($ :domain arg) ($ :range (rest args)))
+                (ctrie-get ($ :from top) ($ :domain arg))))))))))
 
 
+(defun ctrie-lambda-spawn (self &key read-only)
+  "Causes the atomic clone of enclosed ctrie structure and builds a new
+  lexical closure to operate on it.  Does not bother to reproduce fancy
+  (expensive) object, class, bindings, but provides almost identical
+  functionality.  May be used to more efficintly distribute workload
+  in parallel"
+  (funcall self
+    (lambda (ctrie)
+      (make-ctrie-lambda :ctrie ctrie
+        :read-only read-only))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; CTRIE-LAMBDA binding
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defmacro define-ctrie (name &rest args &key (test 'equal) (hash 'sxhash)
+(defmacro define-ctrie (name &rest args &key (object t) (test 'equal) (hash 'sxhash)
                          (stamp (constantly nil)))
   "Define a 'functional' __CTRIE-LAMBDA__ that combines all the the
   capabilities of the raw data structure with behavior and semantics
@@ -314,7 +340,6 @@
   `(MY-CTRIE #'ctrie-size)` `(MY-CTRIE #'ctrie-to-hashtable)`
   etc.  Some additional examples are provided below.
   ```
-  ;;;
   ;;;  (define-ctrie my-ctrie)
   ;;;    =>  MY-CTRIE
   ;;;
@@ -334,13 +359,28 @@
   ;;;       Lambda-list: (VALUE KEY)
   ;;;       Derived type: (FUNCTION (T T) *)
   ;;;
+  ;;;
+  ;;;   (my-ctrie :HONG-KONG :FOOY)
+  ;;;     =>  :FOOY
+  ;;;
+  ;;;   (my-ctrie :HONG-KONG)
+  ;;;     =>  :FOOY ; T
+  ;;;
+  ;;;   (map 'list #'eval (mapcar #`(my-ctrie ,a1 ,a1) (iota 12)))
+  ;;;     =>  (0 1 2 3 4 5 6 7 8 9 10 11)
+  ;;;
+  ;;;   (mapcar my-ctrie (iota 12))
+  ;;;     =>  (0 1 2 3 4 5 6 7 8 9 10 11)
   ```"
   (declare (ignorable test hash stamp))
   `(let1 ctrie-lambda (make-ctrie-lambda :read-only nil
                         :ctrie (apply #'make-ctrie ,args))
      (proclaim '(special ,name))
-     (setf (symbol-value ',name) (make-instance 'ctrie-lambda))
-     (sb-mop:set-funcallable-instance-function ,name ctrie-lambda)
+     (setf (symbol-value ',name) (if ,object
+                                   (make-instance 'ctrie-lambda)
+                                   ctrie-lambda))
+     (when ,object (sb-mop:set-funcallable-instance-function
+                    (symbol-value ',name) ctrie-lambda))
      (setf (fdefinition  ',name) ctrie-lambda)
      (setf (fdefinition  '(setf ,name))
        #'(lambda (value key)
