@@ -272,9 +272,9 @@
    ;;; (funcall v 0 1)             => (ctrie-put ctrie 0 1)
    ```"
   (alet ()
-    (let* ((top     (if ctrie
-                      (ctrie-snapshot ctrie :read-only read-only)
-                      (make-ctrie)))
+    (let* ((top (typecase ctrie
+                  (ctrie (ctrie-snapshot ctrie :read-only read-only))
+                  (null (make-ctrie))))
             (master ctrie)
             (dispatch-table  dispatch)
             (meta   (list :timestamp (local-time:now)))
@@ -283,8 +283,7 @@
             (me     nil)
             (path   nil))
       (plambda (&rest args &aux (arg (car args))) (dispatch-table top at up path meta me master)
-        (flet ((@  (&rest args) (apply dispatch-table top args)) 
-                ($ (&rest args) (apply dispatch-table args)))
+        (flet (($ (&rest args) (apply dispatch-table args)))
           (unless me (setf me this))
           (typecase arg
             (function (apply arg top (rest args)))
@@ -389,6 +388,10 @@
                (ctrie-put ($ :to top) ($ :domain key) ($ :range value))))))
      ',name))
 
+
+
+(defmethod find-ctrie-root ((ctrie ctrie-lambda))
+  (ctrie-root (funcall ctrie #'identity)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

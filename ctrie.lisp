@@ -972,9 +972,7 @@
   with alternate storage models, e.g., an external persistent disk-based
   store. See also `(cas cl-ctrie::find-ctrie-root)`")
   (:method ((ctrie ctrie))
-    (ctrie-root ctrie))
-   (:method ((ctrie ctrie-lambda))
-    (ctrie-root (funcall ctrie #'identity))))
+    (ctrie-root ctrie)))
 
 #+()
 (defgeneric (cas find-ctrie-root) (ctrie-designator old new)

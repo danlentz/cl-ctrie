@@ -76,11 +76,42 @@
         #+cldoc (:file "ctrie-doc")))
 
 
+#+cldoc
+(defmethod asdf:perform ((o asdf::doc-op) (c (eql (asdf:find-system :cl-ctrie))))
+  (asdf:load-system :cl-ctrie)
+  (funcall (intern (symbol-name :readme-quietly) (find-package :cl-ctrie))))
+
+#+cldoc
+(defmethod asdf:operation-done-p ((o asdf::doc-op) (c (eql (asdf:find-system :cl-ctrie))))
+  nil)
+
+
+
+(defclass test-file (asdf:cl-source-file) ())
+
+(defmethod perform ((op asdf:load-op) (c test-file))
+  t)
+
+(defmethod perform ((op asdf:compile-op) (c test-file))
+  t)
+
+
+(defmethod perform ((op asdf:test-op) (c test-file))
+  (with-open-file (log-stream (merge-pathnames ".log"
+                                (slot-value c 'asdf::absolute-pathname))
+                   :direction :output :if-does-not-exist :create
+                   :if-exists :supersede)
+    (let ((*standard-output* (make-broadcast-stream *standard-output* log-stream))
+           (*error-output*    (make-broadcast-stream *error-output* log-stream)))
+      
+      (perform (make-instance 'compile-op) (change-class c 'cl-source-file))
+      (perform (make-instance 'load-op)    (change-class c 'cl-source-file)))))
+
 
 (asdf:defsystem :cl-ctrie-test
   :serial t
   :depends-on (:cl-ctrie :lparallel :cl-skip-list)
-  :components ((:file "ctrie-test")))
+  :components ((:test-file "ctrie-test")))
 
 
 (defmethod asdf:perform ((o asdf:test-op) (c (eql (asdf:find-system :cl-ctrie))))
@@ -97,11 +128,4 @@
 (defmethod asdf:operation-done-p ((o asdf:test-op) (c (eql (asdf:find-system :cl-ctrie-test))))
   nil)
 
-#+cldoc
-(defmethod asdf:perform ((o asdf::doc-op) (c (eql (asdf:find-system :cl-ctrie))))
-  (asdf:load-system :cl-ctrie)
-  (funcall (intern (symbol-name :readme-quietly) (find-package :cl-ctrie))))
 
-#+cldoc
-(defmethod asdf:operation-done-p ((o asdf::doc-op) (c (eql (asdf:find-system :cl-ctrie))))
-  nil)
