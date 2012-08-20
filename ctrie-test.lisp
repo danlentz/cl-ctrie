@@ -1,12 +1,13 @@
 ;;;;; -*- mode: common-lisp;   common-lisp-style: modern;    coding: utf-8; -*-
 ;;;;;
 
+(in-package :cl-user)
 
 (eval-when (:load-toplevel :compile-toplevel :execute)
-  (macrolet ((define-package (name doc &rest packages)
+  (macrolet ((define-package (name docs &rest packages)
                `(defpackage ,name
-                  (:documentation ,doc)
-                  (:use :common-lisp :lisp-unit :lparallel ,@packages)
+                  (:documentation ,docs)
+                  (:use :closer-common-lisp :closer-mop :lisp-unit #+():lparallel ,@packages)
                   (:export :run-ctrie-tests)
                   ,@(loop :for pkg :in packages :collect
                       `(:import-from ,pkg ,@(loop :for sym :being :the :symbols :in pkg
@@ -27,7 +28,7 @@
                                                          nil (get-universal-time))))
           (uscores (make-string (length banner) :initial-element #\-)))
     (format t "~%~%~A~%~A~%~%" banner uscores)
-    (run-all-tests :ctrie)
+    (run-all-tests :cl-ctrie-test)
     (format t "~%~%")
     (finish-output))
   (values))
@@ -272,18 +273,19 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define-test check-flag-computation
-  (assert-eql 2048     (flag nil 0))
-  (assert-eql 1        (flag nil 5))
-  (assert-eql 1        (flag nil 10))
-  (assert-eql 65536    (flag nil 15))
-  (assert-eql 1        (flag nil 20))
-  (assert-eql 256      (flag nil 25))
-  (assert-eql 4        (flag t 0))
-  (assert-eql 1024     (flag 0 0))
-  (assert-eql 67108864 (flag 1 0))
-  (assert-eql 262144   (flag 1 5))
-  (assert-eql 2048     (flag 1 10))
-  (assert-eql 8388608  (flag 1 15)))
+  (with-ctrie (make-ctrie)
+    (assert-eql 2048     (flag nil 0))
+    (assert-eql 1        (flag nil 5))
+    (assert-eql 1        (flag nil 10))
+    (assert-eql 65536    (flag nil 15))
+    (assert-eql 1        (flag nil 20))
+    (assert-eql 256      (flag nil 25))
+    (assert-eql 4        (flag t 0))
+    (assert-eql 1024     (flag 0 0))
+    (assert-eql 67108864 (flag 1 0))
+    (assert-eql 262144   (flag 1 5))
+    (assert-eql 2048     (flag 1 10))
+    (assert-eql 8388608  (flag 1 15))))
 
 
 (define-test check-flag-arc-position
@@ -314,20 +316,21 @@
                       (sleep 0.00001))))))
     (assert-eql (* 512 512) (cdr x))))
 
-
+#+()
 (define-test check-atomic-inode-mutation
-  (dotimes (rep 8)
-    (let ((x (make-inode 0)))
-      (mapc #'sb-thread:join-thread
-        (loop repeat 256
-          collect (sb-thread:make-thread
-                    (lambda ()
-                      (loop repeat 1024
-                        do (loop until (inode-mutate x (deref x) (1+ (deref x))))
-                        (sleep 0.00001))))))
-      (multiple-value-bind (val stamp) (deref x)
-        (assert-eql (* 256 1024) val)
-        (assert-eql val stamp)))))
+  (with-ctrie (make-ctrie)
+    (dotimes (rep 8)
+      (let ((x (make-inode 0)))
+        (mapc #'sb-thread:join-thread
+          (loop repeat 256
+            collect (sb-thread:make-thread
+                      (lambda ()
+                        (loop repeat 1024
+                          do (loop until (inode-mutate x (inode-read x) (1+ (inode-read x))))
+                          (sleep 0.00001))))))
+        (multiple-value-bind (val stamp) (inode-read x)
+          (assert-eql (* 256 1024) val)
+          (assert-eql val stamp))))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -369,8 +372,65 @@
            (mod3 (n)  (mod n 3))
            (mod4 (n)  (mod n 4))
            (self (n)  (logand n #xFFFFFFFF))
-           (fixed (n) (constantly n)))
+           (fixed (n) (declare (ignore n)) 1))
      ,@body))
+
+
+(define-test check-depth-and-simple-extension ()
+  (let1 c (make-ctrie)
+    (assert-eql 1 (ctrie-max-depth c))
+    (assert-eql 1 (ctrie-min-depth c))
+    (ctrie-put c "key" "value")
+    (ctrie-put c "foo" "bar")
+    (ctrie-put c "zip" "pop")
+    (ctrie-put c "whiz" "bang")
+    (ctrie-put c "yow" "wee")
+    (ctrie-put c "snip" "snap")
+    (ctrie-put c "cool" "daddyo")
+    (ctrie-put c "cool" "cat")                                       ;; replace
+    (assert-eql 1 (ctrie-max-depth c))
+    (ctrie-put c "wow" "man")
+    (ctrie-put c "hey" "dude")
+    (ctrie-put c "bad" "ass")
+    (ctrie-put c "yabba" "fred")
+    (ctrie-put c "dabba" "barney")
+    (ctrie-put c "doo" "wilma")
+    (ctrie-put c "bam" "bam")
+    (ctrie-put c "whats" "up")                                      ;; split
+    (assert-eql 2 (ctrie-max-depth c))
+    (assert-eql 1 (ctrie-min-depth c))
+    (ctrie-put c "cool" "kitten")                                   ;; replace at new depth
+    (assert-equalp (ctrie-get c "whats")  (values "up" t))
+    (assert-equalp (ctrie-get c "cool")   (values "kitten" t))      ;; L2 Entries found
+    (ctrie-put c "bibble" "babble")                                 ;; Second L2 Split
+    (assert-eql 2 (ctrie-max-depth c))))
+    
+
+    
+(define-test check-extension/retraction/lnode-chaining ()
+  ;; this might be one of hardest tests.  The odds in real life
+  ;; of needing to extend / contract SIX levels for the insertion
+  ;; removal of one key/value are quite low.  It also, in the course
+  ;; of events, tests a number of entombment/revival cycles, plus, of
+  ;; course, the lnode chaining 
+  (with-worlds-worst-hash-functions
+    (let ((c4 (make-ctrie :hash #'mod4)))
+      (ctrie-put c4 0 0)
+      (ctrie-put c4 1 1)
+      (ctrie-put c4 2 2)
+      (ctrie-put c4 3 3)
+      (assert-eql 1 (ctrie-max-depth c4))
+      (ctrie-put c4 4 4)
+      (assert-eql 7 (ctrie-max-depth c4))
+      (loop for i from 0 to 4 do
+        (assert-eql (values i t) (ctrie-get c4 i)))
+      (ctrie-drop c4 4)
+      (assert-eql 7 (ctrie-max-depth c4))
+      (assert-eql (values 0 t) (ctrie-get c4 0))
+      (assert-eql 1 (ctrie-max-depth c4))
+      (loop for i from 0 to 3 do
+        (assert-eql (values i t) (ctrie-get c4 i))))))
+
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -540,3 +600,21 @@
       (fsm 'invert)
       (assert-eql  0 (fsm 5)))))
 
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; CTRIE-LAMBDA
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+#+()
+(define-test check-ctrie-lambda-spawn ()
+  (flet ((doit (&optional read-only)
+           (let* ((c0 (make-ctrie))
+                   (c1 (ctrie-lambda c0))
+                   (c2 (ctrie-lambda-spawn c1 :read-only read-only)))
+             (mapcar (compose
+                       #'inode-gen
+                       #'root-node-access
+                       #'ctrie-lambda-ctrie)
+               (list c0 c1 c2)))))
+    (doit)))

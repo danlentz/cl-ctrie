@@ -107,3 +107,46 @@
   (logandc2 (sb-kernel:get-lisp-obj-address vector) sb-vm:lowtag-mask))
 
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; TLS VOPs
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+;; see cell.lisp:symbol-value
+(eval-when (:compile-toplevel)
+  (define-vop (tls-ref)
+    (:args (index :scs (descriptor-reg)))
+    (:results (value :scs (descriptor-reg)))
+    #+x86-64
+    (:generator 5
+                (inst mov value (make-ea :qword
+                                         :base thread-base-tn
+                                         :index index :scale 1)))
+    #+x86
+    (:generator 5
+                (inst fs-segment-prefix)
+                (inst mov value (make-ea :dword :base index))))
+  
+  (define-vop (tls-set)
+    (:args (value :scs (descriptor-reg))
+           (index :scs (descriptor-reg)))
+    (:results)
+    #+x86-64
+    (:generator 5
+                (inst mov (make-ea :qword
+                                   :base thread-base-tn
+                                   :index index :scale 1)
+                      value))
+    #+x86
+    (:generator 5
+                (inst fs-segment-prefix)
+                (inst mov (make-ea :dword :base index) value)))
+  
+  (define-vop (%set-symbol-global-value)
+    (:args (value  :scs (descriptor-reg))
+           (symbol :scs (descriptor-reg)))
+    (:results)
+    #+(or x86-64 x86)
+    (:generator 5
+                (storew value symbol symbol-value-slot other-pointer-lowtag))))

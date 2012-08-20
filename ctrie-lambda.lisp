@@ -256,38 +256,6 @@
 
 
 
-(defgeneric ensure-lambda (ctrie-designator &key &allow-other-keys)
-  (:method ((ctrie ctrie) &key)
-    (let* (ctrie lambda)
-      (setf lambda
-        (ctrie-lambda ctrie container lambda))))
-  (:method ((self function) &key)
-    self))
-
-
-;; (defun ctrie-put-many (ctrie &rest one &aux (many (car one)) fn)
-;;   ";;; (ctrie-put-many c (iota 32))"
-;;   (printv "" 'CTRIE-PUT-MANY :hr)
-;;   (flet ((eql2p (x)
-;;            (= x 2))
-;;           (put (pair)
-;;             (apply fn #'ctrie-put pair)))
-;;     (let* ((fn         (ensure-lambda ctrie))
-;;             (pairlist  (loop
-;;                          initially (assert (and (evenp (length many))
-;;                                              (= 1 (length one))))
-;;                          for rest on many by #'cddr
-;;                          for k = (car rest)
-;;                          for v = (cadr rest)
-;;                          for pair = (list k v)
-;;                          collect pair into pairs
-;;                          finally (return (printv pairs)))))
-;;       (assert (every #'eql2p (printv (map 'list #'length pairlist))))
-;;       (prog1 (printv (mapcar #'put pairlist))
-;;         (printv "" "")))))
-
-
-
 (defmacro/once ctrie-lambda (&once ctrie &rest rest)
   "Pandoric Object and Inter-Lexical Communication Protocol
   this macro builds the most unencumbered and widely applicable
@@ -392,42 +360,13 @@
       it)))
 
 
-
-
-  ;; (defun make-ctrie-lambda (ctrie)
-  ;;   "Construct a new functional ctrie and a lexical environment prepared with
-  ;; various fixtures to support it. Supports 'normal' function interop but can
-  ;; also provide functional map semantics
-  ;;  ```
-  ;;  ;;; (funcall v #'ctrie-put 1 1) =>  1
-  ;;  ;;; (funcall v #'ctrie-get 1)   =>  1 ; T
-  ;;  ;;;
-  ;;  ;;; (funcall v #'identity)      => #S(CTRIE :READONLY-P NIL :TEST EQUAL
-  ;;  ;;;                                   :ROOT #S(INODE :GEN #:|ctrie3177| ... )
-  ;;  ;;;
-  ;;  ;;; (funcall v 0)               => (ctrie-get ctrie 0)
-  ;;  ;;; (funcall v 0 1)             => (ctrie-put ctrie 0 1)
-  ;;  ```"
-  ;;   (alet ()
-  ;;     (let* ((it (typecase ctrie
-  ;;                  (ctrie     ctrie)                      ;; (ctrie-snapshot ctrie :read-only read-only))
-  ;;                  (function  (funcall ctrie #'identity)) ;; :read-only read-only))
-  ;;                  (null      (make-ctrie))))
-  ;;             (dispatch-table   +simple-dispatch+)
-  ;;             (meta   (list :timestamp (local-time:now)))
-  ;;             (at     (root-node-access top))
-  ;;             (up     top)
-  ;;             (me     nil)
-  ;;             (path   nil))
-  ;;       (plambda (&rest args &aux (arg (car args))) (dispatch-table top at up path meta me)
-  ;;         (flet (($ (&rest args) (apply dispatch-table args)))
-  ;;           (unless me (setf me this))
-  ;;           (typecase arg
-  ;;             (function (apply arg it (rest args)))
-  ;;             (t
-  ;;               (if (rest args)
-  ;;                 (apply #'ctrie-put ($ :from top) ($ :domain arg) ($ :range (rest args)))
-  ;;                 (ctrie-get ($ :from top) ($ :domain arg))))))))))
+(defgeneric ensure-lambda (ctrie-designator &key &allow-other-keys)
+  (:method ((ctrie ctrie) &key)
+    (let* (ctrie lambda)
+      (setf lambda
+        (ctrie-lambda ctrie container lambda))))
+  (:method ((self function) &key)
+    self))
 
 
 (defun ctrie-lambda-spawn (self &key read-only)
@@ -436,21 +375,10 @@
   (expensive) object, class, bindings, but provides almost identical
   functionality.  May be used to more efficintly distribute workload
   in parallel"
-  (ctrie-lambda (funcall #'ctrie-snapshot
-                   (ctrie-lambda-ctrie self)
-                   :read-only read-only)))
-    
-(define-test check-ctrie-lambda-spawn ()
-  (flet ((doit (&optional read-only)
-           (let* ((c0 (make-ctrie))
-                   (c1 (ctrie-lambda c0))
-                   (c2 (ctrie-lambda-spawn c1 :read-only read-only)))
-             (mapcar (compose
-                       #'inode-gen
-                       #'root-node-access
-                       #'ctrie-lambda-ctrie)
-               (list c0 c1 c2)))))
-    (doit)))
+  (ctrie-lambda
+    (funcall #'ctrie-snapshot
+      (ctrie-lambda-ctrie self)
+      :read-only read-only)))
 
 
 

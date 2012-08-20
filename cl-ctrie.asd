@@ -65,7 +65,8 @@
                      cycle."
   
   :weakly-depends-on (:cl-store :donuts :cldoc :cl-ppcre)
-  :depends-on (:alexandria :lisp-unit :local-time)
+  :depends-on (:closer-mop :contextl :alexandria  
+                :lisp-unit :local-time)
   :components ((:static-file  "cl-ctrie.asd")
                 (:static-file "readme.md")
                 (:file "ctrie-package")
@@ -85,9 +86,8 @@
 (defmethod asdf:operation-done-p ((o asdf::doc-op) (c (eql (asdf:find-system :cl-ctrie))))
   nil)
 
-
-
-(defclass test-file (asdf:cl-source-file) ())
+(defclass test-file (asdf:cl-source-file)
+  ())
 
 (defmethod perform ((op asdf:load-op) (c test-file))
   t)

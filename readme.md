@@ -281,7 +281,7 @@ _[function]_         `CTRIE-PUT  (CTRIE KEY VALUE)`
 > Insert a new entry into CTRIE mapping KEY to VALUE.  If an entry
   with key equal to KEY aleady exists in CTRIE, according to the
   equality predicate defined by `CTRIE-TEST` then the priorbmapping
-  will be replaced by VALUE. Returns `(KEY . VALUE)` representing the
+  will be replaced by VALUE. Returns `VALUE` representing the
   mapping in the resulting CTRIE
 
 
@@ -1251,7 +1251,7 @@ _[function]_         `CTRIE-PUT  (CTRIE KEY VALUE)`
 > Insert a new entry into CTRIE mapping KEY to VALUE.  If an entry
   with key equal to KEY aleady exists in CTRIE, according to the
   equality predicate defined by `CTRIE-TEST` then the priorbmapping
-  will be replaced by VALUE. Returns `(KEY . VALUE)` representing the
+  will be replaced by VALUE. Returns `VALUE` representing the
   mapping in the resulting CTRIE
 
 
@@ -1853,5 +1853,10 @@ _[macro]_            `DEFINE-DIAGRAM  (TYPE (&OPTIONAL CONTEXT) &BODY BODY)`
 
 * * * * * * *
 * * * * * * *
+* * * * * * *
+* * * * * * *
+
+
+* * *
 
 

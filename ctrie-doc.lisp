@@ -526,7 +526,7 @@
          (defmethod make-diagram ((,type ,type) (context ,specializer) &key)
            ,@body)))))
 
-#;; +donuts
+;; +donuts
 ;; (define-diagram snode ()
 ;;   (donuts:[] (format nil "~A | ~A" (snode-key snode) (snode-value snode))))
 

@@ -11,7 +11,7 @@
      Tries with Efficient Non-Blocking Snapshots, (c) ACM 2-25-2012'
      by Prokopec, Bronson, Bagwell, and Odersky.")
   (:shadow :once-only)
-  (:use :common-lisp :alexandria :lisp-unit)
+  (:use :closer-common-lisp :closer-mop :alexandria :lisp-unit)
   (:shadowing-import-from :lisp-unit :set-equal)
   (:import-from :sb-ext :get-cas-expansion :define-cas-expander :cas
     :compare-and-swap :atomic-incf :atomic-decf :defcas :defglobal)
@@ -39,7 +39,9 @@
     :ctrie-to-hashtable
     :ctrie-from-hashtable
     :ctrie-from-alist
-    :ctrie-empty-p   
+    :ctrie-empty-p
+    :ctrie-max-depth
+    :ctrie-min-depth
     :ctrie-save
     :ctrie-load
     :ctrie-export

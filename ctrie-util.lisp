@@ -1,4 +1,4 @@
-;;;;; -*- mode: common-lisp;   common-lisp-style: modern;    coding: utf-8; -*-
+;;;; -*- mode: common-lisp;   common-lisp-style: modern;    coding: utf-8; -*-
 ;;;;;
 
 (in-package :cl-ctrie)
@@ -27,7 +27,21 @@
     if (fboundp sym) do (setf (fdefinition alt) (fdefinition sym))
     else do (when (fboundp xsym) (setf (fdefinition alt) (fdefinition xsym)))
     when #1=(macro-function sym) do (setf (macro-function alt) #1#)))
-   
+
+
+(defun internal-symbols (package)
+  (let ((acc (make-array 100 :adjustable t :fill-pointer 0))
+        (used (package-use-list package)))
+    (do-symbols (symbol package)
+      (unless (find (symbol-package symbol) used)
+        (vector-push-extend symbol acc)))
+    acc))
+
+(defun external-symbols (package)
+  (let ((acc (make-array 100 :adjustable t :fill-pointer 0)))
+    (do-external-symbols (symbol package)
+      (vector-push-extend symbol acc))
+    acc))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Some Helpful Utility Functions and Macros
@@ -40,6 +54,18 @@
   not null"
   (swank:inspect-in-emacs thing :wait wait))
 
+#+swank
+(defun edit (&optional what)
+  "Edit `WHAT` in Emacs.
+  ```
+  ;;; WHAT can be:
+  ;;; -   A pathname or a string,
+  ;;; -   A list (PATHNAME-OR-STRING &key LINE COLUMN POSITION),
+  ;;; -   A function name (symbol or cons),
+  ;;; -   NIL.```"
+  (swank:ed-in-emacs what))
+
+
 (define-symbol-macro ?  (prog1 * (describe *)))
 
 #+swank
@@ -47,6 +73,7 @@
 
 (defvar *break* t
   "special variable used for dynamic control of break loops see {defun :break}")
+
 
 ;;; nikodemus/lisppaste 
 (defun :break (name &rest values)
@@ -96,6 +123,62 @@
 	    finally (return ->>form))))
 |#
 
+
+
+;; (defun curry (fn &rest pref-args)
+;;   (lambda (&rest suf-args)
+;;     (apply fn (append pref-args suf-args);; )))
+
+;; (defun rcurry (fn &rest suf-args)
+;;   (lambda (&rest pref-args)
+;;     (apply fn (append pref-args suf-args))))
+
+;; (defun collect-if (predicate proseq &rest rest)
+;;  (apply 'remove-if-not predicate proseq rest))
+
+;; (declaim (inline ensure-function))	; to propagate return type.
+;; (declaim (ftype (function (t) (values function &optional)) ensure-function))
+
+;; (defun ensure-function (function-designator)
+;;   "Returns the function designated by FUNCTION-DESIGNATOR:
+;; if FUNCTION-DESIGNATOR is a function, it is returned, otherwise
+;; it must be a function name and its FDEFINITION is returned."
+;;   (if (functionp function-designator)
+;;     function-designator
+;;     (fdefinition function-
+;;      designator)))
+
+
+;; (defun compose (function &rest more-functions)
+;;   "Returns a function composed of FUNCTION and MORE-FUNCTIONS that applies its
+;; arguments to to each in turn, starting from the rightmost of MORE-FUNCTIONS,
+;; and then calling the next one with the primary value of the last."
+;;   (declare (optimize (speed 3) (safety 1) (debug 1)))
+;;   (reduce (lambda (f g)
+;; 	    (let ((f (ensure-function f))
+;;                    (g (ensure-function g)))
+;; 	      (lambda (&rest arguments)
+;; 		(declare (dynamic-extent arguments))
+;; 		(funcall f (apply g arguments)))))
+;;     more-functions :initial-value function))
+
+
+
+;; (defun multiple-value-compose (function &rest more-functions)
+;;   "Returns a function composed of FUNCTION and MORE-FUNCTIONS that applies
+;; its arguments to to each in turn, starting from the rightmost of
+;; MORE-FUNCTIONS, and then calling the next one with all the return values of
+;; the last."
+;;   (declare (optimize (speed 3) (safety 1) (debug 1)))
+;;   (reduce (lambda (f g)
+;; 	    (let ((f (ensure-function f))
+;;                    (g (ensure-function g)))
+;; 	      (lambda (&rest arguments)
+;; 		(declare (dynamic-extent arguments))
+;; 		(multiple-value-call f (apply g arguments)))))
+;;     more-functions :initial-value function))
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; 'Unique Value' Utilities
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -116,7 +199,7 @@
   "Returns a random alphabetic string."
   (let ((id (make-string length)))
     (do ((x 0 (incf x)))
-	(( = x length))
+      (( = x length))
       (setf (aref id x) (code-char (+ 97 (random 26)))))
     id))
 
@@ -292,6 +375,75 @@
 ;; Assorted
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+
+(defun reuse-cons (x y x-y)
+  "Return (cons x y), or reuse x-y if it is equal to (cons x y)"
+  (if (and (eql x (car x-y)) (eql y (cdr x-y)))
+      x-y
+    (cons x y)))
+
+
+(define-modify-macro conc1f (obj)
+  (lambda (place obj)
+    (nconc place (list obj))))
+
+
+(defmacro multiple-setf (value &rest places)
+  "The multiple-setf macro was written by Mario Castel‚àö¬∞n. It is a
+ beautiful form to support multiple places in zerof and nilf."
+  (once-only (value)
+    `(setf ,@(loop for place in places
+               append `(,place ,value)))))
+
+
+(defmacro aconsf (place key value &environment env)
+  "CONS is to PUSH as ACONS is to ACONSF; it pushes (cons KEY VALUE) to the PLACE."
+  (multiple-value-bind (temps vals stores set-value get-value)
+      (get-setf-expansion place env)
+    (unless (null (cdr stores))
+      (error "ACONSF can't store to this form: ~:_~S" place))
+    (once-only (key value)
+      `(let* (,@(mapcar 'list temps vals)
+              (,(car stores)
+               (acons ,key ,value ,get-value)))
+         ,set-value
+         ,value))))
+
+;; (define-modify-macro nconcf (&rest lists)
+;;   nconc
+;;   "Modify-macro for NCONC. Sets place designated by the first argument to
+;; the result of calling NCONC with the place and the LISTS.")
+
+
+
+(defmacro fill-hash (hash-table &body key-vals)
+  "Macro for filling a hash-table.  returns the filled hash-table."
+  (let ((table (gensym "hash-table")))
+    `(let ((,table ,hash-table))
+       ,@(loop for (key value) in key-vals
+            collect `(setf (gethash ,key ,table) ,value))
+       ,table)))
+
+(defparameter *codon-table*
+  (fill-hash (make-hash-table :test #'equal)
+    ("UUU" "F") ("UUC" "F") ("UUA" "L") ("UUG" "L")
+    ("UCU" "S") ("UCC" "S") ("UCA" "S") ("UCG" "S")
+    ("UAU" "Y") ("UAC" "Y") ("UAA" "*") ("UAG" "*")
+    ("UGU" "C") ("UGC" "C") ("UGA" "*") ("UGG" "W")
+    ("CUU" "L") ("CUC" "L") ("CUA" "L") ("CUG" "L")
+    ("CCU" "P") ("CCC" "P") ("CCA" "P") ("CCG" "P")
+    ("CAU" "H") ("CAC" "H") ("CAA" "Q") ("CAG" "Q")
+    ("CGU" "R") ("CGC" "R") ("CGA" "R") ("CGG" "R")
+    ("AUU" "I") ("AUC" "I") ("AUA" "I") ("AUG" "M")
+    ("ACU" "T") ("ACC" "T") ("ACA" "T") ("ACG" "T")
+    ("AAU" "N") ("AAC" "N") ("AAA" "K") ("AAG" "K")
+    ("AGU" "S") ("AGC" "S") ("AGA" "R") ("AGG" "R")
+    ("GUU" "V") ("GUC" "V") ("GUA" "V") ("GUG" "V")
+    ("GCU" "A") ("GCC" "A") ("GCA" "A") ("GCG" "A")
+    ("GAU" "D") ("GAC" "D") ("GAA" "E") ("GAG" "E")
+    ("GGU" "G") ("GGC" "G") ("GGA" "G") ("GGG" "G")))
+
+
 ;;; Clozure Common Lisp (??)
 (defmacro ppmx (form)
   "Pretty prints the macro expansion of FORM."
@@ -310,6 +462,28 @@
      (format *trace-output* "~%;;~%;; ")
      (values)))
 
+
+
+(defmacro get-place (place &environment env)
+  (multiple-value-bind (vars vals store-vars writer-form reader-form)
+      (get-setf-expansion place env)
+    (let ((writer `(let (,@(mapcar #'list vars vals))
+                     (lambda (,@store-vars)
+                       ,writer-form)))
+          (reader `(let (,@(mapcar #'list vars vals))
+                     (lambda () ,reader-form))))
+      `(values ,writer ,reader))))
+
+#|
+(defparameter *x* '(1 2 3))
+(defparameter *write-x* (get-place (car *x*)))
+(funcall *write-x* 4)
+(print *x*)
+(defun no-really (set-place)
+  (let ((*x* 42))
+   (funcall set-place 7)))
+(no-really *write-x*)
+|#
 
 ;;; place utils (from ??)
 (defmacro place-fn (place-form)
@@ -336,24 +510,51 @@
   `(prog1 ,place (incf ,place ,delta)))
 
 
-;; KMRCL/USENET
-(defmacro deflex (var val &optional (doc nil docp))
-  "Defines a top level (global) lexical VAR with initial value VAL,
-  which is assigned unconditionally as with DEFPARAMETER. If a DOC
-  string is provided, it is attached to both the name |VAR| and the
-  name *STORAGE-FOR-DEFLEX-VAR-|VAR|* as a documentation string of
-  kind 'VARIABLE. The new VAR will have lexical scope and thus may
-  be shadowed by LET bindings without affecting its global value."
-  (let* ((s0 (load-time-value (symbol-name '#:*storage-for-deflex-var-)))
+
+
+(defmacro deflex (var val &optional (doc nil docp))    
+  "__DEFLEX__ -- Define a top level (global) lexical VAR with initial
+   value VAL, which is assigned unconditionally as with
+   DEFPARAMETER. If a DOC string is provided, it is attached to both
+   the name |VAR| and the name *STORAGE-FOR-DEFLEX-VAR-|VAR|* as a
+   documentation string of kind 'VARIABLE. The new VAR will have
+   lexical scope and thus may be shadowed by LET bindings without
+   affecting its dynamic (global) value.
+
+  > Define 'global lexical variables', that is, top-level
+  variables (convenient when debugging) that are lexical in scope, and
+  thus don't pollute either the special or lexical variable spaces
+  [except for the names of the 'shadow' variables (c.f.), which are
+  hopefully non-conflicting in most cases]. Thanks to the denizens of
+  the 'comp.lang.lisp' newsgroup for many useful discussions (and
+  flames!) on this topic, and for the suggestion for the simple and
+  efficient (albeit inelegant) 'shadow' variable approach used here.
+  [Note: Like several others, I had previously used a single global
+  adjustable vector of shadow values, with complicated compile-time
+  allocation of indices so that symbol-macro FOO expanded into something
+  like this: (AREF *LEXICAL-STORE* (LOAD-TIME-VALUE {index-for-FOO})).
+  But the following approach is much simpler and more maintainable.]
+  -- 2005-06-12 -- Package bugfix thanks to Adam Warner
+  <adam@consulting.net.nz>"
+  
+  (let* ((s0 (symbol-name '#:*storage-for-deflex-var-))
          (s1 (symbol-name var))
-         (p1 (symbol-package var))
-         (s2 (load-time-value (symbol-name '#:*)))
-         (backing-var (intern (concatenate 'string s0 s1 s2) p1)))
-    `(progn
-      (defparameter ,backing-var ,val ,@(when docp `(,doc)))
-      ,@(when docp
-              `((setf (documentation ',var 'variable) ,doc)))
-       (define-symbol-macro ,var ,backing-var))))
+         (s2 (symbol-name '#:*))
+         (s3 (symbol-package var))      ; BUGFIX [see above]
+         (backing-var (intern (concatenate 'string s0 s1 s2) s3)))
+    ;; Note: The DEFINE-SYMBOL-MACRO must be the last thing we do so
+    ;; that the value of the form is the symbol VAR.
+    (if docp
+      `(progn
+         (defparameter ,backing-var ,val ,doc)
+         (setf (documentation ',var 'variable) ,doc)
+         (define-symbol-macro ,var ,backing-var))
+      `(progn
+         (defparameter ,backing-var ,val)
+         (define-symbol-macro ,var ,backing-var)))))
+
+;;; File downloaded from http://rpw3.org/hacks/lisp/deflex.lisp
+
 
 ;;; emacs?
 (defun mapappend (fun &rest args)
@@ -361,3 +562,404 @@
        '()
        (append (apply fun (mapcar 'car args))
          (mapappend fun (mapcar 'cdr args)))))
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; CLOS
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defvar *nuke-existing-packages*   nil)
+(defvar *nuke-existing-classes*    nil)
+(defvar *store-class-superclasses* nil)
+
+(defun fc (class-designator)
+  (typecase class-designator
+    (class    class-designator)  
+    (keyword (fc (string class-designator)))
+    (string  (fc (read-from-string class-designator)))
+    (symbol  (find-class class-designator))
+    (t       (find-class class-designator))))
+
+
+(defun proto (thing)
+  (flet ((get-proto (c)
+           (let ((cc (find-class c)))
+             (c2mop:finalize-inheritance cc)
+             (c2mop:class-prototype cc))))
+    (etypecase thing
+      (class  (get-proto thing))
+      (standard-object (get-proto (class-of thing)))
+      (symbol (get-proto  thing)))))
+
+
+(defun finalize (class-designator)
+  (finalize-inheritance (fc class-designator))
+  (fc class-designator))
+
+
+(defun new (&rest args)
+  (apply #'make-instance args))
+
+
+(defun slot-value-safe (obj slot &optional (unbound-return :unbound))
+  (handler-case (values (slot-value obj slot) t)
+    (unbound-slot (c) (values unbound-return c))))
+
+
+(defun required-arg (name)
+  (error "~S is a required argument" name))
+
+(defgeneric get-slot-details (slot-definition)
+  (declare (optimize speed))
+  (:documentation 
+    "Return a list of slot details which can be used 
+    as an argument to ensure-class")
+  (:method ((slot-definition #+(or ecl abcl (and clisp (not mop))) t 
+              #-(or ecl abcl (and clisp (not mop))) slot-definition))
+    (list :name (slot-definition-name slot-definition)
+      :allocation (slot-definition-allocation slot-definition)
+      :initargs (slot-definition-initargs slot-definition)
+      :readers (slot-definition-readers slot-definition)
+      :type (slot-definition-type slot-definition)
+      :writers (slot-definition-writers slot-definition))))
+
+;; (mapcar #'get-slot-details (sb-mop:class-slots (fc 'cl-user::test-file)))
+;;
+;; ((:NAME ASDF::NAME :ALLOCATION :INSTANCE :INITARGS (:NAME) :READERS NIL
+;;    :TYPE  STRING :WRITERS NIL)
+;;   (:NAME ASDF:VERSION :ALLOCATION :INSTANCE :INITARGS (:VERSION) :READERS NIL
+;;     :TYPE T :WRITERS NIL)
+;;   (:NAME ASDF::DESCRIPTION :ALLOCATION :INSTANCE :INITARGS (:DESCRIPTION)
+;;     :READERS NIL :TYPE T :WRITERS NIL)
+;;   (:NAME ASDF::LONG-DESCRIPTION :ALLOCATION :INSTANCE :INITARGS
+;;     (:LONG-DESCRIPTION) :READERS NIL :TYPE T :WRITERS NIL)
+;;   (:NAME ASDF::LOAD-DEPENDENCIES :ALLOCATION :INSTANCE :INITARGS NIL :READERS
+;;     NIL :TYPE T :WRITERS NIL)
+;;   (:NAME ASDF::IN-ORDER-TO :ALLOCATION :INSTANCE :INITARGS (:IN-ORDER-TO)
+;;     :READERS NIL :TYPE T :WRITERS NIL)
+;;   (:NAME ASDF::DO-FIRST :ALLOCATION :INSTANCE :INITARGS (:DO-FIRST) :READERS NIL
+;;     :TYPE T :WRITERS NIL)
+;;   (:NAME ASDF::INLINE-METHODS :ALLOCATION :INSTANCE :INITARGS NIL :READERS NIL
+;;     :TYPE T :WRITERS NIL)
+;;   (:NAME ASDF::PARENT :ALLOCATION :INSTANCE :INITARGS (:PARENT) :READERS NIL
+;;     :TYPE T :WRITERS NIL)
+;;   (:NAME ASDF::RELATIVE-PATHNAME :ALLOCATION :INSTANCE :INITARGS (:PATHNAME)
+;;     :READERS NIL :TYPE T :WRITERS NIL)
+;;   (:NAME ASDF::ABSOLUTE-PATHNAME :ALLOCATION :INSTANCE :INITARGS NIL :READERS
+;;     NIL :TYPE T :WRITERS NIL)
+;;   (:NAME ASDF::OPERATION-TIMES :ALLOCATION :INSTANCE :INITARGS NIL :READERS NIL
+;;     :TYPE T :WRITERS NIL)
+;;   (:NAME ASDF::AROUND-COMPILE :ALLOCATION :INSTANCE :INITARGS (:AROUND-COMPILE)
+;;     :READERS NIL :TYPE T :WRITERS NIL)
+;;   (:NAME ASDF::%ENCODING :ALLOCATION :INSTANCE :INITARGS (:ENCODING) :READERS
+;;     NIL :TYPE T :WRITERS NIL)
+;;   (:NAME ASDF::PROPERTIES :ALLOCATION :INSTANCE :INITARGS (:PROPERTIES) :READERS
+;;     NIL :TYPE T :WRITERS NIL)
+;;   (:NAME TYPE :ALLOCATION :INSTANCE :INITARGS (:TYPE) :READERS NIL :TYPE T
+;;     :WRITERS NIL))
+
+
+;; Structure definition storing
+(defun get-layout (obj)
+  (slot-value obj 'sb-pcl::wrapper))
+
+(defun get-info (obj)
+  (declare (type sb-kernel:layout obj))
+  (slot-value obj 'sb-int:info))
+
+(defun dd-name (dd)
+  (slot-value dd 'sb-kernel::name))
+
+(defvar *sbcl-struct-inherits*
+  `(,(get-layout (find-class t))
+    ,@(when-let (class (find-class 'sb-kernel:instance nil))
+        (list (get-layout class)))
+    ,(get-layout (find-class 'cl:structure-object))))
+
+(defstruct (struct-def (:conc-name sdef-))
+  (supers (required-arg :supers) :type list)
+  (info (required-arg :info) :type sb-kernel:defstruct-description))
+
+(defun info-or-die (obj)
+  (let ((wrapper (get-layout obj)))
+    (if wrapper
+        (or (get-info wrapper) 
+            (error "No defstruct-definition for ~A." obj))
+        (error "No wrapper for ~A." obj))))
+
+(defun save-able-supers (obj)
+  (set-difference (coerce (slot-value (get-layout obj) 'sb-kernel::inherits)
+                          'list)
+                  *sbcl-struct-inherits*))
+
+(defun get-supers (obj)
+  (loop for x in (save-able-supers obj) 
+     collect (let ((name (dd-name (get-info x))))
+               (if *store-class-superclasses* 
+                   (find-class name)
+                   name))))
+
+
+;; Restoring 
+(defun sbcl-struct-defs (info)
+  (append (sb-kernel::constructor-definitions info)
+          (sb-kernel::class-method-definitions info)))
+
+(defun create-make-foo (dd)
+  (declare (optimize speed))
+  (funcall (compile nil `(lambda () ,@(sbcl-struct-defs dd))))
+  (find-class (dd-name dd)))
+
+
+(defun sb-kernel-defstruct (dd supers source)
+  (declare (ignorable source))
+ ;; #+defstruct-has-source-location 
+  (sb-kernel::%defstruct dd supers source))
+
+  ;; #-defstruct-has-source-location
+  ;; (sb-kernel::%defstruct dd supers))
+
+(defun sbcl-define-structure (dd supers)
+  (cond ((or *nuke-existing-classes*  
+             (not (find-class (dd-name dd) nil)))
+         ;; create-struct
+         (sb-kernel-defstruct dd supers nil)
+         ;; compiler stuff
+         (sb-kernel::%compiler-defstruct dd supers) 
+         ;; create make-?
+         (create-make-foo dd))
+        (t (find-class (dd-name dd)))))
+         
+(defun super-layout (super)
+  (etypecase super
+    (symbol (get-layout (find-class super)))
+    (structure-class 
+     (super-layout (dd-name (info-or-die super))))))
+
+(defun super-layouts (supers)
+  (loop for super in supers 
+    collect (super-layout super)))
+
+
+(defgeneric serializable-slots (object)
+  (declare (optimize speed))
+  (:documentation 
+   "Return a list of slot-definitions to serialize. The default
+    is to call serializable-slots-using-class with the object 
+    and the objects class")
+  (:method ((object standard-object))
+   (serializable-slots-using-class object (class-of object)))
+#+(or sbcl cmu openmcl allegro)
+  (:method ((object structure-object))
+   (serializable-slots-using-class object (class-of object)))
+  (:method ((object condition))
+   (serializable-slots-using-class object (class-of object))))
+
+; unfortunately the metaclass of conditions in sbcl and cmu 
+; are not standard-class
+
+(defgeneric serializable-slots-using-class (object class)
+  (declare (optimize speed))
+  (:documentation "Return a list of slot-definitions to serialize.
+   The default calls compute slots with class")
+  (:method ((object t) (class standard-class))
+   (class-slots class))
+#+(or sbcl cmu openmcl allegro) 
+  (:method ((object t) (class structure-class))
+   (class-slots class))
+#+sbcl
+  (:method ((object t) (class sb-pcl::condition-class))
+   (class-slots class))
+#+cmu
+  (:method ((object t) (class pcl::condition-class))
+   (class-slots class)))
+
+
+
+(defvar *object->sexp-visited-objects* nil)
+
+(defun object->sexp (obj &key suppress-types suppress-properties)
+  "Converts arbitrary CLOS objects into s-expressions that can easily be used in tests."
+ (if (and (subtypep (type-of obj) 'standard-object)
+        (find obj *object->sexp-visited-objects*))
+    :recursive-reference
+    (let ((*object->sexp-visited-objects* (cons obj *object->sexp-visited-objects*)))
+      (cond ((find (type-of obj) suppress-types) :suppressed)
+        ((subtypep (type-of obj) 'standard-object)
+          (multiple-value-bind (instance slots)
+            (make-load-form-saving-slots obj)
+            (let ((class (cadr (cadadr instance)))
+                   (bound-slots (mapcar #'(lambda (s)
+                                            (list (second (first (last (second s))))
+                                              (object->sexp (second (third s))
+                                                :suppress-types suppress-types
+                                                :suppress-properties suppress-properties)))
+                                  (remove 'slot-makunbound (rest slots) :key #'first))))
+              (list* class
+                (sort (remove-if #'(lambda (slot)
+                                     (find (first slot) suppress-properties))
+                        bound-slots)
+                  #'string< :key (compose #'symbol-name #'first))))))
+        ((null obj) nil)
+        ((listp obj)
+          (mapcar #'(lambda (obj) (object->sexp obj
+                                    :suppress-types suppress-types
+                                    :suppress-properties suppress-properties)) obj))
+        (t obj)))))
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; PLISTS
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+
+;; Erik Naggum in comp.lang.lisp.
+;; http://groups.google.fr/group/comp.lang.lisp/msg/ac10b819b1117c4f
+
+(defmacro drop (object place &rest keys &key key test test-not &environment environment)
+  "Drop a particular OBJECT from list in PLACE.  (Intended as counterpart to PUSH/-NEW.)
+Copyright 1999 by Erik Naggum.  Verbatim inclusion and redistribution permitted.
+For any other use, contact Erik Naggum."
+  (declare (ignore key test test-not))
+  (multiple-value-bind (vars vals store-vars writer reader)
+      (get-setf-expansion place environment)
+    (let ((evaled-value (gensym))
+          (store-var (first store-vars)))
+      (if (cdr store-vars)
+        `(let* ((,evaled-value ,object)
+                ,@(mapcar #'list vars vals))
+           (multiple-value-bind ,store-vars ,reader
+             (setq ,store-var (delete ,evaled-value ,store-var :count 1 ,@keys))
+             ,writer))
+        `(let* ((,evaled-value ,object)
+                ,@(mapcar #'list vars vals)
+                (,store-var (delete ,evaled-value ,reader :count 1 ,@keys)))
+           ,writer)))))
+
+
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; printv - extended edition
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Adapted from the Handy PRINTV Macro Written by Dan Corkill
+;; Copyright (C) 2006-2010, Dan Corkill <corkill@GBBopen.org>
+;; Licensed under Apache License 2.0 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun printv-minor-separator ()
+  (format *trace-output* "~&;;; ~60,,,'-<-~>~%")
+  (force-output *trace-output*))
+
+(defun printv-major-separator ()
+  (format *trace-output* "~&;;;~%")
+  (princ
+    (concatenate 'string ";;;"
+      (make-string (- *print-right-margin* 5)
+        :initial-element #\=)) *trace-output*)
+  (force-output *trace-output*))
+
+(defun printv-form-printer (form)
+  (typecase form
+    ;; String (label):
+    (string (format *trace-output* "~&;;; ~a~%" form))
+    ;; Evaluated form:
+    ((or cons (and symbol (not keyword)))
+      (format *trace-output* "~&;;;   ~w =>" form))
+    (vector (format *trace-output* "~&;;   ~s~%" form)) 
+    ;; Self-evaluating form:
+    (t (format *trace-output* "~&;;;   ~s~%" form)))
+  (force-output *trace-output*))
+
+(defun printv-values-printer (values-list)
+  (format *trace-output* "~:[ [returned 0 values]~;~:*~{ ~w~^;~}~]~%"  values-list)
+  (force-output *trace-output*))
+
+
+(defmacro vlet* (bind-forms &body body)
+  `(let* ,(mapcar
+            #'(lambda (form)
+                (if (listp form)
+                  `(,(car form)
+                     (let ((v ,(cadr form)))
+                       (printv (list ',(car form) v))
+                       v))
+                  form))
+            bind-forms)
+     ,@body))
+
+(defmacro vlet (bind-forms &body body)
+  `(let ,(mapcar #'(lambda (form)
+		     (if (listp form)
+                       `(,(car form) (let ((v ,(cadr form)))
+                                       (printv (list ',(car form) v))
+                                       v))
+                       form))
+           bind-forms)
+     ,@body))
+
+
+(defun printv-expander (forms &optional values-trans-fn) ;; Allow for customized printv'ers:
+  (let ((result-sym (gensym)))
+    `(let ((*print-readably* nil) ,result-sym)
+       ,@(loop for form in forms nconcing
+           (cond
+             ;; Markup form:
+             ((eq form ':ff) (list '(printv-major-separator)))
+             ((eq form ':hr) (list '(printv-minor-separator)))
+             
+             ;; Evaluated form:
+             ((and (consp form) (or (eq (car form) 'let) (eq (car form) 'let*)))
+               `((printv-form-printer ',form)
+                  (printv-values-printer
+                    (setf ,result-sym
+                      ,(if values-trans-fn
+                         `(funcall ,values-trans-fn
+                            (multiple-value-list
+                              (case (car form)
+                                (let `((vlet `,(rest form))))
+                                (let* `((vlet* `,(rest form))))))))))))
+                                
+             
+             ((or (consp form) (and (symbolp form) (not (keywordp form))))
+               `((printv-form-printer ',form)
+                  (printv-values-printer
+                    (setf ,result-sym ,(if values-trans-fn
+                                         `(funcall ,values-trans-fn
+                                            (multiple-value-list ,form))
+                                         `(multiple-value-list ,form))))))
+             ;; Self-evaluating form:
+             (t `((printv-form-printer 
+                    (car (setf ,result-sym (list ,form))))))))
+       (values-list ,result-sym))))
+
+
+(defmacro printv (&rest forms)
+  (printv-expander forms))
+
+(defmacro v (&rest forms)
+  (printv-expander forms))
+
+(setf (symbol-function :printv) #'printv-expander)
+
+(define-symbol-macro v/   (printv /))
+(define-symbol-macro v//  (printv //))
+(define-symbol-macro v/// (printv ///))
+
+(define-symbol-macro v+   (printv +))
+(define-symbol-macro v++  (printv ++))
+(define-symbol-macro v+++ (printv +++))
+
+
+(defun ?? (string-designator &optional package external-only)
+  (apply #'apropos string-designator package external-only nil))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+

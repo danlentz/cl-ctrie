@@ -1449,7 +1449,7 @@
   "Insert a new entry into CTRIE mapping KEY to VALUE.  If an entry
   with key equal to KEY aleady exists in CTRIE, according to the
   equality predicate defined by `CTRIE-TEST` then the priorbmapping
-  will be replaced by VALUE. Returns `(KEY . VALUE)` representing the
+  will be replaced by VALUE. Returns `VALUE` representing the
   mapping in the resulting CTRIE"
   (with-ctrie ctrie 
     (loop  with d = 0 and p = nil and result
@@ -1462,7 +1462,7 @@
              (t        (prog1 (setf result it)
                          (when *debug*
                            (format *TRACE-OUTPUT* "~8S  done .~%~S~%" it *ctrie*)))))
-      return (cons key result))))
+      return result)))
 
 
 
@@ -1534,7 +1534,7 @@
 
 (defun (setf ctrie-get) (value ctrie key)
   (with-ctrie ctrie
-    (multiple-value-prog1 (values (cons key value) ctrie)
+    (prog1 value
       (ctrie-put *ctrie* key value))))
 
 
@@ -1657,6 +1657,36 @@
 ;;       (cnode (&rest args)
 ;;         (declare (ignore args))
 ;;         :cnode))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Diagnostic and Status
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+(defun ctrie-max-depth (thing)
+  "Compute the maximum length of any arc. Useful as a diagnostic"
+  (typecase thing
+    (snode 0)
+    (tnode 0)
+    (lnode 0)
+    (ctrie (ctrie-max-depth (inode-read (root-node-access thing))))
+    (inode (ctrie-max-depth (inode-read thing)))
+    (cnode (1+ (loop for arc across (cnode-arcs thing)
+                 maximizing (ctrie-max-depth arc))))))
+
+
+(defun ctrie-min-depth (thing)
+  "Compute the minimum length of any arc. Useful as a diagnostic"
+  (typecase thing
+    (snode 0)
+    (tnode 0)
+    (lnode 0)
+    (ctrie (ctrie-min-depth (inode-read (root-node-access thing))))
+    (inode (ctrie-min-depth (inode-read thing)))
+    (cnode (1+ (loop for arc across (cnode-arcs thing)
+                 minimizing (ctrie-min-depth arc))))))
+
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
