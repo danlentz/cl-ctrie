@@ -953,8 +953,10 @@
   expect that the special variable `*CTRIE*` will be bound to the root
   container of subject CTRIE.  See also the documentation for
   `*CTRIE*`"
-  `(let* ((*ctrie* ,ctrie))
-       ,@body))
+  `(let* ((*ctrie* (if (typep ,ctrie 'function)
+                     (funcall ,ctrie #'identity)
+                     ,ctrie)))
+     ,@body))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -972,20 +974,22 @@
   with alternate storage models, e.g., an external persistent disk-based
   store. See also `(cas cl-ctrie::find-ctrie-root)`")
   (:method ((ctrie ctrie))
-    (ctrie-root ctrie)))
+    (ctrie-root ctrie))
+  (:method ((ctrie function))
+    (find-ctrie-root (funcall ctrie #'identity))))
 
-#+()
-(defgeneric (cas find-ctrie-root) (ctrie-designator old new)
-  (:documentation "(CAS FIND-CTRIE-ROOT) implements the atomic
-  compare-and swap subprimitive that is the operational analogue to
-  `FIND-CTRIE-ROOT`. It should not be referenced by the higher-level
-  implementation or end-user code. The purpose of
-  `(CAS FIND-CTRIE-ROOT)` is to incorporate a level of indirection
-  specialized on the class of the root container to facilitate future
-  extension with alternate storage models, e.g., an external
-  persistent disk-based store.")
-  (:method ((ctrie ctrie) old new)
-    (cas (ctrie-root ctrie) old new)))
+
+;; (defgeneric (cas find-ctrie-root) (ctrie-designator old new)
+;;   (:documentation "(CAS FIND-CTRIE-ROOT) implements the atomic
+;;   compare-and swap subprimitive that is the operational analogue to
+;;   `FIND-CTRIE-ROOT`. It should not be referenced by the higher-level
+;;   implementation or end-user code. The purpose of
+;;   `(CAS FIND-CTRIE-ROOT)` is to incorporate a level of indirection
+;;   specialized on the class of the root container to facilitate future
+;;   extension with alternate storage models, e.g., an external
+;;   persistent disk-based store.")
+;;   (:method ((ctrie ctrie) old new)
+;;     (cas (ctrie-root ctrie) old new)))
 
 
 (defstruct (rdcss-descriptor
@@ -1321,10 +1325,22 @@
   extension is simply to accomodate normal growth capacity and
   allocation.  In both cases, though, the extensions are performed for
   the same initiating cause -- to accomodate the collision of leaf
-  node keys resident at lower levels of the structure.
-
-
-  "
+  node keys resident at lower levels of the structure.  Depending on
+  the similarity of two colliding hash keys, the extension process may
+  not be resolved with a single iteration.  In the case of full
+  collisiion, described above, the extension process will recur, up to
+  a maximum depth of `(32/W)` levels, at which point an L-NODE chain
+  will be created.  At each iteration, a new INODE is created,
+  pointing to a new CNODE containing one of our conflictung pairs.
+  Then, `%INSERT` is attempted on that INODE and this process recurs.
+  Once this cycle of insert/extend completes, each INODE/CNODE pair is
+  returned to the parent -- the entire newly created structure
+  eventually returning to the point of original conflicts whre the
+  extension cycle began.  If we successfully mutate the parent inode
+  by completing an atomic replacement of the old cnode with the one
+  that begins this newly built structue, then our update has succeeded
+  and we return the range value now successfully mapped by KEY in
+  order to indicate our success.  Otherwise we THROW to :RESTART"
   
   ;;;;;;;;;;;;;;;;;;;;;;;;
   ;; 0.  INODE (start)  ;;   
@@ -1430,19 +1446,23 @@
 
 
 (defun ctrie-put (ctrie key value)
-  (check-type ctrie ctrie)
+  "Insert a new entry into CTRIE mapping KEY to VALUE.  If an entry
+  with key equal to KEY aleady exists in CTRIE, according to the
+  equality predicate defined by `CTRIE-TEST` then the priorbmapping
+  will be replaced by VALUE. Returns `(KEY . VALUE)` representing the
+  mapping in the resulting CTRIE"
   (with-ctrie ctrie 
-    (loop  with d = 0 and p = nil 
+    (loop  with d = 0 and p = nil and result
       for  root =  (root-node-access *ctrie*)
       when (catch-case (%insert root key value d p (inode-gen root))
              (:restart (prog1 nil
                          (when *debug*
                            (format *TRACE-OUTPUT* "~8A  timeout insert (~A . ~A)~%"
                              it key value))))
-             (t        (prog1 it
+             (t        (prog1 (setf result it)
                          (when *debug*
                            (format *TRACE-OUTPUT* "~8S  done .~%~S~%" it *ctrie*)))))
-      return it)))
+      return (cons key result))))
 
 
 
@@ -1494,26 +1514,28 @@
 
 
 (defun ctrie-get (ctrie key)
-  (check-type ctrie ctrie)
-    (with-ctrie ctrie
-      (flet ((attempt-get (root key level parent gen try)
-               (declare (ignorable try))
-               (catch-case (%lookup root key level parent gen)
-                 (:notfound  (return-from ctrie-get (values nil nil)))
-                 (:restart   (multiple-value-prog1 (values it nil)
-                               #+()(when *debug* (format t  "~8s  restarting after try ~d.~%" it try))))
-                 (t          (multiple-value-prog1 (values it t)
-                               #+()(when *debug* (format t  "~8s  done on try ~d.~%" it try)))))))
-        (loop with vals with d = 0 and p = nil
-          for  r = (root-node-access ctrie) for try from 1
-          do   (setf vals (multiple-value-list (attempt-get r key d p (inode-gen r) try)))
-          when (> try 1000)  do (error "try ~d" try)
-          when (second vals) do (return-from ctrie-get (values (first vals) t))))))
+  (with-ctrie ctrie
+    (flet ((attempt-get (root key level parent gen try)
+             (declare (ignorable try))
+             (catch-case (%lookup root key level parent gen)
+               (:notfound  (return-from ctrie-get (values nil nil)))
+               (:restart   (multiple-value-prog1 (values it nil)
+                             #+()(when *debug* (format t  "~8s  restarting after try ~d.~%"
+                                                 it try))))
+               (t          (multiple-value-prog1 (values it t)
+                             #+()(when *debug* (format t  "~8s  done on try ~d.~%"
+                                                 it try)))))))
+      (loop with vals with d = 0 and p = nil
+        for  r = (root-node-access *ctrie*) for try from 1
+        do   (setf vals (multiple-value-list (attempt-get r key d p (inode-gen r) try)))
+        when (> try 1000)  do (error "try ~d" try)
+        when (second vals) do (return-from ctrie-get (values (first vals) t))))))
 
 
 (defun (setf ctrie-get) (value ctrie key)
-    (multiple-value-prog1 (values value key ctrie)
-      (ctrie-put ctrie key value)))
+  (with-ctrie ctrie
+    (multiple-value-prog1 (values (cons key value) ctrie)
+      (ctrie-put *ctrie* key value))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1562,12 +1584,11 @@
   
 (defun ctrie-drop (ctrie key)
   "Remove KEY and it's value from the CTRIE."
-  (check-type ctrie ctrie)
     (with-ctrie ctrie
-      (let1 r (root-node-access ctrie)
+      (let1 r (root-node-access *ctrie*)
         (multiple-value-bind (val kind) (%remove r key 0 nil (inode-gen r))
           (case kind
-            (:restart  (return-from ctrie-drop (ctrie-drop ctrie key)))
+            (:restart  (return-from ctrie-drop (ctrie-drop *ctrie* key)))
             (:notfound (values val nil))
             (t         (values val t)))))))
 
@@ -1645,13 +1666,14 @@
 (defgeneric map-node (node fn))
 
 
-(defun ctrie-map (ctrie fn &key atomic &aux accum)
+(defun ctrie-map (ctrie fn &key atomic
+                   &aux accum);; (ctrie (with-ctrie *ctrie*)))
   (declare (special accum))
-  (check-type ctrie ctrie)
-  (with-ctrie (if atomic (ctrie-snapshot ctrie :read-only t) ctrie)
-    (let ((root (root-node-access *ctrie*)))
-      (map-node root fn))
-    accum))
+  (with-ctrie ctrie
+    (with-ctrie (if atomic (ctrie-snapshot *ctrie* :read-only t) *ctrie*)
+      (let ((root (root-node-access *ctrie*)))
+        (map-node root fn))
+      accum)))
 
 
 (defmacro ctrie-do ((key value ctrie &key atomic) &body body)
@@ -1688,22 +1710,30 @@
 
 
 (defun ctrie-map-keys (ctrie fn &key atomic)
-  (ctrie-map ctrie
-    (lambda (k v) (declare (ignore v))
-      (funcall fn k)) :atomic atomic))
+  (with-ctrie ctrie
+    (ctrie-map *ctrie*
+      (lambda (k v) (declare (ignore v))
+        (funcall fn k)) :atomic atomic)))
 
 
 (defun ctrie-map-values (ctrie fn &key atomic)
-  (ctrie-map ctrie
-    (lambda (k v) (declare (ignore k))
-      (funcall fn v)) :atomic atomic))
+  (with-ctrie ctrie 
+    (ctrie-map *ctrie*
+      (lambda (k v) (declare (ignore k))
+        (funcall fn v)) :atomic atomic)))
 
 
-(defgeneric ctrie-map-into (ctrie place fn)
-  (:method ((ctrie ctrie) (place ctrie) fn)
-      (ctrie-map ctrie
-        (lambda (k v) 
-          (apply #'ctrie-put place (funcall fn k v))))))
+;; (defgeneric ctrie-map-into (ctrie place &optional (fn #'identity))
+;;   (:method ((ctrie ctrie) (place ctrie) fn)
+;;       (ctrie-map ctrie
+;;         (lambda (&rest args) 
+;;           (apply #'ctrie-put place (apply fn k v)))))
+;;   (:method (ctrie  place fn &aux
+;;              (place (with-ctrie place *ctrie*))
+;;              (ctrie (with-ctrie ctrie *ctrie*)))
+;;     (ctrie-map ctrie
+;;       (lambda (k v) 
+;;         (apply #'ctrie-put place (funcall fn k v))))))
 
 
 (defun print2 (x y &optional (stream t))
@@ -1726,62 +1756,63 @@
 
 
 (defun ctrie-keys (ctrie &key atomic)
-  (ctrie-map ctrie #'collect-keys :atomic atomic))
+  (with-ctrie ctrie
+    (ctrie-map *ctrie*
+      #'collect-keys :atomic atomic)))
 
 
 (defun ctrie-values (ctrie &key atomic)
-  (ctrie-map ctrie #'collect-values :atomic atomic))
+  (with-ctrie ctrie
+    (ctrie-map *ctrie*
+      #'collect-values :atomic atomic)))
 
 
 (defun ctrie-size (ctrie &aux (accum 0))
-  (ctrie-map-keys ctrie
-    (lambda (x) (declare (ignore x))
-      (incf accum)))
-  accum)
+  (with-ctrie ctrie
+    (ctrie-map-keys *ctrie*
+      (lambda (x) (declare (ignore x))
+        (incf accum)))
+    accum))
 
 
 (defun ctrie-empty-p (ctrie)
-  (check-type ctrie ctrie)
   (with-ctrie ctrie
-    (= 0 (cnode-bitmap (inode-read (root-node-access ctrie))))))
-
-#+()
-(defun ctrie-ensure-get (ctrie key default)
-  "Like CTRIE-GET, but if KEY is not found in CTRIE, automatically adds 
-   the entry (KEY. DEFAULT). Secondary return value is true if key was
-   already in the table."
-  (multiple-value-bind (val ok) (ctrie-get ctrie key)
-      (if ok
-        (values val t)
-        (values (ctrie-put ctrie key default) nil))))
+    (= 0 (cnode-bitmap
+           (inode-read
+             (root-node-access *ctrie*))))))
 
 
 (defun ctrie-to-alist (ctrie &key atomic)
-  (ctrie-map ctrie #'collect2 :atomic atomic))
+  (with-ctrie  ctrie
+    (ctrie-map *ctrie*
+      #'collect2 :atomic atomic)))
 
 
 (defun ctrie-pprint (ctrie &optional (stream t))
-  (pprint-tabular stream (ctrie-to-alist ctrie)))
+  (with-ctrie ctrie
+    (pprint-tabular stream (ctrie-to-alist *ctrie*))))
 
 
 (defun ctrie-to-hashtable (ctrie &key atomic)
-  (alexandria:alist-hash-table
-    (ctrie-map ctrie #'collect2 :atomic atomic)))
+  (with-ctrie ctrie
+    (alexandria:alist-hash-table
+      (ctrie-map *ctrie*
+        #'collect2 :atomic atomic))))
 
 
-(defun ctrie-from-alist (alist)
-  (let ((ctrie (make-ctrie)))
-    (prog1 ctrie
-      (mapc (lambda (pair) (ctrie-put ctrie (car pair) (cdr pair)))
+(defun ctrie-from-alist (alist &key ctrie)
+  (with-ctrie (or ctrie (make-ctrie))
+    (prog1 *ctrie*
+      (mapc (lambda (pair)
+              (ctrie-put *ctrie* (car pair) (cdr pair)))
         alist))))
 
-
-(defun ctrie-from-hashtable (hashtable)
+(defun ctrie-from-hashtable (hashtable &key ctrie)
   "create a new ctrie containing the same (k . v) pairs and equivalent
   test function as HASHTABLE"
-  (let ((ctrie (make-ctrie :test (hash-table-test hashtable))))
-    (prog1 ctrie (maphash (lambda (k v) (ctrie-put ctrie k v))
-                   hashtable))))
+    (with-ctrie (or ctrie (make-ctrie :test (hash-table-test hashtable)))
+      (prog1 *ctrie* (maphash (lambda (k v) (ctrie-put *ctrie* k v))
+                       hashtable))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1796,10 +1827,21 @@
 (defgeneric ctrie-save (ctrie place &key &allow-other-keys)
   (:documentation ""))
 
+(defmethod  ctrie-save :around (ctrie place &key)
+  (log:info "Saving ctrie to ~A" place)
+  (call-next-method))
+
 
 #+cl-store
 (defmethod  ctrie-save ((ctrie ctrie) (place pathname) &key)
-  (prog1 place (cl-store:store (ctrie-snapshot ctrie) place)))
+  (with-ctrie ctrie
+    (prog1 place
+      (cl-store:store (ctrie-snapshot *ctrie*) place))))
+
+(defmethod  ctrie-save ((ctrie function) (place pathname) &key)
+  (with-ctrie ctrie
+    (prog1 place
+      (cl-store:store (ctrie-snapshot *ctrie*) place))))
 
 
 (defgeneric ctrie-load (place &key &allow-other-keys))
@@ -1816,11 +1858,26 @@
 
 #+cl-store 
 (defmethod  ctrie-export ((ctrie ctrie) (place pathname) &key)
-  (prog1 place (cl-store:store (ctrie-to-alist ctrie) place)))
+  (with-ctrie ctrie
+    (prog1 place
+      (cl-store:store (ctrie-to-alist *ctrie*) place))))
 
+(defmethod  ctrie-export ((ctrie function) (place pathname) &key)
+  (with-ctrie ctrie
+    (prog1 place
+      (cl-store:store (ctrie-to-alist *ctrie*) place))))
 
 (defmethod  ctrie-export ((ctrie ctrie) (place hash-table) &key)
-  (ctrie-map ctrie (lambda (k v) (setf (gethash place k) v))))
+  (with-ctrie ctrie
+    (ctrie-map *ctrie*
+      (lambda (k v)
+        (setf (gethash place k) v)))))
+
+(defmethod  ctrie-export ((ctrie function) (place hash-table) &key)
+  (with-ctrie ctrie
+    (ctrie-map *ctrie*
+      (lambda (k v)
+        (setf (gethash place k) v)))))
 
 
 (defgeneric ctrie-import (place &key &allow-other-keys)

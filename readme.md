@@ -278,6 +278,13 @@ _[function]_         `CTRIE-READONLY-P  (CTRIE)`
 
 _[function]_         `CTRIE-PUT  (CTRIE KEY VALUE)`
 
+> Insert a new entry into CTRIE mapping KEY to VALUE.  If an entry
+  with key equal to KEY aleady exists in CTRIE, according to the
+  equality predicate defined by `CTRIE-TEST` then the priorbmapping
+  will be replaced by VALUE. Returns `(KEY . VALUE)` representing the
+  mapping in the resulting CTRIE
+
+
 _[function]_         `CTRIE-GET  (CTRIE KEY)`
 
 _[function]_         `CTRIE-DROP  (CTRIE KEY)`
@@ -298,8 +305,6 @@ _[function]_         `CTRIE-MAP-KEYS  (CTRIE FN &KEY ATOMIC)`
 
 _[function]_         `CTRIE-MAP-VALUES  (CTRIE FN &KEY ATOMIC)`
 
-_[generic-function]_ `CTRIE-MAP-INTO  (CTRIE PLACE FN)`
-
 _[function]_         `CTRIE-KEYS  (CTRIE &KEY ATOMIC)`
 
 _[function]_         `CTRIE-VALUES  (CTRIE &KEY ATOMIC)`
@@ -314,41 +319,19 @@ _[function]_         `CTRIE-TO-ALIST  (CTRIE &KEY ATOMIC)`
 
 _[function]_         `CTRIE-TO-HASHTABLE  (CTRIE &KEY ATOMIC)`
 
-_[function]_         `CTRIE-FROM-HASHTABLE  (HASHTABLE)`
+_[function]_         `CTRIE-FROM-HASHTABLE  (HASHTABLE &KEY CTRIE)`
 
 > create a new ctrie containing the same (k . v) pairs and equivalent
   test function as HASHTABLE
 
 
-_[function]_         `CTRIE-FROM-ALIST  (ALIST)`
+_[function]_         `CTRIE-FROM-ALIST  (ALIST &KEY CTRIE)`
 
 _[function]_         `CTRIE-EMPTY-P  (CTRIE)`
 
-_[method]_           `CTRIE-SAVE  ((CTRIE CTRIE) (PLACE PATHNAME) &KEY)`
-
-_[generic-function]_ `CTRIE-SAVE  (CTRIE PLACE &KEY &ALLOW-OTHER-KEYS)`
-
-_[method]_           `CTRIE-LOAD  ((PLACE PATHNAME) &KEY)`
-
-_[generic-function]_ `CTRIE-LOAD  (PLACE &KEY &ALLOW-OTHER-KEYS)`
-
-_[method]_           `CTRIE-EXPORT  ((CTRIE CTRIE) (PLACE HASH-TABLE) &KEY)`
-
-_[method]_           `CTRIE-EXPORT  ((CTRIE CTRIE) (PLACE PATHNAME) &KEY)`
-
-_[generic-function]_ `CTRIE-EXPORT  (CTRIE PLACE &KEY &ALLOW-OTHER-KEYS)`
-
-_[method]_           `CTRIE-IMPORT  ((PLACE HASH-TABLE) &KEY)`
-
-_[method]_           `CTRIE-IMPORT  ((PLACE PATHNAME) &KEY)`
-
-_[generic-function]_ `CTRIE-IMPORT  (PLACE &KEY &ALLOW-OTHER-KEYS)`
-
 _[function]_         `CTRIE-SNAPSHOT  (CTRIE &KEY READ-ONLY)`
 
-_[macro]_            `DEFINE-CTRIE  (NAME &REST ARGS &KEY (OBJECT T)
-                                     (TEST 'EQUAL) (HASH 'SXHASH)
-                                     (STAMP (CONSTANTLY NIL)))`
+_[macro]_            `DEFINE-CTRIE  (NAME CTRIE &REST ARGS &KEY (OBJECT T) SPEC)`
 
 > Define a 'functional' __CTRIE-LAMBDA__ that combines all the the
   capabilities of the raw data structure with behavior and semantics
@@ -412,25 +395,6 @@ _[macro]_            `DEFINE-CTRIE  (NAME &REST ARGS &KEY (OBJECT T)
   ```
 
 
-_[function]_         `MAKE-CTRIE-LAMBDA  (&KEY CTRIE
-                                          (DISPATCH +SIMPLE-DISPATCH+)
-                                          (READ-ONLY T))`
-
-> Construct a new functional ctrie and a lexical environment prepared with
-  various fixtures to support it. Supports 'normal' function interop but can
-  also provide functional map semantics
-   ```
-   ;;; (funcall v #'ctrie-put 1 1) =>  1
-   ;;; (funcall v #'ctrie-get 1)   =>  1 ; T
-   ;;;
-   ;;; (funcall v #'identity)      => #S(CTRIE :READONLY-P NIL :TEST EQUAL
-   ;;;                                   :ROOT #S(INODE :GEN #:|ctrie3177| ... )
-   ;;;
-   ;;; (funcall v 0)               => (ctrie-get ctrie 0)
-   ;;; (funcall v 0 1)             => (ctrie-put ctrie 0 1)
-   ```
-
-
 _[function]_         `CTRIE-LAMBDA-SPAWN  (SELF &KEY READ-ONLY)`
 
 > Causes the atomic clone of enclosed ctrie structure and builds a new
@@ -440,13 +404,46 @@ _[function]_         `CTRIE-LAMBDA-SPAWN  (SELF &KEY READ-ONLY)`
   in parallel
 
 
-_[function]_         `CTRIE-LAMBDA-RESET  (SELF)`
+_[macro]_            `CTRIE-LAMBDA  (&ONCE CTRIE &REST REST)`
 
-_[function]_         `CTRIE-LAMBDA-DISPATCH-TABLE  (SELF)`
+> Pandoric Object and Inter-Lexical Communication Protocol
+  this macro builds the most unencumbered and widely applicable
+  'purist edition' Of our PLAMBDA based form.  Even as such,
+  a lot of care has been given to many subtle ways it has been
+  refined to offer the most convenient and natural tool possible.
+  ```;;;
+     ;;; (plambda (#<CLOSURE (LAMBDA (&REST ARGS)) {100929EB1B}> )
+     ;;;
+     ;;; DISPATCHING to FUNCTIONAL MAPPING:
+     ;;;   (IF (REST ARGS)
+     ;;;          (APPLY ARG (REST ARGS))
+     ;;;          (FUNCALL ARG #'IDENTITY)) =>
+     ;;; ------------------------------------------------------------
+     ;;; INITIALIZING PLAMBDA
+     ;;; ------------------------------------------------------------
+     ;;;   IT => #S(CTRIE
+     ;;;               :READONLY-P NIL
+     ;;;               :TEST EQUAL
+     ;;;               :HASH SXHASH
+     ;;;               :STAMP #<CLOSURE (LAMBDA # :IN CONSTANTLY) {10092B516B}>
+     ;;;               :ROOT #S(INODE
+     ;;;                        :GEN #:|ctrie2196|
+     ;;;                        :REF #S(REF
+     ;;;                                :STAMP @2012-08-19T13:34:58.314457-04:00
+     ;;;                                :VALUE #S(CNODE :BITMAP 0 :ARCS #())
+     ;;;                                :PREV NIL)))
+     ;;;   PLIST => (:CONTAINER #<CLOSURE (LAMBDA #) {100929EACB}> 
+     ;;;             :TIMESTAMP @2012-08-19T13:34:58.314464-04:00)
+     ;;;   STACK => (#<CLOSURE (LAMBDA #) {100929EACB}>)
+     ;;; 
+     ;;; ------------------------------------------------------------
+     ;;;  #<CLOSURE (LAMBDA (&REST #:ARGS55)) {100929EACB}>
+     ;;;```
 
-_[generic-function]_ `CTRIE-LAMBDA-DISPATCH  (CTRIE-LAMBDA)`
 
-> Returns and (with setf) changes the dispatch of the specified ctrie-lambda
+_[generic-function]_ `CTRIE-LAMBDA-DISPATCH  (CTRIE-LAMBDA-OBJECT)`
+
+> Returns and (with setf) changes the dispatch of the specified ctrie-lambda-object
 
 
 
@@ -454,16 +451,6 @@ _[special-variable]_ `+SIMPLE-DISPATCH+  ((DLAMBDA (:FROM (ARG) ARG)
                                                    (:TO (ARG) ARG)
                                                    (:DOMAIN (ARG) ARG)
                                                    (:RANGE (ARG) ARG)))`
-
-_[function]_         `CTRIE-CURSOR-RESET  (SELF)`
-
-_[function]_         `CTRIE-CURSOR-TIMESTAMP  (SELF)`
-
-_[function]_         `CTRIE-CURSOR-CTRIE  (SELF)`
-
-_[function]_         `CTRIE-CURSOR-LOOKING-AT  (SELF)`
-
-_[function]_         `CTRIE-CURSOR-AT-TOP-P  (SELF)`
 
 _[macro]_            `CTRIE-ERROR  (CONDITION &REST ARGS)`
 
@@ -1018,37 +1005,6 @@ _[function]_         `TNODE-CELL  (TNODE)`
 
 
 
-_[method]_           `ENTOMB  ((SNODE SNODE))`
-
-> Entomb an SNODE in a newly created TNODE
-
-
-_[method]_           `ENTOMB  ((LNODE LNODE))`
-
-> Entomb an LNODE in a newly created TNODE
-
-
-_[method]_           `ENTOMB  (NODE)`
-
-> Unless the provided argument is of a type for which an entombment
-    specialization has been defined, signal an error, as we have arrived
-    at an undefined state and cannot continue processing.
-
-
-_[generic-function]_ `ENTOMB  (NODE)`
-
-> Return a newly constructed TNODE enclosing the argument
-  LEAF-NODE structure `NODE`
-
-
-_[generic-function]_ `RESURRECT  (NODE)`
-
-> Return the 'resurection' of the NODE argument.  The
-  resurrection of an INODE that references a TNODE is the
-  LEAF-NODE structure entombed by that TNODE.  The resurrection of
-  any other node is simply itself.
-
-
 _[structure]_        `CNODE ()`
 
 > A CNODE, or 'Ctrie Node' is a MAIN-NODE containing a vector of up
@@ -1137,40 +1093,6 @@ _[function]_         `MAP-CNODE  (FN CNODE)`
   vector will occur
 
 
-_[method]_           `REFRESH  ((SNODE SNODE) GEN)`
-
-> An SNODE represents a LEAF storage cell and does not require
-    any coordination with generational descriptors, and so is simply
-    returned as-is. 
-
-
-_[method]_           `REFRESH  ((INODE INODE) GEN)`
-
-> Generate a replacement for inode that continues to reference the
-    same MAIN-NODE as before, but otherwise contains the new generational
-    descriptor GEN, and a new REF substructure initialized
-    with freshly generated metadata, unconditionally discarding the old.
-    Note that the refresh of an inode is not transitive to the nodes contained
-    in the portion of the CTRIE that it references.  I.e., the process does
-    not eagerly descend and propagate until needed, eliminating the
-    overhead incurred by full traversals which, in many situations, turn out
-    to be not even necessary.
-
-
-_[method]_           `REFRESH  ((CNODE CNODE) GEN)`
-
-> Return a new cnode structure identical to CNODE, but with any
-    arcs that are INODES refreshed to generational descriptor GEN
-
-
-_[generic-function]_ `REFRESH  (PLACE GEN)`
-
-> Reconcile the node specified by PLACE with an
-  updated generational descriptor object, GEN. The actions required
-  for this reconciliation vary according to the node type and 
-  specializations are defined on a casewise basis.
-
-
 _[function]_         `CNODE-CONTRACTED  (CNODE LEVEL)`
 
 > The _CONTRACTION_ of a CNODE is an ajustment performed when a CNODE
@@ -1216,33 +1138,6 @@ _[function]_         `CLEAN-PARENT  (PARENT-INODE TARGET-INODE KEY LEVEL)`
   removal is an arc consisting of an `ENTOMBED` inode (one referencing a TNODE), then,
   if that arc remains accessible from the parent of a CNODE containing it, generate
   the compression of that CNODE and update its parent INODE with the result.
-
-
-_[generic-function]_ `LEAF-NODE-KEY  (RESOURCE)`
-
-> Return the KEY contained in a node that may be
-  either an SNODE or entombed SNODE, regardless of which kind it
-  happens to be
-
-
-_[generic-function]_ `LEAF-NODE-VALUE  (RESOURCE)`
-
-> Return the VALUE contained in a node that may be
-  either an SNODE or entombed SNODE, regardless of which kind it
-  happens to be
-
-
-_[generic-function]_ `FIND-CTRIE-ROOT  (CTRIE-DESIGNATOR)`
-
-> FIND-CTRIE-ROOT is a subprimitive used by the
-  internal CTRIE implementation to access the root inode of a given
-  ctrie root-container. It does not provide safe access to the
-  contents of that inode and should not be referenced by the
-  higher-level implementation or end-user code.  The purpose of
-  FIND-CTRIE-ROOT is to incorporate a level of indirection specialized
-  on the class of the root container to facilitate future extension
-  with alternate storage models, e.g., an external persistent disk-based
-  store. See also `(cas cl-ctrie::find-ctrie-root)`
 
 
 _[structure]_        `RDCSS-DESCRIPTOR ()`
@@ -1352,6 +1247,13 @@ _[function]_         `CTRIE-SNAPSHOT  (CTRIE &KEY READ-ONLY)`
 _[function]_         `CTRIE-CLEAR  (CTRIE)`
 
 _[function]_         `CTRIE-PUT  (CTRIE KEY VALUE)`
+
+> Insert a new entry into CTRIE mapping KEY to VALUE.  If an entry
+  with key equal to KEY aleady exists in CTRIE, according to the
+  equality predicate defined by `CTRIE-TEST` then the priorbmapping
+  will be replaced by VALUE. Returns `(KEY . VALUE)` representing the
+  mapping in the resulting CTRIE
+
 
 _[function]_         `%INSERT  (INODE KEY VALUE LEVEL PARENT STARTGEN)`
 
@@ -1524,10 +1426,22 @@ _[function]_         `%INSERT  (INODE KEY VALUE LEVEL PARENT STARTGEN)`
   extension is simply to accomodate normal growth capacity and
   allocation.  In both cases, though, the extensions are performed for
   the same initiating cause -- to accomodate the collision of leaf
-  node keys resident at lower levels of the structure.
-
-
-  
+  node keys resident at lower levels of the structure.  Depending on
+  the similarity of two colliding hash keys, the extension process may
+  not be resolved with a single iteration.  In the case of full
+  collisiion, described above, the extension process will recur, up to
+  a maximum depth of `(32/W)` levels, at which point an L-NODE chain
+  will be created.  At each iteration, a new INODE is created,
+  pointing to a new CNODE containing one of our conflictung pairs.
+  Then, `%INSERT` is attempted on that INODE and this process recurs.
+  Once this cycle of insert/extend completes, each INODE/CNODE pair is
+  returned to the parent -- the entire newly created structure
+  eventually returning to the point of original conflicts whre the
+  extension cycle began.  If we successfully mutate the parent inode
+  by completing an atomic replacement of the old cnode with the one
+  that begins this newly built structue, then our update has succeeded
+  and we return the range value now successfully mapped by KEY in
+  order to indicate our success.  Otherwise we THROW to :RESTART
 
 
 _[function]_         `CTRIE-GET  (CTRIE KEY)`
@@ -1570,25 +1484,9 @@ _[macro]_            `CTRIE-DO  ((KEY VALUE CTRIE &KEY ATOMIC) &BODY BODY)`
   ;;;             (format t "~&~8S => ~10S~%" k v))
 
 
-_[method]_           `MAP-NODE  ((NODE CNODE) FN)`
-
-_[method]_           `MAP-NODE  ((NODE LNODE) FN)`
-
-_[method]_           `MAP-NODE  ((NODE TNODE) FN)`
-
-_[method]_           `MAP-NODE  ((NODE SNODE) FN)`
-
-_[method]_           `MAP-NODE  ((NODE INODE) FN)`
-
-_[method]_           `MAP-NODE  ((NODE NULL) FN)`
-
-_[generic-function]_ `MAP-NODE  (NODE FN)`
-
 _[function]_         `CTRIE-MAP-KEYS  (CTRIE FN &KEY ATOMIC)`
 
 _[function]_         `CTRIE-MAP-VALUES  (CTRIE FN &KEY ATOMIC)`
-
-_[generic-function]_ `CTRIE-MAP-INTO  (CTRIE PLACE FN)`
 
 _[function]_         `CTRIE-KEYS  (CTRIE &KEY ATOMIC)`
 
@@ -1604,37 +1502,15 @@ _[function]_         `CTRIE-TO-HASHTABLE  (CTRIE &KEY ATOMIC)`
 
 _[function]_         `CTRIE-PPRINT  (CTRIE &OPTIONAL (STREAM T))`
 
-_[function]_         `CTRIE-FROM-ALIST  (ALIST)`
+_[function]_         `CTRIE-FROM-ALIST  (ALIST &KEY CTRIE)`
 
-_[function]_         `CTRIE-FROM-HASHTABLE  (HASHTABLE)`
+_[function]_         `CTRIE-FROM-HASHTABLE  (HASHTABLE &KEY CTRIE)`
 
 > create a new ctrie containing the same (k . v) pairs and equivalent
   test function as HASHTABLE
 
 
-_[method]_           `CTRIE-SAVE  ((CTRIE CTRIE) (PLACE PATHNAME) &KEY)`
-
-_[generic-function]_ `CTRIE-SAVE  (CTRIE PLACE &KEY &ALLOW-OTHER-KEYS)`
-
-_[method]_           `CTRIE-LOAD  ((PLACE PATHNAME) &KEY)`
-
-_[generic-function]_ `CTRIE-LOAD  (PLACE &KEY &ALLOW-OTHER-KEYS)`
-
-_[method]_           `CTRIE-EXPORT  ((CTRIE CTRIE) (PLACE HASH-TABLE) &KEY)`
-
-_[method]_           `CTRIE-EXPORT  ((CTRIE CTRIE) (PLACE PATHNAME) &KEY)`
-
-_[generic-function]_ `CTRIE-EXPORT  (CTRIE PLACE &KEY &ALLOW-OTHER-KEYS)`
-
-_[method]_           `CTRIE-IMPORT  ((PLACE HASH-TABLE) &KEY)`
-
-_[method]_           `CTRIE-IMPORT  ((PLACE PATHNAME) &KEY)`
-
-_[generic-function]_ `CTRIE-IMPORT  (PLACE &KEY &ALLOW-OTHER-KEYS)`
-
-_[macro]_            `DEFINE-CTRIE  (NAME &REST ARGS &KEY (OBJECT T)
-                                     (TEST 'EQUAL) (HASH 'SXHASH)
-                                     (STAMP (CONSTANTLY NIL)))`
+_[macro]_            `DEFINE-CTRIE  (NAME CTRIE &REST ARGS &KEY (OBJECT T) SPEC)`
 
 > Define a 'functional' __CTRIE-LAMBDA__ that combines all the the
   capabilities of the raw data structure with behavior and semantics
@@ -1698,28 +1574,9 @@ _[macro]_            `DEFINE-CTRIE  (NAME &REST ARGS &KEY (OBJECT T)
   ```
 
 
-_[function]_         `MAKE-CTRIE-LAMBDA  (&KEY CTRIE
-                                          (DISPATCH +SIMPLE-DISPATCH+)
-                                          (READ-ONLY T))`
+_[generic-function]_ `CTRIE-LAMBDA-DISPATCH  (CTRIE-LAMBDA-OBJECT)`
 
-> Construct a new functional ctrie and a lexical environment prepared with
-  various fixtures to support it. Supports 'normal' function interop but can
-  also provide functional map semantics
-   ```
-   ;;; (funcall v #'ctrie-put 1 1) =>  1
-   ;;; (funcall v #'ctrie-get 1)   =>  1 ; T
-   ;;;
-   ;;; (funcall v #'identity)      => #S(CTRIE :READONLY-P NIL :TEST EQUAL
-   ;;;                                   :ROOT #S(INODE :GEN #:|ctrie3177| ... )
-   ;;;
-   ;;; (funcall v 0)               => (ctrie-get ctrie 0)
-   ;;; (funcall v 0 1)             => (ctrie-put ctrie 0 1)
-   ```
-
-
-_[generic-function]_ `CTRIE-LAMBDA-DISPATCH  (CTRIE-LAMBDA)`
-
-> Returns and (with setf) changes the dispatch of the specified ctrie-lambda
+> Returns and (with setf) changes the dispatch of the specified ctrie-lambda-object
 
 
 
@@ -1732,13 +1589,46 @@ _[function]_         `CTRIE-LAMBDA-SPAWN  (SELF &KEY READ-ONLY)`
   in parallel
 
 
-_[function]_         `CTRIE-LAMBDA-RESET  (SELF)`
+_[macro]_            `CTRIE-LAMBDA  (&ONCE CTRIE &REST REST)`
 
-_[function]_         `CTRIE-LAMBDA-DISPATCH-TABLE  (SELF)`
+> Pandoric Object and Inter-Lexical Communication Protocol
+  this macro builds the most unencumbered and widely applicable
+  'purist edition' Of our PLAMBDA based form.  Even as such,
+  a lot of care has been given to many subtle ways it has been
+  refined to offer the most convenient and natural tool possible.
+  ```;;;
+     ;;; (plambda (#<CLOSURE (LAMBDA (&REST ARGS)) {100929EB1B}> )
+     ;;;
+     ;;; DISPATCHING to FUNCTIONAL MAPPING:
+     ;;;   (IF (REST ARGS)
+     ;;;          (APPLY ARG (REST ARGS))
+     ;;;          (FUNCALL ARG #'IDENTITY)) =>
+     ;;; ------------------------------------------------------------
+     ;;; INITIALIZING PLAMBDA
+     ;;; ------------------------------------------------------------
+     ;;;   IT => #S(CTRIE
+     ;;;               :READONLY-P NIL
+     ;;;               :TEST EQUAL
+     ;;;               :HASH SXHASH
+     ;;;               :STAMP #<CLOSURE (LAMBDA # :IN CONSTANTLY) {10092B516B}>
+     ;;;               :ROOT #S(INODE
+     ;;;                        :GEN #:|ctrie2196|
+     ;;;                        :REF #S(REF
+     ;;;                                :STAMP @2012-08-19T13:34:58.314457-04:00
+     ;;;                                :VALUE #S(CNODE :BITMAP 0 :ARCS #())
+     ;;;                                :PREV NIL)))
+     ;;;   PLIST => (:CONTAINER #<CLOSURE (LAMBDA #) {100929EACB}> 
+     ;;;             :TIMESTAMP @2012-08-19T13:34:58.314464-04:00)
+     ;;;   STACK => (#<CLOSURE (LAMBDA #) {100929EACB}>)
+     ;;; 
+     ;;; ------------------------------------------------------------
+     ;;;  #<CLOSURE (LAMBDA (&REST #:ARGS55)) {100929EACB}>
+     ;;;```
 
-_[generic-function]_ `CTRIE-LAMBDA-DISPATCH  (CTRIE-LAMBDA)`
 
-> Returns and (with setf) changes the dispatch of the specified ctrie-lambda
+_[generic-function]_ `CTRIE-LAMBDA-DISPATCH  (CTRIE-LAMBDA-OBJECT)`
+
+> Returns and (with setf) changes the dispatch of the specified ctrie-lambda-object
 
 
 
@@ -1746,16 +1636,6 @@ _[special-variable]_ `+SIMPLE-DISPATCH+  ((DLAMBDA (:FROM (ARG) ARG)
                                                    (:TO (ARG) ARG)
                                                    (:DOMAIN (ARG) ARG)
                                                    (:RANGE (ARG) ARG)))`
-
-_[function]_         `CTRIE-CURSOR-RESET  (SELF)`
-
-_[function]_         `CTRIE-CURSOR-TIMESTAMP  (SELF)`
-
-_[function]_         `CTRIE-CURSOR-CTRIE  (SELF)`
-
-_[function]_         `CTRIE-CURSOR-LOOKING-AT  (SELF)`
-
-_[function]_         `CTRIE-CURSOR-AT-TOP-P  (SELF)`
 
 _[macro]_            `CTRIE-ERROR  (CONDITION &REST ARGS)`
 
@@ -1876,6 +1756,102 @@ _[macro]_            `DEFINE-DIAGRAM  (TYPE (&OPTIONAL CONTEXT) &BODY BODY)`
   for a specific CONTEXT. See {defgeneric cl-ctrie::make-diagram}.
 
 
+* * * * * * *
+
+
+  `CTRIE-MODIFICATION-FAILED (CTRIE-OPERATIONAL-ERROR)`
+
+> This condition indicates an unhandled failure of an attempt to
+         perform stateful modification to CTRIE.  The most common case in
+         which this might occur is when such an attempt is mode on a CTRIE
+         designated as READONLY-P.  In any case, this condition represents an
+         exception from which processing cannot continue and requires
+         interactive user intervention in order to recover.
+
+
+_[condition]_        `CTRIE-OPERATION-RETRIES-EXCEEDED (CTRIE-OPERATIONAL-ERROR)`
+
+> Condition indicating an operation has failed the
+   maximum number of times specified by the special-variable
+   *retries*
+
+
+_[condition]_        `CTRIE-NOT-IMPLEMENTED (CTRIE-ERROR)`
+
+> Condition designating functionality for which the
+   implementation has not been written, but has not been deliberately
+   excluded.
+
+
+_[condition]_        `CTRIE-NOT-SUPPORTED (CTRIE-ERROR)`
+
+> Condition designating functionality that is
+  deliberately not supported.
+
+
+_[condition]_        `CTRIE-INVALID-DYNAMIC-CONTEXT (CTRIE-OPERATIONAL-ERROR)`
+
+> Condition indicating an operation was attempted
+   outside the dynamic extent of a valid enclosing WITH-CTRIE form
+
+
+_[condition]_        `CTRIE-GENERATIONAL-MISMATCH (CTRIE-STRUCTURAL-ERROR)`
+
+> Condition indicating an operation encountered an
+   outdated or inconsistent node during its attempted traversal
+
+
+_[function]_         `README  (&OPTIONAL (STREAM *STANDARD-OUTPUT*))`
+
+> Update documentation sections of the README file. When an output stream
+  is specified, the results are also echoed to that stream. To inhibit
+  output, invoke as `(readme (make-broadcast-stream))` or use `README-QUIETLY`
+
+
+_[function]_         `README-QUIETLY  ()`
+
+> Update documentation sections of the README file, inhibiting any other
+  printed output.
+
+
+_[function]_         `APIDOC  (&OPTIONAL (SCOPE :EXTERNAL))`
+
+> Collect a list of strings representing the documentation for
+  CL-CTRIE rendered in a compact format suitable for inclusion in a
+  lightweight text-markup format document.  If SCOPE is specified it
+  must be either :EXTERNAL. corresponding to those symbols exported as
+  the public API, or :HOME, which designates all symbols defined
+  locally in package.
+
+
+_[function]_         `PRINC-APIDOC  (&OPTIONAL (SCOPE :EXTERNAL))`
+
+> Print to `*STANDARD-OUTPUT*` the documentation for CL-CTRIE rendered
+  in a compact format.  This is intended primarily as a convenience to
+  the interactive user seeking quick reference at the REPL.  If SCOPE
+  is specified it must be either :EXTERNAL. corresponding to those
+  symbols exported as the public API, or :HOME, which designates all
+  symbols defined locally in package.
+
+
+_[function]_         `COLLECT-DOCS  (&OPTIONAL (SCOPE :EXTERNAL)
+                                     (SORT #'STRING<))`
+
+> Regenerate on-disk html documentation and collect the cached
+  in-memory descriptors for further processing. If SCOPE is specified
+  it must be either :EXTERNAL. corresponding to those symbols exported
+  as the public API, or :HOME, which designates all symbols defined
+  locally in package.  Output order may be customized by an optionally
+  specified SORT function.
+
+
+_[macro]_            `DEFINE-DIAGRAM  (TYPE (&OPTIONAL CONTEXT) &BODY BODY)`
+
+> Define a diagrammatic representation of TYPE, optionally specialized
+  for a specific CONTEXT. See {defgeneric cl-ctrie::make-diagram}.
+
+
+* * * * * * *
 * * * * * * *
 
 

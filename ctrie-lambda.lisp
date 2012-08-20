@@ -27,6 +27,53 @@
   (set-dispatch-macro-character  #\# #\` #'|#`-reader|))
 
 
+(defmacro with-macro-character ((ch func) &body body)
+  "Bind the reader macro func to ch and execute the body in this
+  environment.  Restore the original reader-macros when this form is
+  done.
+  ;;;
+  ;;; (with-macro-character (ch func) body)
+  ;;;"
+  (let ((c (gensym))
+        (f (gensym))
+        (o (gensym)))
+    `(let ((,c ,ch)
+           (,f ,func))
+       (let ((,o (get-macro-character ,c)))
+         (set-macro-character ,c ,f)
+         (unwind-protect
+              (progn ,@body)
+           (set-macro-character ,c ,o))))))
+
+
+(defmacro with-macro-characters (pairs &body body)
+  "Bind the reader macro func1 to ch1, and so on, and execute the body
+   in this environment. Restore the original reader-macros when this
+   form is done.
+   ;;;
+   ;;; (with-macro-characters ((ch1 func1) (ch1 func2) ...) body)
+   ;;;"
+  (if (null pairs)
+      `(progn ,@body)
+      `(if (oddp (length ',(car pairs)))
+           (error "with-macro-characters: ~A must be a pair of a
+           character and a reader-macro-function" ',(car pairs))
+           (with-macro-character ,(car pairs)
+             (with-macro-characters ,(cdr pairs)
+               ,@body)))))
+
+
+;; (defun try-it ()
+;;   (with-macro-characters
+;;       ((#\! #'reader-iota-0)
+;;        (#\@ #'reader-iota-1))
+;;     (concatenate 'list
+;;                  '(first)
+;;                  (read-from-string "!10")
+;;                  '(second)
+;;                  (read-from-string "@10"))))
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Specialized Binding Form
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -38,6 +85,7 @@
        (declare (function ,gname))
        (flet ((,name (&rest args) (apply ,gname args)))
          ,@body))))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Pandoric Object Protocol 
@@ -64,8 +112,8 @@
              dispatch-table)))))
 
 
-(defmacro/once dlambda-bind (spec)
-  `(dlambda ,@spec))
+;; (defmacro/once dlambda-bind (spec)
+;;   `(dlambda ,@spec))
 
 
 (defmacro alet (letargs &rest body)
@@ -103,19 +151,20 @@
       (let-binding-transform (cdr bs)))))
 
 
-(defun pandoriclet-get (letargs)
-  `(case sym
-     ,@(mapcar #`((,(car a1)) ,(car a1))
-         letargs)
-     (t (error "Unknown pandoric get: ~a" sym))))
+(eval-when (:load-toplevel :compile-toplevel :execute)
+  (defun pandoriclet-get (letargs)
+    `(case sym
+       ,@(mapcar #`((,(car a1)) ,(car a1))
+           letargs)
+       (t (error "Unknown pandoric get: ~a" sym))))
 
 
-(defun pandoriclet-set (letargs)
-  `(case sym
-     ,@(mapcar #`((,(car a1))
-                   (setq ,(car a1) val))
-         letargs)
-     (t (error "Unknown pandoric set: ~a" sym))))
+  (defun pandoriclet-set (letargs)
+    `(case sym
+       ,@(mapcar #`((,(car a1))
+                     (setq ,(car a1) val))
+           letargs)
+       (t (error "Unknown pandoric set: ~a" sym)))))
 
 
 (defmacro pandoriclet (letargs &rest body)
@@ -169,9 +218,6 @@
                 (t             (&rest args)  (apply this args)))))))
 
 
-(defvar *pandoric-eval-tunnel*)
-
-
 (defmacro pandoric-eval (vars expr)
   `(let ((*pandoric-eval-tunnel* (plambda () ,vars t)))
      (eval `(with-pandoric-slots ,',vars *pandoric-eval-tunnel* ,,expr))))
@@ -186,9 +232,271 @@
 
 
 
+;; (ppmx
+;;   (defmacro define-pandoric-interface (name implements) ;; &rest forms)
+;;     (with-unique-names  (me supers)
+;;       `(defparameter ,name  
+;;          (alet ((,me ,name) (,supers ',implements))
+;;            (dlambda
+;;              (:reset      () t)
+;;              (:name       () ,me)
+;;              (:implements () ,supers)
+;;              (t (&rest args) (apply this args)))))))) 
+;;                ,@forms
+;;   ;; (unless ,name (apply this :reset ,name ,supers))
+;;(setf implements (mapcar #`(,a1) ,supers)))
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                         ;; CTRIE-LAMBDA ;;                                  ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+
+(defgeneric ensure-lambda (ctrie-designator &key &allow-other-keys)
+  (:method ((ctrie ctrie) &key)
+    (let* (ctrie lambda)
+      (setf lambda
+        (ctrie-lambda ctrie container lambda))))
+  (:method ((self function) &key)
+    self))
+
+
+;; (defun ctrie-put-many (ctrie &rest one &aux (many (car one)) fn)
+;;   ";;; (ctrie-put-many c (iota 32))"
+;;   (printv "" 'CTRIE-PUT-MANY :hr)
+;;   (flet ((eql2p (x)
+;;            (= x 2))
+;;           (put (pair)
+;;             (apply fn #'ctrie-put pair)))
+;;     (let* ((fn         (ensure-lambda ctrie))
+;;             (pairlist  (loop
+;;                          initially (assert (and (evenp (length many))
+;;                                              (= 1 (length one))))
+;;                          for rest on many by #'cddr
+;;                          for k = (car rest)
+;;                          for v = (cadr rest)
+;;                          for pair = (list k v)
+;;                          collect pair into pairs
+;;                          finally (return (printv pairs)))))
+;;       (assert (every #'eql2p (printv (map 'list #'length pairlist))))
+;;       (prog1 (printv (mapcar #'put pairlist))
+;;         (printv "" "")))))
+
+
+
+(defmacro/once ctrie-lambda (&once ctrie &rest rest)
+  "Pandoric Object and Inter-Lexical Communication Protocol
+  this macro builds the most unencumbered and widely applicable
+  'purist edition' Of our PLAMBDA based form.  Even as such,
+  a lot of care has been given to many subtle ways it has been
+  refined to offer the most convenient and natural tool possible.
+  ```;;;
+     ;;; (plambda (#<CLOSURE (LAMBDA (&REST ARGS)) {100929EB1B}> )
+     ;;;
+     ;;; DISPATCHING to FUNCTIONAL MAPPING:
+     ;;;   (IF (REST ARGS)
+     ;;;          (APPLY ARG (REST ARGS))
+     ;;;          (FUNCALL ARG #'IDENTITY)) =>
+     ;;; ------------------------------------------------------------
+     ;;; INITIALIZING PLAMBDA
+     ;;; ------------------------------------------------------------
+     ;;;   IT => #S(CTRIE
+     ;;;               :READONLY-P NIL
+     ;;;               :TEST EQUAL
+     ;;;               :HASH SXHASH
+     ;;;               :STAMP #<CLOSURE (LAMBDA # :IN CONSTANTLY) {10092B516B}>
+     ;;;               :ROOT #S(INODE
+     ;;;                        :GEN #:|ctrie2196|
+     ;;;                        :REF #S(REF
+     ;;;                                :STAMP @2012-08-19T13:34:58.314457-04:00
+     ;;;                                :VALUE #S(CNODE :BITMAP 0 :ARCS #())
+     ;;;                                :PREV NIL)))
+     ;;;   PLIST => (:CONTAINER #<CLOSURE (LAMBDA #) {100929EACB}> 
+     ;;;             :TIMESTAMP @2012-08-19T13:34:58.314464-04:00)
+     ;;;   STACK => (#<CLOSURE (LAMBDA #) {100929EACB}>)
+     ;;; 
+     ;;; ------------------------------------------------------------
+     ;;;  #<CLOSURE (LAMBDA (&REST #:ARGS55)) {100929EACB}>
+     ;;;```"
+  `(alet (IT AT ME PLIST STACK 
+           ,@(remove-if #'boundp `(,@rest)))          
+     
+     ;; INITIALIZATION THUNK
+     ;; ---------------------------
+     (unless it (funcall this
+                  #'(lambda (&rest args)
+                      (declare (ignorable args))
+                      (printv :hr "INITIALIZING PLAMBDA" :hr)
+                      (prog1 this
+                        (setf it (or ,ctrie (make-ctrie)))
+                      ;;   at (dlambda
+                      ;;        (:test () (root-node-access it))
+                      ;;        (t     () (funcall this :test))))                        
+                      ;;   (setf
+                      ;;     mbox  (sb-concurrency:make-mailbox)
+                      ;;     queue (sb-concurrency:make-queue)))
+                        (push this stack)
+                        (setf
+                          (getf plist :timestamp) (local-time:now)
+                          (getf plist :container) this)
+                        (printv it)
+                        (printv plist)
+                        (printv stack "" :hr)))))
+     
+  ;; OPERATIONAL DISPATCH
+  ;; --------------------
+     (setf me (PLAMBDA (&rest args &aux (arg (car args)))
+                    (IT ME AT THIS PLIST STACK  ,@REST)
+                
+                (printv :hr " ")
+                (format *trace-output* "~%;;; (plambda (~S~{ ~S~})~%;;;"
+                  arg (rest args))
+
+                (typecase arg
+                  
+                  (function (printv "DISPATCHING to FUNCTIONAL MAPPING:"
+                              (apply arg it (rest args))))  ;; (if (rest args)
+                                                            ;;   (apply arg (rest args))
+                                                            ;;   (funcall arg #'identity))))
+
+                  (t        (printv "DISPATCHING to STRUCTURAL MAP:" (rest args) arg)
+                              (cond
+                                ((and (atom arg) (= 1 (length args)))
+                                  (printv (apply #'ctrie-get it args)))
+                                ((and (atom arg) (= 2 (length args)))
+                                  (printv (apply #'ctrie-put it args)))
+                                ((every #'atom args)
+                                  (printv (mapcar (lambda (key) (ctrie-get it key)) args)))
+                                ((and (every #'consp args) (every #'atom (mapcar #'cdr args)))
+                                  (printv (mapcar (lambda (pair) (ctrie-put it (car pair) (cdr pair))) args)))
+                                (t (error "incongruent argument list ~s" args)))))))))
+
+
+
+(define-symbol-macro |it|   #'identity)
+(define-symbol-macro |pp|   #'ctrie-pprint)
+(define-symbol-macro |k*|   #'ctrie-keys)
+(define-symbol-macro |v*|   #'ctrie-values)
+(define-symbol-macro |kv*|  #'ctrie-to-alist)
+
+
+(defgeneric ctrie-lambda-ctrie (ctrie-designator)
+  (:method ((ctrie ctrie))
+    ctrie)
+  (:method ((ctrie function))
+    (with-pandoric-slots (it) ctrie
+      it)))
+
+
+
+
+  ;; (defun make-ctrie-lambda (ctrie)
+  ;;   "Construct a new functional ctrie and a lexical environment prepared with
+  ;; various fixtures to support it. Supports 'normal' function interop but can
+  ;; also provide functional map semantics
+  ;;  ```
+  ;;  ;;; (funcall v #'ctrie-put 1 1) =>  1
+  ;;  ;;; (funcall v #'ctrie-get 1)   =>  1 ; T
+  ;;  ;;;
+  ;;  ;;; (funcall v #'identity)      => #S(CTRIE :READONLY-P NIL :TEST EQUAL
+  ;;  ;;;                                   :ROOT #S(INODE :GEN #:|ctrie3177| ... )
+  ;;  ;;;
+  ;;  ;;; (funcall v 0)               => (ctrie-get ctrie 0)
+  ;;  ;;; (funcall v 0 1)             => (ctrie-put ctrie 0 1)
+  ;;  ```"
+  ;;   (alet ()
+  ;;     (let* ((it (typecase ctrie
+  ;;                  (ctrie     ctrie)                      ;; (ctrie-snapshot ctrie :read-only read-only))
+  ;;                  (function  (funcall ctrie #'identity)) ;; :read-only read-only))
+  ;;                  (null      (make-ctrie))))
+  ;;             (dispatch-table   +simple-dispatch+)
+  ;;             (meta   (list :timestamp (local-time:now)))
+  ;;             (at     (root-node-access top))
+  ;;             (up     top)
+  ;;             (me     nil)
+  ;;             (path   nil))
+  ;;       (plambda (&rest args &aux (arg (car args))) (dispatch-table top at up path meta me)
+  ;;         (flet (($ (&rest args) (apply dispatch-table args)))
+  ;;           (unless me (setf me this))
+  ;;           (typecase arg
+  ;;             (function (apply arg it (rest args)))
+  ;;             (t
+  ;;               (if (rest args)
+  ;;                 (apply #'ctrie-put ($ :from top) ($ :domain arg) ($ :range (rest args)))
+  ;;                 (ctrie-get ($ :from top) ($ :domain arg))))))))))
+
+
+(defun ctrie-lambda-spawn (self &key read-only)
+  "Causes the atomic clone of enclosed ctrie structure and builds a new
+  lexical closure to operate on it.  Does not bother to reproduce fancy
+  (expensive) object, class, bindings, but provides almost identical
+  functionality.  May be used to more efficintly distribute workload
+  in parallel"
+  (ctrie-lambda (funcall #'ctrie-snapshot
+                   (ctrie-lambda-ctrie self)
+                   :read-only read-only)))
+    
+(define-test check-ctrie-lambda-spawn ()
+  (flet ((doit (&optional read-only)
+           (let* ((c0 (make-ctrie))
+                   (c1 (ctrie-lambda c0))
+                   (c2 (ctrie-lambda-spawn c1 :read-only read-only)))
+             (mapcar (compose
+                       #'inode-gen
+                       #'root-node-access
+                       #'ctrie-lambda-ctrie)
+               (list c0 c1 c2)))))
+    (doit)))
+
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The Ref Reader
+;; (pipeop --  http://cadr.g.hatena.ne.jp/g000001/20081125/1227612201)
+;; (ppmx (progn #/person/car/father/name/last/1))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+#+notyet
+(defun pipeop (q)
+  "_REFERENCE PIPELINE_
+   ```
+   ;;;   
+   ;;; (progn #/person/car/father/name/last/1)
+   ;;;
+   ;;; => (PROGN (NTH 0 (LAST (NAME (FATHER (CAR (PERSON)))))))
+   ;;; ```"
+  (labels ((pipeop-n (expr rest)
+             (let ((expr (read-from-string expr)))
+               `(,@(if (numberp expr)
+                     `(nth ,(1- expr))
+                     (list expr))
+                  ,@(if rest (list rest) rest))))
+            (recur (q acc)
+              (let* ((cmds (string q))
+                      (pos (position #\/ cmds)))
+                (if pos
+                  (recur (subseq cmds (1+ pos))
+                    (pipeop-n (subseq cmds 0 pos) acc))
+                  (pipeop-n cmds acc)))))
+    (recur q () )))
+
+#+()
+(set-dispatch-macro-character #\# #\/
+  (lambda (str char arg)
+    (declare (ignore char arg))
+    (pipeop (read str nil nil nil))))
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; CTRIE-LAMBDA Dispatch
+;; (notyet)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 
 (defparameter +simple-dispatch+
   (dlambda
@@ -196,6 +504,7 @@
     (:to     (arg) arg)
     (:domain (arg) arg)
     (:range  (arg) arg)))
+
 
 (defparameter +pax-romana+
   (dlambda
@@ -208,20 +517,19 @@
         (format nil "~:r" arg)))))
 
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; CTRIE-LAMBDA Metaclass
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; CTRIE-LAMBDA Metaclass (expoloratory)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defclass ctrie-lambda-class (sb-mop:funcallable-standard-class)
   ())
 
 (defmethod sb-mop:validate-superclass ((sub ctrie-lambda-class)
-                                        (super sb-mop:funcallable-standard-class))
+                                        (super funcallable-standard-class))
   t)
 
-
-(defclass ctrie-lambda (sb-mop:funcallable-standard-object)
+(defclass ctrie-lambda-object (sb-mop:funcallable-standard-object)
   ((dispatch
      :initarg :dispatch
      :accessor ctrie-lambda-dispatch)
@@ -234,83 +542,34 @@
   (:metaclass ctrie-lambda-class))
 
 
-(defmethod slot-unbound (class (instance ctrie-lambda) (slot (eql 'ctrie)))
+(defmethod slot-unbound (class (instance ctrie-lambda-object) (slot (eql 'ctrie)))
   (funcall instance #'identity))
 
-(defmethod slot-unbound (class (instance ctrie-lambda) (slot (eql 'dispatch)))
+#+notyet
+(defmethod slot-unbound (class (instance ctrie-lambda-object) (slot (eql 'dispatch)))
   (ctrie-lambda-dispatch-table instance))
 
-(defmethod slot-unbound (class (instance ctrie-lambda) (slot (eql 'function)))
-  (ctrie-lambda-reset instance))
+(defmethod slot-unbound (class (instance ctrie-lambda-object) (slot (eql 'function)))
+  (fdefinition instance))
 
 
-;; (defmethod slot-unbound (class (instance ctrie-lambda) (slot (eql 'ctrie)))
-;;   (setf (slot-value instance 'ctrie) (funcall instance #'identity)))
-;; (defmethod slot-unbound (class (instance ctrie-lambda) (slot (eql 'dispatch)))
-;;   (setf (slot-value instance 'dispatch) (ctrie-lambda-dispatch-table instance)))
-;; (defmethod slot-unbound (class (instance ctrie-lambda) (slot (eql 'function)))
-;;   (setf (slot-value instance 'function) (ctrie-lambda-reset instance)))
+#+notyet
+(defclass ctrie-transactional-class (sub ctrie-lambda-class) ())
 
+#+notyet
+(defmethod sb-mop:validate-superclass
+  ((sub ctrie-lambda-class) (super ctrie-transactional-class)) t)
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; CTRIE-LAMBDA Lexical Closure
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-
-(defun make-ctrie-lambda (&key ctrie (dispatch +simple-dispatch+) (read-only t))
-  "Construct a new functional ctrie and a lexical environment prepared with
-  various fixtures to support it. Supports 'normal' function interop but can
-  also provide functional map semantics
-   ```
-   ;;; (funcall v #'ctrie-put 1 1) =>  1
-   ;;; (funcall v #'ctrie-get 1)   =>  1 ; T
-   ;;;
-   ;;; (funcall v #'identity)      => #S(CTRIE :READONLY-P NIL :TEST EQUAL
-   ;;;                                   :ROOT #S(INODE :GEN #:|ctrie3177| ... )
-   ;;;
-   ;;; (funcall v 0)               => (ctrie-get ctrie 0)
-   ;;; (funcall v 0 1)             => (ctrie-put ctrie 0 1)
-   ```"
-  (alet ()
-    (let* ((top (typecase ctrie
-                  (ctrie (ctrie-snapshot ctrie :read-only read-only))
-                  (null (make-ctrie))))
-            (master ctrie)
-            (dispatch-table  dispatch)
-            (meta   (list :timestamp (local-time:now)))
-            (at     (root-node-access top))
-            (up     top)
-            (me     nil)
-            (path   nil))
-      (plambda (&rest args &aux (arg (car args))) (dispatch-table top at up path meta me master)
-        (flet (($ (&rest args) (apply dispatch-table args)))
-          (unless me (setf me this))
-          (typecase arg
-            (function (apply arg top (rest args)))
-            (t
-              (if (rest args)
-                (apply #'ctrie-put ($ :from top) ($ :domain arg) ($ :range (rest args)))
-                (ctrie-get ($ :from top) ($ :domain arg))))))))))
-
-
-(defun ctrie-lambda-spawn (self &key read-only)
-  "Causes the atomic clone of enclosed ctrie structure and builds a new
-  lexical closure to operate on it.  Does not bother to reproduce fancy
-  (expensive) object, class, bindings, but provides almost identical
-  functionality.  May be used to more efficintly distribute workload
-  in parallel"
-  (funcall self
-    (lambda (ctrie)
-      (make-ctrie-lambda :ctrie ctrie
-        :read-only read-only))))
+#+notyet
+(defclass ctrie-transactional-object (ctrie-lambda-object transactional-collection)
+  () (:metaclass ctrie-transactional-class))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; CTRIE-LAMBDA binding
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defmacro define-ctrie (name &rest args &key (object t) (test 'equal) (hash 'sxhash)
-                         (stamp (constantly nil)))
+(defmacro define-ctrie (name ctrie &rest args &key (object t) spec)
   "Define a 'functional' __CTRIE-LAMBDA__ that combines all the the
   capabilities of the raw data structure with behavior and semantics
   one would expect of any other ordinary common-lisp function.  The
@@ -371,87 +630,85 @@
   ;;;   (mapcar my-ctrie (iota 12))
   ;;;     =>  (0 1 2 3 4 5 6 7 8 9 10 11)
   ```"
-  (declare (ignorable test hash stamp))
-  `(let1 ctrie-lambda (make-ctrie-lambda :read-only nil
-                        :ctrie (apply #'make-ctrie ,args))
-     (proclaim '(special ,name))
-     (setf (symbol-value ',name) (if ,object
-                                   (make-instance 'ctrie-lambda)
-                                   ctrie-lambda))
-     (when ,object (sb-mop:set-funcallable-instance-function
-                    (symbol-value ',name) ctrie-lambda))
-     (setf (fdefinition  ',name) ctrie-lambda)
-     (setf (fdefinition  '(setf ,name))
-       #'(lambda (value key)
-           (with-pandoric-slots (dispatch-table top) ctrie-lambda
-             (flet (($ (&rest args) (apply dispatch-table args)))
-               (ctrie-put ($ :to top) ($ :domain key) ($ :range value))))))
-     ',name))
+  (declare (ignorable args object spec))
+  (with-gensyms (ctrie-lambda)
+    `(let1 ,ctrie-lambda (ctrie-lambda ,ctrie)
+       (proclaim '(special ,name))
+       (setf (symbol-value ',name)
+         (if ,object (make-instance 'ctrie-lambda-object) ,ctrie-lambda))
+       (when ,object (sb-mop:set-funcallable-instance-function
+                       (symbol-value ',name) ,ctrie-lambda))
+       (setf (fdefinition  ',name) ,ctrie-lambda)
+       (setf (fdefinition  '(setf ,name))
+         #'(lambda (value key)
+             (funcall ,ctrie-lambda key value)))        
+       ',name)))
 
 
 
-(defmethod find-ctrie-root ((ctrie ctrie-lambda))
-  (ctrie-root (funcall ctrie #'identity)))
+;;(ppmx (define-ctrie c (make-ctrie)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; CTRIE-LAMBDA Initialization
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+#+()
 (define-pandoric-function ctrie-lambda-dispatch-table (dispatch-table)
   dispatch-table)
 
+#+()
 (defun (setf ctrie-lambda-dispatch-table) (dispatch ctrie-lambda)
   (with-pandoric-slots (dispatch-table) ctrie-lambda
     (setf dispatch-table dispatch)))
 
+#+()
 (define-pandoric-function ctrie-lambda-reset (at top up path)
   (prog1 self
     (setf at (root-node-access top))
     (setf up top)
     (setf path nil)))
 
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; CTRIE-CURSOR
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-(defun ctrie-cursor-reset (self)
-  (ctrie-lambda-reset self))
+;; (defun ctrie-cursor-reset (self)
+;;   (ctrie-lambda-reset self))
 
-(define-pandoric-function ctrie-cursor-timestamp (meta)
-  (getf meta :timestamp))
+;; (define-pandoric-function ctrie-cursor-timestamp (meta)
+;;   (getf meta :timestamp))
 
-(define-pandoric-function ctrie-cursor-ctrie (top)
-  top)
+;; (define-pandoric-function ctrie-cursor-ctrie (top)
+;;   top)
 
-(define-pandoric-function ctrie-cursor-looking-at (at)
-  (type-of at))
+;; (define-pandoric-function ctrie-cursor-looking-at (at)
+;;   (type-of at))
 
-(define-pandoric-function ctrie-cursor-at-top-p (up top)
-  (eq up top))
+;; (define-pandoric-function ctrie-cursor-at-top-p (up top)
+;;   (eq up top))
 
-(define-pandoric-function ctrie-cursor-up (at up path)
-  nil)
+;; (define-pandoric-function ctrie-cursor-up (at up path)
+;;   nil)
 
-(define-pandoric-function ctrie-cursor-down (at up path)
-  (when (inode-p at)
-    (push (cons at up) path)
-    (setf up at)
-    (setf at (inode-read at))))
+;; (define-pandoric-function ctrie-cursor-down (at up path)
+;;   (when (inode-p at)
+;;     (push (cons at up) path)
+;;     (setf up at)
+;;     (setf at (inode-read at))))
 
-(define-pandoric-function ctrie-cursor-next (at up path)
-  nil)
+;; (define-pandoric-function ctrie-cursor-next (at up path)
+;;   nil)
 
-(define-pandoric-function ctrie-cursor-has-next-p (at up path)
-  nil)
+;; (define-pandoric-function ctrie-cursor-has-next-p (at up path)
+;;   nil)
 
-(define-pandoric-function ctrie-cursor-prev (at up path)
-  nil)
+;; (define-pandoric-function ctrie-cursor-prev (at up path)
+;;   nil)
 
-(define-pandoric-function ctrie-cursor-has-prev-p (at up path)
-  nil)
+;; (define-pandoric-function ctrie-cursor-has-prev-p (at up path)
+;;   nil)
 
 
 
