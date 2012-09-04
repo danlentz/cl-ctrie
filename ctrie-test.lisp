@@ -547,8 +547,57 @@
     (assert-true (ctrie-empty-p c))
     c))
 
+(defglobal *test-ctrie* (make-ctrie))
+(defglobal *input* (coerce (iota (expt 2 18)) 'vector))
+(defglobal *kernels* (loop for i from 0 to 3 collect (lparallel:make-kernel (expt 2 i))))
+
+(define-test check-parallel-put-parallel-get ()
+  (loop for kernel in *kernels* do
+    (let1 lparallel:*kernel* kernel
+      (ctrie-clear *test-ctrie*)
+      (assert-true (ctrie-empty-p *test-ctrie*))
+      (lparallel:pmap nil #'(lambda (i) (ctrie-put *test-ctrie* i i)) *input*)
+      (assert-eql (length *input*) (ctrie-size *test-ctrie*))
+      (lparallel:pmap nil #'(lambda (i) (assert-eql i (ctrie-get *test-ctrie* i))) *input*))))
 
 
+
+;; (setf lparallel:*kernel* (cadr *kernels*))  
+;; (progn
+;;   (ctrie-clear *test-ctrie*)
+;;   (loop for kernel in *kernels* collect
+;;     (let* ((lparallel:*kernel* kernel)
+;;             (channel (lparallel:make-channel 1024)))
+;;       (loop for i from 0 to 1023 collect
+;;         (lparallel:submit-task channel (lambda () (ctrie-put *test-ctrie* i i))))
+;;       (loop for i from 0 to 1023 collect
+;;         (lparallel:receive-result channel))      
+;;       ;; (assert (notany #'null (print (loop for i from 0 to 1023 collect (ctrie-get ctrie i)))))
+;;       ;; (format t "~&~a~%" kernel)
+;;       (ctrie-to-alist *test-ctrie*))))
+
+;; (defun put-parallel (&optional (round 2) (total (expt 2 10)))
+;;   (assert (= 0 (mod total (expt 2 round))))
+;;   (ctrie-clear *test-ctrie*)
+;;   (sb-thread:barrier (:memory)
+;;     (let* ((num-threads (expt 2 round))
+;;             (per-thread (/ total num-threads)))
+;;       (mapc #'sb-thread:join-thread
+;;         (loop repeat num-threads
+;;           for start from 0 by per-thread
+;;           collect (sb-thread:make-thread
+;;                     (lambda ()
+;;                       (loop for i from start
+;;                         repeat per-thread
+;;                         do (ctrie-put *test-ctrie* i i))))))
+;;       (assert-eql total (ctrie-size *test-ctrie*))
+;;       (loop for j from 0 to (1- total)
+;;         do (assert-eql (values j t) (ctrie-get *test-ctrie* j)))
+;;       (print (ctrie-size *test-ctrie*))
+;;       #+() (ctrie-pprint *test-ctrie*))))
+  
+;; (put-parallel )
+ 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Snapshot Related Features
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

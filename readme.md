@@ -63,7 +63,37 @@ initial development cycle.
 
 ### Status
 
-TODO
+All unit tests should succeed, with parallelism tested for 1, 2, 4, and
+8 threads on an 8-core Intel(R) Xeon(R) CPU E5462  @ 2.80GHz,
+SBCL 1.0.57.56-2273f3a, Mac OS X Server version 10.6.8.
+
+```
+Starting test run on Tuesday, September 4, 2012 07:18:47 PM EDT
+---------------------------------------------------------------
+
+CHECK-ALET-FSM: 7 assertions passed, 0 failed.
+CHECK-ATOMIC-CLEAR: 6 assertions passed, 0 failed.
+CHECK-ATOMIC-UPDATE: 1 assertions passed, 0 failed.
+CHECK-BULK-INSERT/DROP: 1048579 assertions passed, 0 failed.
+CHECK-BULK-INSERT/LOOKUP: 1048578 assertions passed, 0 failed.
+CHECK-BYTE-VECTOR-HEX-STRING-ROUNDRIP: 10 assertions passed, 0 failed.
+CHECK-CATCH-CASE: 128 assertions passed, 0 failed.
+CHECK-CTRIE-SMOKE-TEST: 31 assertions passed, 0 failed.
+CHECK-DEPTH-AND-SIMPLE-EXTENSION: 8 assertions passed, 0 failed.
+CHECK-EXTENSION/RETRACTION/LNODE-CHAINING: 14 assertions passed, 0 failed.
+CHECK-FBIND: 3 assertions passed, 0 failed.
+CHECK-FLAG-ARC-POSITION: 165 assertions passed, 0 failed.
+CHECK-FLAG-COMPUTATION: 12 assertions passed, 0 failed.
+CHECK-LNODE-INSERTED/REMOVED: 270 assertions passed, 0 failed.
+CHECK-LNODE-LENGTH/ENLIST: 8 assertions passed, 0 failed.
+CHECK-LNODE-SEARCH: 4 assertions passed, 0 failed.
+CHECK-PARALLEL-PUT-PARALLEL-GET: 8 assertions passed, 0 failed.
+CHECK-SIMPLE-INSERT/LOOKUP: 170 assertions passed, 0 failed.
+CHECK-SIMPLE-INSERT/LOOKUP/DROP: 255 assertions passed, 0 failed.
+CHECK-TABLE-ABSTRACTION-FIXTURES: 3 assertions passed, 0 failed.
+CHECK-TIMING-COLLECTION-FIXTURES: 18 assertions passed, 0 failed.
+TOTAL: 2098278 assertions passed, 0 failed, 0 execution errors.
+```
 
 ### Ideosyncrasies
 
@@ -119,7 +149,6 @@ for correct ctrie operation.
 
 - __`ctrie-package.lisp:`__  Package Definition
 - __`ctrie.lisp:`__          Structural Implementation
-- __`ctrie-lambda.lisp:`__   Stateful Protocols
 - __`ctrie-util.lisp:`__     Supporting Utilities
 
 #### Supplemental
@@ -128,6 +157,7 @@ The following files define extended functionality, management,
 and analysis facilities supporting the development of CL-CTRIE.
 
 - `ctrie-cas.lisp:`   SBCL CAS extensions
+- `ctrie-lambda.lisp:` Experiments with Stateful Protocols
 - `ctrie-doc.lisp:`   Automated Documentation Support
 - `ctrie-test.lisp:`  Test and Performance Measurement
 
@@ -1757,106 +1787,3 @@ _[macro]_            `DEFINE-DIAGRAM  (TYPE (&OPTIONAL CONTEXT) &BODY BODY)`
 
 
 * * * * * * *
-
-
-  `CTRIE-MODIFICATION-FAILED (CTRIE-OPERATIONAL-ERROR)`
-
-> This condition indicates an unhandled failure of an attempt to
-         perform stateful modification to CTRIE.  The most common case in
-         which this might occur is when such an attempt is mode on a CTRIE
-         designated as READONLY-P.  In any case, this condition represents an
-         exception from which processing cannot continue and requires
-         interactive user intervention in order to recover.
-
-
-_[condition]_        `CTRIE-OPERATION-RETRIES-EXCEEDED (CTRIE-OPERATIONAL-ERROR)`
-
-> Condition indicating an operation has failed the
-   maximum number of times specified by the special-variable
-   *retries*
-
-
-_[condition]_        `CTRIE-NOT-IMPLEMENTED (CTRIE-ERROR)`
-
-> Condition designating functionality for which the
-   implementation has not been written, but has not been deliberately
-   excluded.
-
-
-_[condition]_        `CTRIE-NOT-SUPPORTED (CTRIE-ERROR)`
-
-> Condition designating functionality that is
-  deliberately not supported.
-
-
-_[condition]_        `CTRIE-INVALID-DYNAMIC-CONTEXT (CTRIE-OPERATIONAL-ERROR)`
-
-> Condition indicating an operation was attempted
-   outside the dynamic extent of a valid enclosing WITH-CTRIE form
-
-
-_[condition]_        `CTRIE-GENERATIONAL-MISMATCH (CTRIE-STRUCTURAL-ERROR)`
-
-> Condition indicating an operation encountered an
-   outdated or inconsistent node during its attempted traversal
-
-
-_[function]_         `README  (&OPTIONAL (STREAM *STANDARD-OUTPUT*))`
-
-> Update documentation sections of the README file. When an output stream
-  is specified, the results are also echoed to that stream. To inhibit
-  output, invoke as `(readme (make-broadcast-stream))` or use `README-QUIETLY`
-
-
-_[function]_         `README-QUIETLY  ()`
-
-> Update documentation sections of the README file, inhibiting any other
-  printed output.
-
-
-_[function]_         `APIDOC  (&OPTIONAL (SCOPE :EXTERNAL))`
-
-> Collect a list of strings representing the documentation for
-  CL-CTRIE rendered in a compact format suitable for inclusion in a
-  lightweight text-markup format document.  If SCOPE is specified it
-  must be either :EXTERNAL. corresponding to those symbols exported as
-  the public API, or :HOME, which designates all symbols defined
-  locally in package.
-
-
-_[function]_         `PRINC-APIDOC  (&OPTIONAL (SCOPE :EXTERNAL))`
-
-> Print to `*STANDARD-OUTPUT*` the documentation for CL-CTRIE rendered
-  in a compact format.  This is intended primarily as a convenience to
-  the interactive user seeking quick reference at the REPL.  If SCOPE
-  is specified it must be either :EXTERNAL. corresponding to those
-  symbols exported as the public API, or :HOME, which designates all
-  symbols defined locally in package.
-
-
-_[function]_         `COLLECT-DOCS  (&OPTIONAL (SCOPE :EXTERNAL)
-                                     (SORT #'STRING<))`
-
-> Regenerate on-disk html documentation and collect the cached
-  in-memory descriptors for further processing. If SCOPE is specified
-  it must be either :EXTERNAL. corresponding to those symbols exported
-  as the public API, or :HOME, which designates all symbols defined
-  locally in package.  Output order may be customized by an optionally
-  specified SORT function.
-
-
-_[macro]_            `DEFINE-DIAGRAM  (TYPE (&OPTIONAL CONTEXT) &BODY BODY)`
-
-> Define a diagrammatic representation of TYPE, optionally specialized
-  for a specific CONTEXT. See {defgeneric cl-ctrie::make-diagram}.
-
-
-* * * * * * *
-* * * * * * *
-* * * * * * *
-* * * * * * *
-
-
-* * *
-
-
