@@ -68,7 +68,7 @@ All unit tests should succeed, with parallelism tested for 1, 2, 4, and
 SBCL 1.0.57.56-2273f3a, Mac OS X Server version 10.6.8.
 
 ```
-Starting test run on Tuesday, September 4, 2012 07:18:47 PM EDT
+Starting test run on Tuesday, September 4, 2012 07:53:53 PM EDT
 ---------------------------------------------------------------
 
 CHECK-ALET-FSM: 7 assertions passed, 0 failed.
@@ -84,15 +84,15 @@ CHECK-EXTENSION/RETRACTION/LNODE-CHAINING: 14 assertions passed, 0 failed.
 CHECK-FBIND: 3 assertions passed, 0 failed.
 CHECK-FLAG-ARC-POSITION: 165 assertions passed, 0 failed.
 CHECK-FLAG-COMPUTATION: 12 assertions passed, 0 failed.
-CHECK-LNODE-INSERTED/REMOVED: 270 assertions passed, 0 failed.
+CHECK-LNODE-INSERTED/REMOVED: 218 assertions passed, 0 failed.
 CHECK-LNODE-LENGTH/ENLIST: 8 assertions passed, 0 failed.
 CHECK-LNODE-SEARCH: 4 assertions passed, 0 failed.
-CHECK-PARALLEL-PUT-PARALLEL-GET: 8 assertions passed, 0 failed.
+CHECK-PARALLEL-PUT-PARALLEL-GET: 1048584 assertions passed, 0 failed.
 CHECK-SIMPLE-INSERT/LOOKUP: 170 assertions passed, 0 failed.
 CHECK-SIMPLE-INSERT/LOOKUP/DROP: 255 assertions passed, 0 failed.
 CHECK-TABLE-ABSTRACTION-FIXTURES: 3 assertions passed, 0 failed.
 CHECK-TIMING-COLLECTION-FIXTURES: 18 assertions passed, 0 failed.
-TOTAL: 2098278 assertions passed, 0 failed, 0 execution errors.
+TOTAL: 3146802 assertions passed, 0 failed, 0 execution errors.
 ```
 
 ### Ideosyncrasies

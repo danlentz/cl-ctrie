@@ -558,7 +558,11 @@
       (assert-true (ctrie-empty-p *test-ctrie*))
       (lparallel:pmap nil #'(lambda (i) (ctrie-put *test-ctrie* i i)) *input*)
       (assert-eql (length *input*) (ctrie-size *test-ctrie*))
-      (lparallel:pmap nil #'(lambda (i) (assert-eql i (ctrie-get *test-ctrie* i))) *input*))))
+      (lparallel:pmap nil #'(lambda (i) (assert-eql i (ctrie-get *test-ctrie* i))) *input*)
+      (loop
+        for i across *input*
+        do (assert-eql i (ctrie-get *test-ctrie* i)))
+      )))
 
 
 
