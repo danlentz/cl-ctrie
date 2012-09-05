@@ -109,6 +109,8 @@
 
 
 (defmethod asdf:perform ((o asdf:test-op) (c (eql (asdf:find-system :cl-ctrie))))
+  (when (find-package :cl-ctrie-test)
+    (delete-package :cl-ctrie-test))
   (asdf:load-system :cl-ctrie-test)
   (with-open-file (log-stream (asdf:system-relative-pathname c "ctrie-test" :type "log")
                     :direction :output :if-does-not-exist :create :if-exists :supersede)
