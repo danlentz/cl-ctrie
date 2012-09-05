@@ -585,6 +585,10 @@
 (defvar *kernels*    (loop for i from 0 to 3
                           collect (lparallel:make-kernel (expt 2 i))))
 
+(defun end-kernels ()
+  (loop for kernel in *kernels*
+    do (let1 lparallel:*kernel* kernel
+         (lparallel:end-kernel :wait t))))
 
 (define-test check-parallel-insert-parallel-lookup ()
   (loop for kernel in *kernels* do

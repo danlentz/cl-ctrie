@@ -1,6 +1,6 @@
 
 
-Starting test run on Wednesday, September 5, 2012 09:07:32 AM EDT
+Starting test run on Wednesday, September 5, 2012 09:35:08 AM EDT
 -----------------------------------------------------------------
 
 CHECK-ALET-FSM: 7 assertions passed, 0 failed.
@@ -16,7 +16,7 @@ CHECK-EXTENSION/RETRACTION/LNODE-CHAINING: 14 assertions passed, 0 failed.
 CHECK-FBIND: 3 assertions passed, 0 failed.
 CHECK-FLAG-ARC-POSITION: 165 assertions passed, 0 failed.
 CHECK-FLAG-COMPUTATION: 12 assertions passed, 0 failed.
-CHECK-LNODE-INSERTED/REMOVED: 174 assertions passed, 0 failed.
+CHECK-LNODE-INSERTED/REMOVED: 274 assertions passed, 0 failed.
 CHECK-LNODE-LENGTH/ENLIST: 8 assertions passed, 0 failed.
 CHECK-LNODE-SEARCH: 4 assertions passed, 0 failed.
 CHECK-PARALLEL-INSERT-PARALLEL-DROP: 4194316 assertions passed, 0 failed.
@@ -25,5 +25,5 @@ CHECK-SIMPLE-INSERT/LOOKUP: 170 assertions passed, 0 failed.
 CHECK-SIMPLE-INSERT/LOOKUP/DROP: 255 assertions passed, 0 failed.
 CHECK-TABLE-ABSTRACTION-FIXTURES: 18 assertions passed, 0 failed.
 CHECK-TIMING-COLLECTION-FIXTURES: 18 assertions passed, 0 failed.
-TOTAL: 10486817 assertions passed, 0 failed, 0 execution errors.
+TOTAL: 10486917 assertions passed, 0 failed, 0 execution errors.
 
