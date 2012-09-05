@@ -90,22 +90,11 @@
   ())
 
 (defmethod perform ((op asdf:load-op) (c test-file))
-  t)
+  (call-next-method))
 
 (defmethod perform ((op asdf:compile-op) (c test-file))
-  t)
+  (call-next-method))
 
-
-(defmethod perform ((op asdf:test-op) (c test-file))
-  (with-open-file (log-stream (merge-pathnames ".log"
-                                (slot-value c 'asdf::absolute-pathname))
-                   :direction :output :if-does-not-exist :create
-                   :if-exists :supersede)
-    (let ((*standard-output* (make-broadcast-stream *standard-output* log-stream))
-           (*error-output*    (make-broadcast-stream *error-output* log-stream)))
-      
-      (perform (make-instance 'compile-op) (change-class c 'cl-source-file))
-      (perform (make-instance 'load-op)    (change-class c 'cl-source-file)))))
 
 
 (asdf:defsystem :cl-ctrie-test
@@ -116,11 +105,16 @@
 
 (defmethod asdf:perform ((o asdf:test-op) (c (eql (asdf:find-system :cl-ctrie))))
   (asdf:load-system :cl-ctrie-test)
-  (funcall (intern (symbol-name :run-ctrie-tests) (find-package :cl-ctrie-test))))
+  (with-open-file (log-stream (asdf:system-relative-pathname c "ctrie-test" :type "log")
+                    :direction :output :if-does-not-exist :create :if-exists :supersede)
+    (let ((*standard-output*  (make-broadcast-stream *standard-output* log-stream))
+           (*trace-output*    (make-broadcast-stream *trace-output* log-stream))
+           (*error-output*    (make-broadcast-stream *error-output* log-stream)))      
+      (funcall (intern (symbol-name :run-ctrie-tests) (find-package :cl-ctrie-test))))))
 
 (defmethod asdf:perform ((o asdf:test-op) (c (eql (asdf:find-system :cl-ctrie-test))))
-  (asdf:load-system :cl-ctrie-test)
-  (funcall (intern (symbol-name :run-ctrie-tests) (find-package :cl-ctrie-test))))
+  (asdf:test-system :cl-ctrie))
+
 
 (defmethod asdf:operation-done-p ((o asdf:test-op) (c (eql (asdf:find-system :cl-ctrie))))
   nil)

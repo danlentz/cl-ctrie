@@ -526,6 +526,11 @@
     c))
 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Bulk Operation Tests
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
 (define-test check-bulk-insert/lookup ()
   (let ((c (make-ctrie))
          (num (* 1024 1024)))
@@ -547,11 +552,19 @@
     (assert-true (ctrie-empty-p c))
     c))
 
-(defglobal *test-ctrie* (make-ctrie))
-(defglobal *input* (coerce (iota (expt 2 18)) 'vector))
-(defglobal *kernels* (loop for i from 0 to 3 collect (lparallel:make-kernel (expt 2 i))))
 
-(define-test check-parallel-put-parallel-get ()
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Parallel Operation Tests
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defvar *test-ctrie* (make-ctrie))
+(defvar *input*      (coerce (iota (expt 2 18)) 'vector))
+(defvar *kernels*    (loop for i from 0 to 3
+                          collect (lparallel:make-kernel (expt 2 i))))
+
+
+(define-test check-parallel-insert-parallel-lookup ()
   (loop for kernel in *kernels* do
     (let1 lparallel:*kernel* kernel
       (ctrie-clear *test-ctrie*)
@@ -559,26 +572,26 @@
       (lparallel:pmap nil #'(lambda (i) (ctrie-put *test-ctrie* i i)) *input*)
       (assert-eql (length *input*) (ctrie-size *test-ctrie*))
       (lparallel:pmap nil #'(lambda (i) (assert-eql i (ctrie-get *test-ctrie* i))) *input*)
-      (loop
-        for i across *input*
-        do (assert-eql i (ctrie-get *test-ctrie* i)))
+      (loop for i across *input*
+        do (assert-eql (values i t) (ctrie-get *test-ctrie* i)))
+      )))
+
+
+(define-test check-parallel-insert-parallel-drop ()
+  (loop for kernel in *kernels* do
+    (let1 lparallel:*kernel* kernel
+      (ctrie-clear *test-ctrie*)
+      (assert-true (ctrie-empty-p *test-ctrie*))
+      (lparallel:pmap nil #'(lambda (i) (ctrie-put *test-ctrie* i i)) *input*)
+      (assert-eql (length *input*) (ctrie-size *test-ctrie*))
+      (loop for i across *input*
+        do (assert-eql (values i t) (ctrie-get *test-ctrie* i)))
+      (lparallel:pmap nil #'(lambda (i) (ctrie-drop *test-ctrie* i)) *input*)
+      (assert-true (ctrie-empty-p *test-ctrie*))
       )))
 
 
 
-;; (setf lparallel:*kernel* (cadr *kernels*))  
-;; (progn
-;;   (ctrie-clear *test-ctrie*)
-;;   (loop for kernel in *kernels* collect
-;;     (let* ((lparallel:*kernel* kernel)
-;;             (channel (lparallel:make-channel 1024)))
-;;       (loop for i from 0 to 1023 collect
-;;         (lparallel:submit-task channel (lambda () (ctrie-put *test-ctrie* i i))))
-;;       (loop for i from 0 to 1023 collect
-;;         (lparallel:receive-result channel))      
-;;       ;; (assert (notany #'null (print (loop for i from 0 to 1023 collect (ctrie-get ctrie i)))))
-;;       ;; (format t "~&~a~%" kernel)
-;;       (ctrie-to-alist *test-ctrie*))))
 
 ;; (defun put-parallel (&optional (round 2) (total (expt 2 10)))
 ;;   (assert (= 0 (mod total (expt 2 round))))
@@ -600,7 +613,7 @@
 ;;       (print (ctrie-size *test-ctrie*))
 ;;       #+() (ctrie-pprint *test-ctrie*))))
   
-;; (put-parallel )
+
  
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Snapshot Related Features

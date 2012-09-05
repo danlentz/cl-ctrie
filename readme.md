@@ -63,12 +63,13 @@ initial development cycle.
 
 ### Status
 
-All unit tests should succeed, with parallelism tested for 1, 2, 4, and
-8 threads on an 8-core Intel(R) Xeon(R) CPU E5462  @ 2.80GHz,
-SBCL 1.0.57.56-2273f3a, Mac OS X Server version 10.6.8.
+All unit tests should succeed, and parallelism has been tested for 1,
+2, 4, and 8 threads on an 8-core system (Dual Intel(R) Xeon(R) CPU
+E5462 @ 2.80GHz), SBCL version 1.0.57.56-2273f3a, and Mac OS X Server
+version 10.6.8.
 
 ```
-Starting test run on Tuesday, September 4, 2012 07:53:53 PM EDT
+Starting test run on Tuesday, September 4, 2012 09:02:59 PM EDT
 ---------------------------------------------------------------
 
 CHECK-ALET-FSM: 7 assertions passed, 0 failed.
@@ -87,12 +88,14 @@ CHECK-FLAG-COMPUTATION: 12 assertions passed, 0 failed.
 CHECK-LNODE-INSERTED/REMOVED: 218 assertions passed, 0 failed.
 CHECK-LNODE-LENGTH/ENLIST: 8 assertions passed, 0 failed.
 CHECK-LNODE-SEARCH: 4 assertions passed, 0 failed.
-CHECK-PARALLEL-PUT-PARALLEL-GET: 1048584 assertions passed, 0 failed.
+CHECK-PARALLEL-INSERT-PARALLEL-DROP: 1048588 assertions passed, 0 failed.
+CHECK-PARALLEL-INSERT-PARALLEL-LOOKUP: 1048584 assertions passed, 0 failed.
 CHECK-SIMPLE-INSERT/LOOKUP: 170 assertions passed, 0 failed.
 CHECK-SIMPLE-INSERT/LOOKUP/DROP: 255 assertions passed, 0 failed.
 CHECK-TABLE-ABSTRACTION-FIXTURES: 3 assertions passed, 0 failed.
 CHECK-TIMING-COLLECTION-FIXTURES: 18 assertions passed, 0 failed.
-TOTAL: 3146802 assertions passed, 0 failed, 0 execution errors.
+
+TOTAL: 4195390 assertions passed, 0 failed, 0 execution errors.
 ```
 
 ### Ideosyncrasies
