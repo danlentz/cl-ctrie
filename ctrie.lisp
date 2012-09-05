@@ -14,6 +14,14 @@
   binding, which is properly established by wrapping the operation in
   an appropriate WITH-CTRIE form.")
 
+(defvar       *hash-code*     nil
+  "Special variable used to store the hash-code that corresponds to the
+  current operation.  Used as a means of improving efficiency by eliminating
+  needless recomputation of the hash function, which is the most expensive
+  part of most user-level ctrie operations.  If this value is not set, then
+  the hash will simply be computed on demand and processing will continue
+  unaffected.  Use of this variable is simply an optional performace
+  optimization techniqie.")
 
 (defparameter *retries*        16
   "Establishes the number of restarts permitted to a CTRIE operation
@@ -156,15 +164,15 @@
        -  TAG is NIl if evaluation of the FORMS completed normally
           or the tag thrown and cought.
     * EXAMPLE:
-    ```
-    ;;; (multiple-value-bind (result tag)
-    ;;;            (multi-catch (:a :b)
-    ;;;                 ...FORMS...)
-    ;;;              (case tag 
-    ;;;                 (:a ...)
-    ;;;                 (:b ...)
-    ;;;                 (t ...)))
-    ```"
+        ```
+        ;;; (multiple-value-bind (result tag)
+        ;;;            (multi-catch (:a :b)
+        ;;;                 ...FORMS...)
+        ;;;              (case tag 
+        ;;;                 (:a ...)
+        ;;;                 (:b ...)
+        ;;;                 (t ...)))
+        ```"
     (let ((block-name (gensym)))
       `(block ,block-name
          ,(multi-catch-1 block-name tag-list forms))))
@@ -220,14 +228,15 @@
       (local-time:now))))
 
 
-(defun flag (key level)
+(defun flag (key level &optional use-cached-p)
   "For a given depth, LEVEL, within a CTRIE, extract the correspondant
   sequence of bits from the computed hash of KEY that indicate the
   logical index of the arc on the path to which that key may be found.
   Note that the logical index of the arc is most likely not the same
   as the physical index where it is actually located -- for that see
   `FLAG-ARC-POSITION`"
-  (ash 1 (logand (ash (cthash key) (- level)) #x1f)))
+  (ash 1 (logand (ash (or (when use-cached-p *hash-code*) (cthash key))
+                   (- level)) #x1f)))
 
 
 (defun flag-present-p (flag bitmap)
@@ -840,7 +849,7 @@
                (target-ref (inode-read target-inode)))
           (when (cnode-p parent-ref)
             (let* ((bmp   (cnode-bitmap parent-ref))
-                    (flag (flag key level))
+                    (flag (flag key level t))
                     (pos  (flag-arc-position flag bmp)))
               (when (and (flag-present-p flag bmp)
                       (tnode-p target-ref)
@@ -1391,7 +1400,7 @@
     
     (CNODE (let* ((cnode it)
                    (bmp  (cnode-bitmap cnode))
-                   (flag (flag key level))
+                   (flag (flag key level t))
                    (pos  (flag-arc-position flag bmp)))
              
              ;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1474,18 +1483,19 @@
   equality predicate defined by `CTRIE-TEST` then the priorbmapping
   will be replaced by VALUE. Returns `VALUE` representing the
   mapping in the resulting CTRIE"
-  (with-ctrie ctrie 
-    (loop  with d = 0 and p = nil and result
-      for  root =  (root-node-access *ctrie*)
-      when (catch-case (%insert root key value d p (inode-gen root))
-             (:restart (prog1 nil
-                         (when *debug*
-                           (format *TRACE-OUTPUT* "~8A  timeout insert (~A . ~A)~%"
-                             it key value))))
-             (t        (prog1 (setf result it)
-                         (when *debug*
-                           (format *TRACE-OUTPUT* "~8S  done .~%~S~%" it *ctrie*)))))
-      return result)))
+  (with-ctrie ctrie
+    (let1 *hash-code* (cthash key)
+      (loop  with d = 0 and p = nil and result
+        for  root =  (root-node-access *ctrie*)
+        when (catch-case (%insert root key value d p (inode-gen root))
+               (:restart (prog1 nil
+                           (when *debug*
+                             (format *TRACE-OUTPUT* "~8A  timeout insert (~A . ~A)~%"
+                               it key value))))
+               (t        (prog1 (setf result it)
+                           (when *debug*
+                             (format *TRACE-OUTPUT* "~8S  done .~%~S~%" it *ctrie*)))))
+        return result))))
 
 
 
@@ -1519,7 +1529,7 @@
                (throw :notfound node)))
       (cnode (let* ((cnode node)
                      (bmp  (cnode-bitmap cnode))
-                     (flag (flag key level))
+                     (flag (flag key level t))
                      (pos  (flag-arc-position flag bmp)))
                (if (not (flag-present-p flag bmp))
                  (throw :notfound cnode)
@@ -1541,21 +1551,22 @@
   associated value and T as multiple values, or returns NIL and NIL
   if there is no such entry. Entries can be added using SETF."
   (with-ctrie ctrie
-    (flet ((attempt-get (root key level parent gen try)
-             (declare (ignorable try))
-             (catch-case (%lookup root key level parent gen)
-               (:notfound  (return-from ctrie-get (values nil nil)))
-               (:restart   (multiple-value-prog1 (values it nil)
-                             #+()(when *debug* (format t  "~8s  restarting after try ~d.~%"
-                                                 it try))))
-               (t          (multiple-value-prog1 (values it t)
-                             #+()(when *debug* (format t  "~8s  done on try ~d.~%"
-                                                 it try)))))))
-      (loop with vals with d = 0 and p = nil
-        for  r = (root-node-access *ctrie*) for try from 1
-        do   (setf vals (multiple-value-list (attempt-get r key d p (inode-gen r) try)))
-        when (> try 1000)  do (error "try ~d" try)
-        when (second vals) do (return-from ctrie-get (values (first vals) t))))))
+    (let1 *hash-code* (cthash key)
+      (flet ((attempt-get (root key level parent gen try)
+               (declare (ignorable try))
+               (catch-case (%lookup root key level parent gen)
+                 (:notfound  (return-from ctrie-get (values nil nil)))
+                 (:restart   (multiple-value-prog1 (values it nil)
+                               #+()(when *debug* (format t  "~8s  restarting after try ~d.~%"
+                                                   it try))))
+                 (t          (multiple-value-prog1 (values it t)
+                               #+()(when *debug* (format t  "~8s  done on try ~d.~%"
+                                                   it try)))))))
+        (loop with vals with d = 0 and p = nil
+          for  r = (root-node-access *ctrie*) for try from 1
+          do   (setf vals (multiple-value-list (attempt-get r key d p (inode-gen r) try)))
+          when (> try 1000)  do (error "try ~d" try)
+          when (second vals) do (return-from ctrie-get (values (first vals) t)))))))
 
 
 (defun (setf ctrie-get) (value ctrie key)
@@ -1580,7 +1591,7 @@
                (values leaf-value t)
                (values it :restart))))
     (cnode (let* ((bmp  (cnode-bitmap it))
-                   (flag (flag key level))
+                   (flag (flag key level t))
                    (pos  (flag-arc-position flag bmp)))
              (if (not (flag-present-p flag bmp))
                (values key :notfound)
@@ -1612,13 +1623,14 @@
   "Remove KEY and it's associated value from CTRIE. Returns as multiple
   values the value associated with KEY and T if there was such an entry,
   otherewise NIL and NIL"
-    (with-ctrie ctrie
-      (let1 r (root-node-access *ctrie*)
-        (multiple-value-bind (val kind) (%remove r key 0 nil (inode-gen r))
-          (case kind
-            (:restart  (return-from ctrie-drop (ctrie-drop *ctrie* key)))
-            (:notfound (values val nil))
-            (t         (values val t)))))))
+  (with-ctrie ctrie
+    (let ((r (root-node-access *ctrie*))
+           (*hash-code* (cthash key)))
+      (multiple-value-bind (val kind) (%remove r key 0 nil (inode-gen r))
+        (case kind
+          (:restart  (return-from ctrie-drop (ctrie-drop *ctrie* key)))
+          (:notfound (values val nil))
+          (t         (values val t)))))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

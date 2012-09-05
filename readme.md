@@ -182,47 +182,47 @@ reported below.
 
     
 ```
-  seconds  |     gc     |     consed    |    calls   |  sec/call  |  name  
-----------------------------------------------------------------
-     3.810 |      0.000 |           384 | 12,000,000 |   0.000000 | CTHASH
-     1.770 |      0.000 |         1,040 | 12,000,000 |   0.000000 | FLAG
-     1.332 |      0.925 |   261,160,000 |  1,000,000 |   0.000001 | CTRIE-PUT
-     0.955 |      0.000 |             0 |  5,101,473 |   0.000000 | FIND-CTRIE-ROOT
-     0.654 |      0.071 |   357,490,000 |  2,101,473 |   0.000000 | MAKE-CNODE
-     0.600 |      0.000 |            48 |  2,067,648 |   0.000000 | INODE-COMMIT
-     0.543 |      0.040 |    85,981,184 |  2,101,473 |   0.000000 | %MAKE-CNODE
-     0.521 |      0.000 |           176 |  2,033,824 |   0.000000 | CTEQUAL
-     0.494 |      0.000 |             0 | 12,000,000 |   0.000000 | FLAG-ARC-POSITION
-     0.400 |      0.237 |    20,388,048 |  1,000,000 |   0.000000 | MAKE-SNODE
-     0.369 |      0.054 |   143,871,728 |  2,101,473 |   0.000000 | MAKE-REF
-     0.350 |      0.000 |             0 | 11,966,176 |   0.000000 | FLAG-PRESENT-P
-     0.319 |      0.000 |            48 |  2,000,000 |   0.000000 | LEAF-NODE-KEY
-     0.197 |      0.000 |           112 |  1,000,000 |   0.000000 | SNODE
-     0.172 |      0.000 |             0 |  2,000,000 |   0.000000 | LEAF-NODE-VALUE
-     0.147 |      0.000 |            32 |  2,101,473 |   0.000000 | CTSTAMP
-     0.066 |      0.000 |             0 |  2,101,473 |   0.000000 | FLAG-VECTOR
-     0.032 |      0.000 |           112 |     33,825 |   0.000001 | MAKE-INODE
-     0.015 |      0.000 |           208 |     33,824 |   0.000000 | ENTOMB
-     0.008 |      0.000 |             0 |     33,824 |   0.000000 | RESURRECT
-     0.000 |      0.000 |        65,504 |     33,824 |   0.000000 | MAKE-TNODE
-     0.000 |      0.000 |             0 |          2 |   0.000000 | MAP-NODE
-     0.000 |      0.000 |    42,082,064 |  1,000,000 |   0.000000 | CNODE-EXTENDED
-     0.000 |      0.000 |            64 |     67,648 |   0.000000 | CNODE-UPDATED
-     0.000 |      0.000 |           256 |  1,000,000 |   0.000000 | CNODE-TRUNCATED
-     0.000 |      0.000 |             0 |     33,825 |   0.000000 | %MAKE-INODE
-     0.000 |      0.000 |             0 |          1 |   0.000000 | %MAKE-CTRIE
-     0.000 |      0.000 |             0 |     33,824 |   0.000000 | CLEAN-PARENT
-     0.000 |      0.000 |         1,536 |  4,000,000 |   0.000000 | %LOOKUP
-     0.000 |      0.000 |         1,376 |  3,966,176 |   0.000000 | %REMOVE
-     0.000 |      0.000 |             0 |          1 |   0.000000 | MAKE-CTRIE
-     0.000 |      0.000 |             0 |          1 |   0.000000 | CTRIE-MAP-KEYS
-     0.000 |      0.000 |             0 |          1 |   0.000000 | CTRIE-MAP
-     0.000 |      0.232 |   320,038,576 |  1,000,000 |   0.000000 | CTRIE-GET
-     0.000 |      0.000 |             0 |          1 |   0.000000 | CTRIE-SIZE
-     0.000 |      0.601 |   229,090,464 |  1,000,000 |   0.000000 | CTRIE-DROP
-----------------------------------------------------------------
-    12.750 |      2.160 | 1,460,172,960 | 86,913,263 |            | Total
-
+  seconds  |     gc     |    consed   |    calls   |  sec/call  |  name  
+--------------------------------------------------------------
+     1.331 |      1.001 | 332,691,664 |  2,198,622 |   0.000001 | MAKE-CNODE
+     1.123 |      0.000 |       1,904 |  3,179,578 |   0.000000 | CTHASH
+     0.871 |      0.000 |      44,608 |  5,344,350 |   0.000000 | ROOT-NODE-ACCESS
+     0.847 |      0.182 |  69,549,200 |  2,198,622 |   0.000000 | %MAKE-CNODE
+     0.820 |      0.000 |         576 | 12,582,934 |   0.000000 | FLAG
+     0.796 |      0.000 |         352 | 12,582,934 |   0.000000 | FLAG-ARC-POSITION
+     0.611 |      0.000 |         832 |  2,130,976 |   0.000000 | CTEQUAL
+     0.551 |      0.000 |      33,600 | 12,549,110 |   0.000000 | FLAG-PRESENT-P
+     0.529 |      0.000 |         720 |  5,344,350 |   0.000000 | FIND-CTRIE-ROOT
+     0.496 |      0.044 | 108,904,336 |  2,198,622 |   0.000000 | MAKE-REF
+     0.295 |      0.102 |  33,284,592 |  1,048,576 |   0.000000 | MAKE-SNODE
+     0.243 |      0.000 |         144 |  2,198,622 |   0.000000 | CTSTAMP
+     0.225 |      0.000 |         256 |  2,097,152 |   0.000000 | LEAF-NODE-KEY
+     0.216 |      0.118 |  32,803,552 |  1,048,576 |   0.000000 | CNODE-EXTENDED
+     0.189 |      0.000 |      32,848 |  2,097,152 |   0.000000 | LEAF-NODE-VALUE
+     0.146 |      0.000 |       1,872 |  1,048,576 |   0.000000 | SNODE
+     0.018 |      0.000 |           0 |     33,824 |   0.000001 | MAKE-INODE
+     0.016 |      0.000 |           0 |     34,257 |   0.000000 | RESURRECT
+     0.007 |      0.000 |   1,048,304 |     33,824 |   0.000000 | MAKE-TNODE
+     0.000 |      0.127 |  50,427,456 |  1,048,576 |   0.000000 | CTRIE-GET
+     0.000 |      0.000 |           0 |          1 |   0.000000 | CTRIE-SIZE
+     0.000 |      0.000 |       5,104 |  1,048,576 |   0.000000 | CTRIE-PUT
+     0.000 |      0.000 |           0 |          1 |   0.000000 | CTRIE-EMPTY-P
+     0.000 |      0.000 |           0 |          1 |   0.000000 | CTRIE-MAP
+     0.000 |      0.000 |      42,544 |  1,048,602 |   0.000000 | CTRIE-DROP
+     0.000 |      0.000 |           0 |          1 |   0.000000 | CTRIE-MAP-KEYS
+     0.000 |      0.000 |           0 |  1,116,226 |   0.000000 | MAP-NODE
+     0.000 |      0.000 |           0 |     33,824 |   0.000000 | ENTOMB
+     0.000 |      0.000 |           0 |     67,620 |   0.000000 | CNODE-UPDATED
+     0.000 |      0.000 |     268,496 |  4,160,480 |   0.000000 | %INSERT
+     0.000 |      0.000 |      39,024 |  2,164,798 |   0.000000 | INODE-COMMIT
+     0.000 |      0.000 |     342,688 |  4,160,556 |   0.000000 | %REMOVE
+     0.000 |      0.000 |         544 |     33,796 |   0.000000 | CLEAN-PARENT
+     0.000 |      0.000 |   1,375,952 |     33,824 |   0.000000 | %MAKE-INODE
+     0.000 |      0.000 |     262,352 |  4,194,304 |   0.000000 | %LOOKUP
+     0.000 |      0.000 |       3,504 |  1,048,576 |   0.000000 | CNODE-TRUNCATED
+     0.000 |      0.000 |           0 |         26 |   0.000000 | MAP-CNODE
+--------------------------------------------------------------
+     9.328 |      1.574 | 631,167,024 | 90,110,445 |            | Total
 ```
 
 ### Documentation
@@ -731,6 +731,17 @@ _[special-variable]_ `*TIMEOUT*  (2)`
   processing.
 
 
+_[special-variable]_ `*HASH-CODE*  (NIL)`
+
+> Special variable used to store the hash-code that corresponds to the
+  current operation.  Used as a means of improving efficiency by eliminating
+  needless recomputation of the hash function, which is the most expensive
+  part of most user-level ctrie operations.  If this value is not set, then
+  the hash will simply be computed on demand and processing will continue
+  unaffected.  Use of this variable is simply an optional performace
+  optimization techniqie.
+
+
 _[macro]_            `MULTI-CATCH  (TAG-LIST &BODY FORMS)`
 
 > Macro allowing catch of multiple tags at once and
@@ -741,15 +752,15 @@ _[macro]_            `MULTI-CATCH  (TAG-LIST &BODY FORMS)`
        -  TAG is NIl if evaluation of the FORMS completed normally
           or the tag thrown and cought.
     * EXAMPLE:
-    ```
-    ;;; (multiple-value-bind (result tag)
-    ;;;            (multi-catch (:a :b)
-    ;;;                 ...FORMS...)
-    ;;;              (case tag 
-    ;;;                 (:a ...)
-    ;;;                 (:b ...)
-    ;;;                 (t ...)))
-    ```
+        ```
+        ;;; (multiple-value-bind (result tag)
+        ;;;            (multi-catch (:a :b)
+        ;;;                 ...FORMS...)
+        ;;;              (case tag 
+        ;;;                 (:a ...)
+        ;;;                 (:b ...)
+        ;;;                 (t ...)))
+        ```
 
 
 _[macro]_            `CATCH-CASE  (FORM &REST CASES)`
@@ -839,7 +850,7 @@ _[macro]_            `WITH-CTRIE  (&ONCE CTRIE &BODY BODY)`
   `*CTRIE*`
 
 
-_[function]_         `FLAG  (KEY LEVEL)`
+_[function]_         `FLAG  (KEY LEVEL &OPTIONAL USE-CACHED-P)`
 
 > For a given depth, LEVEL, within a CTRIE, extract the correspondant
   sequence of bits from the computed hash of KEY that indicate the

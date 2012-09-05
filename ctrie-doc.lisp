@@ -41,7 +41,7 @@
 
 (setf (get 'readme :internal-marker) "* * * * * * *")
 (setf (get 'readme :internal-ref)  
-  '(*ctrie* *retries* *timeout*
+  '(*ctrie* *retries* *timeout* *hash-code*
      multi-catch catch-case
      ctrie ctrie-p ctrie-hash ctrie-test ctrie-readonly-p cthash ctequal
      with-ctrie flag flag-present-p flag-arc-position flag-vector

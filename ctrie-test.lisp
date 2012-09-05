@@ -8,7 +8,11 @@
                `(defpackage ,name
                   (:documentation ,docs)
                   (:use :closer-common-lisp :closer-mop :lisp-unit #+():lparallel ,@packages)
-                  (:export :run-ctrie-tests)
+                  (:export
+                    :run-ctrie-tests
+                    :run-ctrie-benchmarks
+                    :run-ctrie-deterministic-profile
+                    :run-ctrie-statistical-profile)
                   ,@(loop :for pkg :in packages :collect
                       `(:import-from ,pkg ,@(loop :for sym :being :the :symbols :in pkg
                                               :collect (make-symbol (string sym))))))))
@@ -34,14 +38,31 @@
   (values))
 
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Fixtures
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+(defvar *test-ctrie* (make-ctrie))
+(defvar *input*      (shuffle (coerce (iota (expt 2 20)) 'vector)))
+(defvar *input-256k* (shuffle (coerce (iota (expt 2 18)) 'vector)))
+(defvar *kernels*    (loop for i from 0 to 3
+                       collect (lparallel:make-kernel (expt 2 i))))
+(defvar *table*)
+(defvar *table-type*)
+(defvar *table-test*)
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Table Abstraction Scaffolding
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-
 (defmacro with-skiplist-tables (&body body)
   `(flet ((make-table (&key (test #'eql))
-            (cl-skip-list:make-skip-list :key-equal test :value-equal test))
+            (cl-skip-list:make-skip-list
+              :duplicates-allowed? t
+              :key-equal test
+              :value-equal test))
            (table-clear (tbl)
              (cl-skip-list:map-skip-list (lambda (k v)
                                            (declare (ignore v))
@@ -576,19 +597,37 @@
 
 
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Profiling
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+(defun run-ctrie-deterministic-profile ()
+  (ctrie-clear *test-ctrie*)
+  (swank:profile-reset)
+  (swank:unprofile-all)
+  (swank:profile-package (find-package :cl-ctrie) t t)
+  (loop for i across *input* do (ctrie-put  *test-ctrie* i i))
+  (assert (eql (ctrie-size *test-ctrie*) (length *input*)))
+  (loop for i across *input* do (ctrie-get  *test-ctrie* i))
+  (loop for i across *input* do (ctrie-drop *test-ctrie* i))
+  (assert (ctrie-empty-p *test-ctrie*))
+  (swank:profile-report)
+  (swank:unprofile-all))
+
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Parallel Operation Tests
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defvar *test-ctrie* (make-ctrie))
-(defvar *input*      (shuffle (coerce (iota (expt 2 20)) 'vector)))
-(defvar *kernels*    (loop for i from 0 to 3
-                          collect (lparallel:make-kernel (expt 2 i))))
 
 (defun end-kernels ()
   (loop for kernel in *kernels*
     do (let1 lparallel:*kernel* kernel
          (lparallel:end-kernel :wait t))))
+
 
 (define-test check-parallel-insert-parallel-lookup ()
   (loop for kernel in *kernels* do
@@ -710,3 +749,41 @@
                        #'ctrie-lambda-ctrie)
                (list c0 c1 c2)))))
     (doit)))
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Benchmarking
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;(table-clear *table*)
+
+(defmacro try-bench-insert ()
+  `(progn
+;     (defparameter *table* (make-table))
+;     (defparameter *table-type* (type-of *table*))
+;     (defparameter *table-test* :insert)
+     (loop for kernel in *kernels* do 
+       (setf *table* (make-table))
+       (setf *table-type* (type-of *table*))
+       (setf *table-test* :insert)
+       collect (let1 lparallel:*kernel* kernel         
+                 (list*
+                   :bench *table-test*
+                   :type  *table-type*
+                   :threads (lparallel:kernel-worker-count)
+                   (collate-timing
+                     (with-timing-collected-runs (3)
+                       (lparallel:pmap nil (lambda (i)
+                                             (table-put *table* i i))
+                         *input*))))))))
+
+
+(defun benchmark-insert ()
+  ;; (declare (optimize (speed 3)))
+  ;; (sb-ext:gc) 
+  (append
+    (print (with-hash-tables     (try-bench-insert))) (terpri)
+    (print (with-ctrie-tables    (try-bench-insert))) (terpri)
+    (print (with-skiplist-tables (try-bench-insert))) (terpri)))
+
