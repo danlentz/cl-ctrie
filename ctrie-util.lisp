@@ -10,38 +10,59 @@
 
 (defparameter *alternative-package-exports*
   '(:get :put :drop :make :do :keys :values :size :test :hash :readonly-p
-     :map :map-keys :map-values :map-into :clear :pprint :error :to-alist :to-hashtable
-     :from-hashtable :from-alist :empty-p :save :load :export :import :snapshot)
+     :map :map-keys :map-values :clear :pprint :error :to-alist :to-hashtable
+     :from-hashtable :from-alist :empty-p :save :load :export :import :snapshot :fork
+     :lambda :lambda-ctrie :lambda-class :lambda-object :lambda-spawn :define
+     :max-depth :min-depth)
   "defines the symbols exported by the alternative packaging style experiment")
-
-
-(defun generate-alternative-package ()
-  "a simple hack to experiment with alternative packaging style"
-  (delete-package :ctrie)
-  (make-package :ctrie :use nil)
-  (mapc (lambda (sym) (export (intern (string sym) :ctrie) :ctrie))
-    *alternative-package-exports*)      
-  (loop for alt being the :external-symbols of :ctrie
-    for sym = (symbolicate "CTRIE-" alt)
-    for xsym = (symbolicate alt "-CTRIE")
-    if (fboundp sym) do (setf (fdefinition alt) (fdefinition sym))
-    else do (when (fboundp xsym) (setf (fdefinition alt) (fdefinition xsym)))
-    when #1=(macro-function sym) do (setf (macro-function alt) #1#)))
-
 
 (defun internal-symbols (package)
   (let ((acc (make-array 100 :adjustable t :fill-pointer 0))
         (used (package-use-list package)))
-    (do-symbols (symbol package)
+    (do-symbols (symbol (find-package package))
       (unless (find (symbol-package symbol) used)
         (vector-push-extend symbol acc)))
     acc))
 
 (defun external-symbols (package)
   (let ((acc (make-array 100 :adjustable t :fill-pointer 0)))
-    (do-external-symbols (symbol package)
+    (do-external-symbols (symbol (find-package package))
       (vector-push-extend symbol acc))
     acc))
+
+
+(defun generate-alternative-package ()
+  "Generate package :CTRIE which supports an alternative package/naming style
+  in which the contents are meant to be used in a fully-qualified package:symbol
+  manner, rather than used or imported.  For example, `#'CL-CTRIE:CTRIE-GET` would
+  be equivalent to `#'CTRIE:GET,` `#'CL-CTRIE:MAKE-CTRIE` to `#'CTRIE:MAKE` and
+  so forth."
+  (let* ((banner (format nil "Mapping symbols to alternative package: \"CTRIE\""))
+          (uscores (make-string (length banner) :initial-element #\-))
+          (*package* (find-package :cl-ctrie))
+          (*print-length* 20)
+          (*print-lines* 1))
+    (format t "~%~%~A~%~A~%~%" banner uscores)
+    (delete-package :ctrie)
+    (make-package :ctrie :use nil)
+    (mapc (lambda (sym) (export (intern (string sym) :ctrie) :ctrie))
+      *alternative-package-exports*)      
+    (loop for alt across (sort (external-symbols :ctrie) #'string<)
+      for sym = (symbolicate "CTRIE-" alt)
+      for xsym = (symbolicate alt "-CTRIE")
+      do (format t "~&~20S -> " alt)
+      when #3=(find-class sym nil) do (format t "C: ~A " (setf (find-class alt) #3#))
+      do (if #1=(macro-function sym)
+           (format t "M: ~A " (setf (macro-function alt) #1#))
+           (if #2=(macro-function xsym)
+             (format t "M: ~A " (setf (macro-function alt) #2#))
+             (if (fboundp xsym)
+               (format t "F: ~A " (setf (fdefinition alt) (fdefinition xsym)))
+               (when (fboundp sym)
+                 (format t "F: ~A " (setf (fdefinition alt) (fdefinition sym))))))))
+    (terpri)
+    (values)))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Some Helpful Utility Functions and Macros
@@ -92,13 +113,14 @@
 ;; http://blog.thezerobit.com/2012/07/21/immutable-persistent-data-structures-in-common-lisp.html
 
 (defmacro -> (x &optional (form nil form-supplied-p) &rest more)
-  "* EXAMPLE
-   ;;; (-> (empty-map)
-   ;;;   (with :a 100)
-   ;;;   (with :b 200)
-   ;;;   (less :a))
-   ;;;
-   ;;; #{| (:B 200) |}"
+  " * EXAMPLE
+  ```;;; (-> (empty-map)
+     ;;;   (with :a 100)
+     ;;;   (with :b 200)
+     ;;;   (less :a))
+     ;;;
+     ;;; #{| (:B 200) |}
+ ```"
   (if form-supplied-p
     (if more
       `(-> (-> ,x ,form) ,@more)
@@ -852,7 +874,7 @@ For any other use, contact Erik Naggum."
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defun printv-minor-separator ()
-  (format *trace-output* "~&;;; ~60,,,'-<-~>~%")
+  (format *trace-output* "~&;;; ~72,,,'-<-~>~%")
   (force-output *trace-output*))
 
 (defun printv-major-separator ()
@@ -912,7 +934,7 @@ For any other use, contact Erik Naggum."
              ((eq form ':ff) (list '(printv-major-separator)))
              ((eq form ':hr) (list '(printv-minor-separator)))
              
-             ;; Evaluated form:
+             ;; Binding form:
              ((and (consp form) (or (eq (car form) 'let) (eq (car form) 'let*)))
                `((printv-form-printer ',form)
                   (printv-values-printer
@@ -921,10 +943,14 @@ For any other use, contact Erik Naggum."
                          `(funcall ,values-trans-fn
                             (multiple-value-list
                               (case (car form)
-                                (let `((vlet `,(rest form))))
-                                (let* `((vlet* `,(rest form))))))))))))
-                                
+                                (let (vlet `,(rest form)))
+                                (let* (vlet* `,(rest form))))))
+                         `(multiple-value-list
+                            (case (car form)
+                              (let (vlet `,(rest form)))
+                              (let* (vlet* `,(rest form))))))))))
              
+             ;; Evaluated form:
              ((or (consp form) (and (symbolp form) (not (keywordp form))))
                `((printv-form-printer ',form)
                   (printv-values-printer
@@ -932,6 +958,7 @@ For any other use, contact Erik Naggum."
                                          `(funcall ,values-trans-fn
                                             (multiple-value-list ,form))
                                          `(multiple-value-list ,form))))))
+             
              ;; Self-evaluating form:
              (t `((printv-form-printer 
                     (car (setf ,result-sym (list ,form))))))))

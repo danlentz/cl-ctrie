@@ -20,7 +20,6 @@
     :ctrie
     :ctrie-test
     :ctrie-hash
-    :ctrie-readonly-p
     :ctrie-do
     :ctrie-put
     :ctrie-get
@@ -28,7 +27,6 @@
     :ctrie-map
     :ctrie-map-keys
     :ctrie-map-values
-    :ctrie-map-into
     :ctrie-keys
     :ctrie-values
     :ctrie-size
@@ -40,6 +38,7 @@
     :ctrie-from-hashtable
     :ctrie-from-alist
     :ctrie-empty-p
+    :ctrie-readonly-p
     :ctrie-max-depth
     :ctrie-min-depth
     :ctrie-save
@@ -47,6 +46,13 @@
     :ctrie-export
     :ctrie-import
     :ctrie-snapshot
+    :ctrie-fork
+    :ctrie-lambda
+    :ctrie-lambda-ctrie
+    :ctrie-lambda-spawn
+    :ctrie-lambda-class
+    :ctrie-lambda-object
+    :define-ctrie    
     :ctrie-error
     :ctrie-structural-error
     :ctrie-operational-error
@@ -55,20 +61,6 @@
     :ctrie-not-supported
     :ctrie-invalid-dynamic-context
     :ctrie-generational-mismatch
-    :ctrie-modification-failed
-    :make-ctrie-cursor
-    :ctrie-cursor-reset
-    :ctrie-cursor-timestamp
-    :ctrie-cursor-ctrie
-    :ctrie-cursor-looking-at
-    :ctrie-cursor-at-top-p
-    :make-ctrie-lambda
-    :define-ctrie
-    :ctrie-lambda-dispatch
-    :+simple-dispatch+
-    :ctrie-lambda-spawn
-    :ctrie-lambda-class
-    :ctrie-lambda
-    :ctrie-lambda-reset
-    :ctrie-lambda-dispatch-table))
+    :ctrie-modification-failed))
+
   

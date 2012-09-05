@@ -20,21 +20,17 @@
      ctrie-values ctrie-size ctrie-clear ctrie-pprint 
      ctrie-to-alist ctrie-to-hashtable ctrie-from-hashtable
      ctrie-from-alist ctrie-empty-p ctrie-save ctrie-load ctrie-export
-     ctrie-import ctrie-snapshot
-     define-ctrie
-     make-ctrie-lambda
+     ctrie-import
+     ctrie-max-depth
+     ctrie-min-depth
+     ctrie-snapshot
+     ctrie-fork 
+     ctrie-lambda
+     ctrie-lambda-ctrie
      ctrie-lambda-spawn
      ctrie-lambda-class
-     ctrie-lambda
-     ctrie-lambda-reset
-     ctrie-lambda-dispatch-table
-     ctrie-lambda-dispatch
-     +simple-dispatch+
-     ctrie-cursor-reset
-     ctrie-cursor-timestamp
-     ctrie-cursor-ctrie
-     ctrie-cursor-looking-at
-     ctrie-cursor-at-top-p
+     ctrie-lambda-object
+     define-ctrie
      ctrie-error ctrie-structural-error
      ctrie-operational-error ctrie-operation-retries-exceeded
      ctrie-not-implemented ctrie-not-supported
@@ -71,21 +67,16 @@
      ctrie-to-alist ctrie-to-hashtable ctrie-pprint ctrie-from-alist
      ctrie-from-hashtable
      ctrie-save ctrie-load ctrie-export ctrie-import
-     define-ctrie
-     make-ctrie-lambda
-     ctrie-lambda-dispatch
+     ctrie-max-depth
+     ctrie-min-depth
+     ctrie-snapshot
+     ctrie-fork 
+     ctrie-lambda
+     ctrie-lambda-ctrie
      ctrie-lambda-spawn
      ctrie-lambda-class
-     ctrie-lambda
-     ctrie-lambda-reset
-     ctrie-lambda-dispatch-table
-     ctrie-lambda-dispatch
-     +simple-dispatch+
-     ctrie-cursor-reset
-     ctrie-cursor-timestamp
-     ctrie-cursor-ctrie
-     ctrie-cursor-looking-at
-     ctrie-cursor-at-top-p
+     ctrie-lambda-object
+     define-ctrie
      ctrie-error ctrie-structural-error ctrie-operational-error
      ctrie-modification-failed
      ctrie-operation-retries-exceeded ctrie-not-implemented

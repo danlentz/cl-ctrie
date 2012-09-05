@@ -156,13 +156,15 @@
        -  TAG is NIl if evaluation of the FORMS completed normally
           or the tag thrown and cought.
     * EXAMPLE:
+    ```
     ;;; (multiple-value-bind (result tag)
     ;;;            (multi-catch (:a :b)
     ;;;                 ...FORMS...)
     ;;;              (case tag 
     ;;;                 (:a ...)
     ;;;                 (:b ...)
-    ;;;                 (t ...)))"
+    ;;;                 (t ...)))
+    ```"
     (let ((block-name (gensym)))
       `(block ,block-name
          ,(multi-catch-1 block-name tag-list forms))))
@@ -345,6 +347,7 @@
   standard common-lisp specification for *PRINT-READABLY*. A
   trivial example of the printed representation might appear as
   follows:
+  ```
   ;;;
   ;;;    #S(CTRIE
   ;;;       :READONLY-P NIL
@@ -356,7 +359,7 @@
   ;;;                      :BITMAP 67108864
   ;;;                      :FLAGS #*00000000000000000000000000100000
   ;;;                      :ARCS #(#S(SNODE :KEY 1 :VALUE 2)))>)
-  ;;;"
+  ```"
   ;; (if (ref-p (inode-ref o))
   ;;   (progn
   ;;   (print-unreadable-object (o stream)
@@ -906,23 +909,24 @@
   "A CTRIE structure is the root container that uniquely identifies a CTRIE
   instance, and  contains the following perameters which specify the
   definable aspects of each CTRIE:
-   - `READONLY-P` if not `NIL` prohibits any future modification or
+
+  - `READONLY-P` if not `NIL` prohibits any future modification or
   cloning of this instance.
-   - `TEST` is a designator for an equality predicate that will be
+  - `TEST` is a designator for an equality predicate that will be
   applied to disambiguate and determine the equality of any two
   keys. It is recommened that this value be a symbol that is fboundp,
   to retain capability of externalization (save/restore). At present,
   though, this is not enforced and a function object or lambda
   expression will also be accepted, albeit without the ability of
   save/restore.
-   - `HASH` is a designator for a hash function, which may be
+  - `HASH` is a designator for a hash function, which may be
   desirable to customize when one has specific knowledge about the set
   of keys which will populate the table.  At this time, a 32-bit hash
   is recommended as this is what has been used for development and
   testing and has been shown to provide good performance in
   practice. As with `TEST` it is recommended that `HASH` be specified
   by a symbol that is fboundp.
-   - `ROOT` is the slot used internally for storage of the root inode
+  - `ROOT` is the slot used internally for storage of the root inode
   structure that maintains the reference to the contents of the ctrie
   proper.  The ctrie-root must only be accessed using the _RDCSS ROOT
   NODE PROTOCOL_ defined by the top-level entry-points `ROOT-NODE-ACCESS`
@@ -1097,23 +1101,40 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defun ctrie-snapshot (ctrie &key read-only)
-  ""
+  "Atomically create a clone of CTRIE that may be operated upon
+  independently without affecting or being affected by operations or
+  content of the original CTRIE.  If READ-ONLY is NIL (the default),
+  the new CTRIE will be a READABLE/WRITABLE 'fork' of CTRIE (see
+  `CTRIE-FORK`) otherwise, the clone will be READABLE only, which has
+  considerable performance benefits in some circumstances, as the arcs
+  will not require `REFRESH` and should be the preferred mode when
+  updates (writability) of the clone are not required"
   (loop until
     (let* ((root (root-node-access ctrie))
             (main (inode-read root)))
-      (when (root-node-replace ctrie root main (make-inode main (gensym "ctrie")))
+      (when (root-node-replace ctrie root main
+              (make-inode main (gensym "ctrie")))
         (return-from ctrie-snapshot
           (if read-only
             (make-ctrie :readonly-p t :root root)
             (make-ctrie :root (make-inode main (gensym "ctrie")))))))))
 
 
+(defun ctrie-fork (ctrie)
+  "Atomically create a READABLE and WRITABLE clone of CTRIE that may
+  be operated upon independently without affecting or being affected
+  by the original CTRIE."
+  (ctrie-snapshot ctrie))
+
+
 (defun ctrie-clear (ctrie)
-  ""
+  "Atomically clear all entries stored in CTRIE, returning it to a condition
+  which returns `T` when tested with predicate `CTRIE-EMPTY-P`"
   (loop until
     (let* ((root (root-node-access ctrie))
             (main (inode-read root)))
-      (when (root-node-replace ctrie root main (make-inode (make-cnode) (gensym "ctrie")))
+      (when (root-node-replace ctrie root main
+              (make-inode (make-cnode) (gensym "ctrie")))
         (return-from ctrie-clear ctrie)))))
 
 
@@ -1122,6 +1143,8 @@
 ;; descriptions of the ctrie which change the protocol to eliminate this
 ;; possibility by starting with a fully initialized level 0 cnode
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+'hashtable
 
 #+()
 (defun cas-ctrie-root (ctrie new-value)
@@ -1514,6 +1537,9 @@
 
 
 (defun ctrie-get (ctrie key)
+  "Find the entry in CTRIE whose key is KEY and returns the
+  associated value and T as multiple values, or returns NIL and NIL
+  if there is no such entry. Entries can be added using SETF."
   (with-ctrie ctrie
     (flet ((attempt-get (root key level parent gen try)
              (declare (ignorable try))
@@ -1583,7 +1609,9 @@
 
   
 (defun ctrie-drop (ctrie key)
-  "Remove KEY and it's value from the CTRIE."
+  "Remove KEY and it's associated value from CTRIE. Returns as multiple
+  values the value associated with KEY and T if there was such an entry,
+  otherewise NIL and NIL"
     (with-ctrie ctrie
       (let1 r (root-node-access *ctrie*)
         (multiple-value-bind (val kind) (%remove r key 0 nil (inode-gen r))
@@ -1693,11 +1721,21 @@
 ;; Mapping Operators
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defgeneric map-node (node fn))
+(defgeneric map-node (node fn)
+  (:documentation "Applies a function two arguments, FN, to all (key . value)
+  pairs contained in and below NODE.  This function is expected to be specialized
+  with appropriate implementations for each specific type of possible NODE"))
 
 
-(defun ctrie-map (ctrie fn &key atomic
-                   &aux accum);; (ctrie (with-ctrie *ctrie*)))
+(defun ctrie-map (ctrie fn &key atomic &aux
+                   accum)
+  
+  "Applies a function two arguments, FN, to each (key . value) pair present in
+  CTRIE.  During the extent of CTRIE-MAP, a special variable ACCUM (initially NIL)
+  is available for accumulation of a result value which will be returned after
+  the completion of the CTRIE-MAP call.  If ATOMIC is non-NIL, the operation will
+  be performed on a read-only atomic snapshot of CTRIE, which guarantees a
+  consistent, point-in-time representation of the entries present in CTRIE"
   (declare (special accum))
   (with-ctrie ctrie
     (with-ctrie (if atomic (ctrie-snapshot *ctrie* :read-only t) *ctrie*)
@@ -1707,9 +1745,19 @@
 
 
 (defmacro ctrie-do ((key value ctrie &key atomic) &body body)
-  "Iterate over (key . value) in ctrie in the manner of dolist.
+  "Iterate over the contents of CTRIE in the manner of dolist. For each
+  (key . value) pair present in CTRIE, BODY (implicit PROGN) will be
+  evaluated with the symbols specified for KEY and VALUE will be bound
+  to the respective entry constituents.  A special variable
+  ACCUM (initially NIL) is available for accumulation of a result
+  value which will be returned after the completion of the CTRIE-DO
+  call.  If ATOMIC is non-NIL, the operation will be performed on a
+  read-only atomic snapshot of CTRIE, which guarantees a consistent,
+  point-in-time representation of the entries present in CTRIE.
+  ```
   ;;;  EXAMPLE: (ctrie-do (k v ctrie)
-  ;;;             (format t \"~&~8S => ~10S~%\" k v))"
+  ;;;             (format t \"~&~8S => ~10S~%\" k v))
+  ```"
   `(ctrie-map ,ctrie #'(lambda (,key ,value) ,@body)
      :atomic ,atomic))
 
@@ -1729,7 +1777,6 @@
 
 
 (defmethod map-node ((node lnode) fn)
- ;; (log:sexp node)
   (map-node (lnode-elt node) fn)
   (map-node (lnode-next node) fn))
 
@@ -1740,6 +1787,14 @@
 
 
 (defun ctrie-map-keys (ctrie fn &key atomic)
+  "Applies a function one argument, FN, to each key present in CTRIE.
+  During the extent of CTRIE-MAP-KEYS, a special variable
+  ACCUM (initially NIL) is available for accumulation of a result
+  value which will be returned after the completion of the
+  CTRIE-MAP-KEYS call.  If ATOMIC is non-NIL, the operation will be
+  performed on a read-only atomic snapshot of CTRIE, which guarantees
+  a consistent, point-in-time representation of the keys present in
+  CTRIE"
   (with-ctrie ctrie
     (ctrie-map *ctrie*
       (lambda (k v) (declare (ignore v))
@@ -1747,6 +1802,14 @@
 
 
 (defun ctrie-map-values (ctrie fn &key atomic)
+  "Applies a function one argument, FN, to each value present in CTRIE.
+  During the extent of CTRIE-MAP-VALUES, a special variable
+  ACCUM (initially NIL) is available for accumulation of a result
+  value which will be returned after the completion of the
+  CTRIE-MAP-VALUES call.  If ATOMIC is non-NIL, the operation will be
+  performed on a read-only atomic snapshot of CTRIE, which guarantees
+  a consistent, point-in-time representation of the values present in
+  CTRIE"
   (with-ctrie ctrie 
     (ctrie-map *ctrie*
       (lambda (k v) (declare (ignore k))
@@ -1767,45 +1830,66 @@
 
 
 (defun print2 (x y &optional (stream t))
+  "Pretty print a pair of values as if a CONS cell"
   (format stream " (~W . ~W) " x y))
 
 
 (defun collect2 (x y)
+  "Collect a cons cell containing X and Y into special variable ACCUM,
+  which is expected to be defined, bound, and list-valued"
   (declare (special accum))
   (push (cons x y) accum))
 
 
 (defun collect-keys (x y)
+  "Collect X into special variable ACCUM, which is expected to be
+  defined, bound, and list-valued"
   (declare (special accum) (ignore y))
   (push x accum))
 
 
 (defun collect-values (x y)
+  "Collect Y into special variable ACCUM, which is expected to be
+  defined, bound, and list-valued"
   (declare (special accum) (ignore x))
   (push y accum))
 
 
 (defun ctrie-keys (ctrie &key atomic)
+  "Construct and return a list containing all keys present in CTRIE.
+  If ATOMIC is non-NIL, the operation will be performed on a read-only
+  atomic snapshot of CTRIE, which guarantees a consistent,
+  point-in-time representation of the keys present in CTRIE"
   (with-ctrie ctrie
     (ctrie-map *ctrie*
       #'collect-keys :atomic atomic)))
 
 
 (defun ctrie-values (ctrie &key atomic)
+  "Construct and return a list containing all values present in CTRIE.
+  If ATOMIC is non-NIL, the operation will be performed on a read-only
+  atomic snapshot of CTRIE, which guarantees a consistent,
+  point-in-time representation of the values present in CTRIE"
   (with-ctrie ctrie
     (ctrie-map *ctrie*
       #'collect-values :atomic atomic)))
 
 
-(defun ctrie-size (ctrie &aux (accum 0))
+(defun ctrie-size (ctrie &key atomic &aux (accum 0))
+  "Return the number of entries present in CTRIE.  If ATOMIC is non-NIL,
+  the operation will be performed on a read-only atomic snapshot of CTRIE,
+  which guarantees a consistent, point-in-time representation of CTRIE"
   (with-ctrie ctrie
     (ctrie-map-keys *ctrie*
       (lambda (x) (declare (ignore x))
-        (incf accum)))
+        (incf accum))
+      :atomic atomic)
     accum))
 
 
 (defun ctrie-empty-p (ctrie)
+  "Return T if CTRIE contains no entries, otherwise NIL. This function is
+  O(1) and is much more efficient than testing for `CTRIE-SIZE` of 0"
   (with-ctrie ctrie
     (= 0 (cnode-bitmap
            (inode-read
@@ -1813,36 +1897,63 @@
 
 
 (defun ctrie-to-alist (ctrie &key atomic)
+  "Return an alist containing all (key . value) pairs found in CTRIE.
+  If ATOMIC is non-NIL, the operation will be performed on a read-only
+  atomic snapshot of CTRIE, which guarantees a consistent,
+  point-in-time representation of the entries in CTRIE"
   (with-ctrie  ctrie
     (ctrie-map *ctrie*
       #'collect2 :atomic atomic)))
 
 
 (defun ctrie-pprint (ctrie &optional (stream t))
+  "Pretty-print a representation of CTRIE as an alist containing
+  all (key . value) pairs found in it.  Atomicity is not guaranteed"
   (with-ctrie ctrie
     (pprint-tabular stream (ctrie-to-alist *ctrie*))))
 
 
-(defun ctrie-to-hashtable (ctrie &key atomic)
+(defun ctrie-to-hashtable (ctrie &key atomic hash-table
+                            &aux (accum (or hash-table
+                                          (make-hash-table
+                                            :test (ctrie-test ctrie)
+                                            :hash-function (ctrie-hash ctrie)
+                                            :synchronized atomic))))
+  "Return a hash-table containing all (key . value) pairs found in CTRIE.
+  If ATOMIC is non-NIL, the operation will be performed on a read-only
+  atomic snapshot of CTRIE, which guarantees a consistent,
+  point-in-time representation of the entries in CTRIE. If HASH-TABLE
+  is specified, it will be used as the destination hash-table.
+  Otherwise, a new hash-table will be created with hash-function and
+  test identical to that of CTRIE.  It will be created as synchronized
+  if ATOMIC is not NIL"
+  (check-type accum hash-table)
   (with-ctrie ctrie
-    (alexandria:alist-hash-table
-      (ctrie-map *ctrie*
-        #'collect2 :atomic atomic))))
+    (ctrie-map *ctrie*
+      #'(lambda (k v) (setf (gethash k accum) v))
+      :atomic atomic)))
 
 
 (defun ctrie-from-alist (alist &key ctrie)
+  "Return a CTRIE containing all (key . value) pairs found in ALIST.
+  If CTRIE is specified, it will be used as the destination ctrie.
+  Otherwise, a new ctrie will be created. Atomicity is not guaranteed"
   (with-ctrie (or ctrie (make-ctrie))
     (prog1 *ctrie*
       (mapc (lambda (pair)
               (ctrie-put *ctrie* (car pair) (cdr pair)))
         alist))))
 
-(defun ctrie-from-hashtable (hashtable &key ctrie)
-  "create a new ctrie containing the same (k . v) pairs and equivalent
-  test function as HASHTABLE"
-    (with-ctrie (or ctrie (make-ctrie :test (hash-table-test hashtable)))
+(defun ctrie-from-hashtable (hash-table &key ctrie)
+  "Return a CTRIE containing all (key . value) pairs found in HASH-TABLE.
+  If CTRIE is specified, it will be used as the destination ctrie.
+  Otherwise, a new ctrie will be created with test identical to that
+  of HASH-TABLE. The hash-function will NOT be preserved, as that
+  information does not appear to be recoverable from a hash-table once
+  created"
+  (with-ctrie (or ctrie (make-ctrie :test (hash-table-test hash-table)))
       (prog1 *ctrie* (maphash (lambda (k v) (ctrie-put *ctrie* k v))
-                       hashtable))))
+                       hash-table))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1855,7 +1966,10 @@
 
 
 (defgeneric ctrie-save (ctrie place &key &allow-other-keys)
-  (:documentation ""))
+  (:documentation "Save a representation of CTRIE to PLACE such that an
+  identical ctrie may be restored at a later time using `CTRIE-LOAD` on
+  that PLACE.  CTRIE-SAVE guarantees consistency under all circumstances
+  using an atomic, point-in-time snapshot of CTRIE."))
 
 (defmethod  ctrie-save :around (ctrie place &key)
   (log:info "Saving ctrie to ~A" place)
@@ -1863,64 +1977,81 @@
 
 
 #+cl-store
-(defmethod  ctrie-save ((ctrie ctrie) (place pathname) &key)
+(defmethod  ctrie-save ((ctrie ctrie) (pathname pathname) &key)
+  "Save a representation of CTRIE to PATHNAME such that an
+  identical ctrie may be restored at a later time using `CTRIE-LOAD` on
+  that PATHNAME.  CTRIE-SAVE guarantees consistency under all circumstances
+  using an atomic, point-in-time snapshot of CTRIE."
   (with-ctrie ctrie
-    (prog1 place
-      (cl-store:store (ctrie-snapshot *ctrie*) place))))
-
-(defmethod  ctrie-save ((ctrie function) (place pathname) &key)
-  (with-ctrie ctrie
-    (prog1 place
-      (cl-store:store (ctrie-snapshot *ctrie*) place))))
-
-
-(defgeneric ctrie-load (place &key &allow-other-keys))
-
+    (prog1 pathname
+      (cl-store:store (ctrie-snapshot *ctrie*) pathname))))
 
 #+cl-store
-(defmethod  ctrie-load ((place pathname) &key)
-  (cl-store:restore place))
+(defmethod  ctrie-save ((ctrie-lambda function) (pathname pathname) &key)
+  "Save a representation of CTRIE-LAMBDA to PATHNAME such that a ctrie
+  identical to `(ctrie-lambda-ctrie CTRIE-LAMBDA)` may be restored at
+  a later time using `CTRIE-LOAD` on that PATHNAME.  CTRIE-SAVE
+  guarantees consistency under all circumstances using an atomic,
+  point-in-time snapshot of CTRIE-LAMBDA."
+  (with-ctrie ctrie-lambda
+    (prog1 pathname
+      (cl-store:store (ctrie-snapshot *ctrie*) pathname))))
+
+
+(defgeneric ctrie-load (place &key &allow-other-keys)
+  (:documentation "Restore a ctrie that has been saved to PLACE using
+  `CTRIE-SAVE`"))
+
+#+cl-store
+(defmethod  ctrie-load ((pathname pathname) &key)
+  "Restore a ctrie that has been saved to PATHNAME using `CTRIE-SAVE`"
+  (cl-store:restore pathname))
 
 
 (defgeneric ctrie-export (ctrie place &key &allow-other-keys)
-  (:documentation ""))
+  (:documentation "Save all (key . value) pairs found in CTRIE to PLACE,
+  such that they may be restored later using `CTRIE-IMPORT`.  Properties
+  of CTRIE (other than the entries contained) are NOT preserved.  Atomicity
+  is not guaranteed.  `CTRIE-EXPORT` provides an alternative to `CTRIE-SAVE`
+  that supports a more compact, space-efficient stored representation, at
+  the expense of losing the consistency and identicality guarantees
+  of `CTRIE-SAVE`"))
 
 
 #+cl-store 
-(defmethod  ctrie-export ((ctrie ctrie) (place pathname) &key)
+(defmethod  ctrie-export ((ctrie ctrie) (pathname pathname) &key)
+  "Save all (key . value) pairs found in CTRIE to PATHNAME,
+  such that they may be restored later using `CTRIE-IMPORT` on that
+  PATHNAME.  Properties of CTRIE (other than the entries contained)
+  are NOT preserved.  Atomicity is not guaranteed"
   (with-ctrie ctrie
-    (prog1 place
-      (cl-store:store (ctrie-to-alist *ctrie*) place))))
+    (prog1 pathname
+      (cl-store:store (ctrie-to-alist *ctrie*) pathname))))
 
-(defmethod  ctrie-export ((ctrie function) (place pathname) &key)
-  (with-ctrie ctrie
-    (prog1 place
-      (cl-store:store (ctrie-to-alist *ctrie*) place))))
-
-(defmethod  ctrie-export ((ctrie ctrie) (place hash-table) &key)
-  (with-ctrie ctrie
-    (ctrie-map *ctrie*
-      (lambda (k v)
-        (setf (gethash place k) v)))))
-
-(defmethod  ctrie-export ((ctrie function) (place hash-table) &key)
-  (with-ctrie ctrie
-    (ctrie-map *ctrie*
-      (lambda (k v)
-        (setf (gethash place k) v)))))
+#+cl-store 
+(defmethod  ctrie-export ((ctrie-lambda function) (pathname pathname) &key)
+  "Save all (key . value) pairs found in CTRIE-LAMBDA to PATHNAME,
+  such that they may be restored later using `CTRIE-IMPORT` on that
+  PATHNAME.  Properties of CTRIE-LAMBDA (other than the entries
+  contained) are NOT preserved.  Atomicity is not guaranteed"
+  (with-ctrie ctrie-lambda
+    (prog1 pathname
+      (cl-store:store (ctrie-to-alist *ctrie*) pathname))))
 
 
-(defgeneric ctrie-import (place &key &allow-other-keys)
-  (:documentation ""))
+(defgeneric ctrie-import (place &key ctrie &allow-other-keys)
+  (:documentation "Restore all (key . value) pairs saved to PLACE into
+  either the specified CTRIE if provided, or one newly created with
+  default properties."))
 
 
 #+cl-store
-(defmethod  ctrie-import ((place pathname) &key)
-  (ctrie-from-alist (cl-store:restore place)))
+(defmethod  ctrie-import ((pathname pathname) &key ctrie)
+  "Restore all (key . value) pairs saved to PATHNAME into
+  either the specified CTRIE if provided, or one newly created with
+  default properties."
+  (ctrie-from-alist (cl-store:restore pathname) :ctrie ctrie))
 
-
-(defmethod  ctrie-import ((place hash-table) &key)
-  (ctrie-from-hashtable place))
 
 
 

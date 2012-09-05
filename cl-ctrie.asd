@@ -41,16 +41,17 @@
                           complexity bounds of the basic operations...
                           with a low constant factor due to [large dispersal
                           ratio, (32^n arcs at level n)]. Ctries support a
-                          lock-free, linearizable, constant-time SNAPSHOT
+                          lock-free, linearizable, constant-time SNAPSHOT (CLONE)
                           operation... This is a breakthrough in concurrent
                           data-structure design, since other existing concurrent
-                          data-structures do not support snapshots. [This provides
-                          the means to support features such as] lock-free,
-                          linearizable iterator, size and clear operations. [This
-                          is superior to other] existing concurrent data-structures
-                          [which require the use of global locks [for exclusive,
-                          blocking semantics for update access] permitting...
-                          [no concurrent readers or writers] during any [update,
+                          data-structures do not support [radable/writable]
+                          snapshots. [This provides the means to support
+                          features such as] lock-free, linearizable iterator,
+                          size and clear operations. [This is superior to other]
+                          existing concurrent data-structuresm [which require
+                          the use of global locks [for exclusive, blocking
+                          semantics for update access] permitting... [no
+                          concurrent readers or writers] during any [update,
                           insert, remove or other modifications]. In particular,
                           Ctries have an O(1) ITERATOR creation operation, O(1)
                           CLEAR operation, O(1) DUPLICATE operation and an
@@ -76,6 +77,10 @@
                 (:file "ctrie-lambda")
         #+cldoc (:file "ctrie-doc")))
 
+
+(defmethod asdf:perform :after ((o asdf:load-op) (c (eql (asdf:find-system :cl-ctrie))))
+  (let ((*package* (find-package :cl-ctrie)))
+    (funcall (intern (symbol-name :generate-alternative-package) (find-package :cl-ctrie)))))
 
 #+cldoc
 (defmethod asdf:perform ((o asdf::doc-op) (c (eql (asdf:find-system :cl-ctrie))))

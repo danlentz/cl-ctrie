@@ -4,8 +4,9 @@
 (in-package "SB-VM")
 
 ;;
-;; This cas extension is entirely the genius of Paul Khuong.
-;;
+;; These cas extensions are credited entirely to the genius of Paul Khuong,
+;; Nikodemus, et. al.  They are incorporated here to facilitate experimentation
+;; and further development
 
 
 (handler-bind ((simple-error

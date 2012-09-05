@@ -12,7 +12,7 @@
                   ,@(loop :for pkg :in packages :collect
                       `(:import-from ,pkg ,@(loop :for sym :being :the :symbols :in pkg
                                               :collect (make-symbol (string sym))))))))
-    (define-package #:cl-ctrie-test
+    (define-package :cl-ctrie-test
       "This is a testing sandbox for the system :cl-ctrie"
       :cl-ctrie))) 
 

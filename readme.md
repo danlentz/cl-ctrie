@@ -63,7 +63,7 @@ initial development cycle.
 
 ### Status
 
-All unit tests should succeed, and parallelism has been tested for 1,
+All tests should succeed; parallelism has been tested for 1,
 2, 4, and 8 threads on an 8-core system (Dual Intel(R) Xeon(R) CPU
 E5462 @ 2.80GHz), SBCL version 1.0.57.56-2273f3a, and Mac OS X Server
 version 10.6.8.
@@ -255,23 +255,24 @@ _[structure]_        `CTRIE ()`
 > A CTRIE structure is the root container that uniquely identifies a CTRIE
   instance, and  contains the following perameters which specify the
   definable aspects of each CTRIE:
-   - `READONLY-P` if not `NIL` prohibits any future modification or
+
+  - `READONLY-P` if not `NIL` prohibits any future modification or
   cloning of this instance.
-   - `TEST` is a designator for an equality predicate that will be
+  - `TEST` is a designator for an equality predicate that will be
   applied to disambiguate and determine the equality of any two
   keys. It is recommened that this value be a symbol that is fboundp,
   to retain capability of externalization (save/restore). At present,
   though, this is not enforced and a function object or lambda
   expression will also be accepted, albeit without the ability of
   save/restore.
-   - `HASH` is a designator for a hash function, which may be
+  - `HASH` is a designator for a hash function, which may be
   desirable to customize when one has specific knowledge about the set
   of keys which will populate the table.  At this time, a 32-bit hash
   is recommended as this is what has been used for development and
   testing and has been shown to provide good performance in
   practice. As with `TEST` it is recommended that `HASH` be specified
   by a symbol that is fboundp.
-   - `ROOT` is the slot used internally for storage of the root inode
+  - `ROOT` is the slot used internally for storage of the root inode
   structure that maintains the reference to the contents of the ctrie
   proper.  The ctrie-root must only be accessed using the _RDCSS ROOT
   NODE PROTOCOL_ defined by the top-level entry-points `ROOT-NODE-ACCESS`
@@ -320,49 +321,237 @@ _[function]_         `CTRIE-PUT  (CTRIE KEY VALUE)`
 
 _[function]_         `CTRIE-GET  (CTRIE KEY)`
 
+> Find the entry in CTRIE whose key is KEY and returns the
+  associated value and T as multiple values, or returns NIL and NIL
+  if there is no such entry. Entries can be added using SETF.
+
+
 _[function]_         `CTRIE-DROP  (CTRIE KEY)`
 
-> Remove KEY and it's value from the CTRIE.
+> Remove KEY and it's associated value from CTRIE. Returns as multiple
+  values the value associated with KEY and T if there was such an entry,
+  otherewise NIL and NIL
 
 
 _[macro]_            `CTRIE-DO  ((KEY VALUE CTRIE &KEY ATOMIC) &BODY BODY)`
 
-> Iterate over (key . value) in ctrie in the manner of dolist.
+> Iterate over the contents of CTRIE in the manner of dolist. For each
+  (key . value) pair present in CTRIE, BODY (implicit PROGN) will be
+  evaluated with the symbols specified for KEY and VALUE will be bound
+  to the respective entry constituents.  A special variable
+  ACCUM (initially NIL) is available for accumulation of a result
+  value which will be returned after the completion of the CTRIE-DO
+  call.  If ATOMIC is non-NIL, the operation will be performed on a
+  read-only atomic snapshot of CTRIE, which guarantees a consistent,
+  point-in-time representation of the entries present in CTRIE.
+  ```
   ;;;  EXAMPLE: (ctrie-do (k v ctrie)
   ;;;             (format t "~&~8S => ~10S~%" k v))
+  ```
 
 
 _[function]_         `CTRIE-MAP  (CTRIE FN &KEY ATOMIC &AUX ACCUM)`
 
+> Applies a function two arguments, FN, to each (key . value) pair present in
+  CTRIE.  During the extent of CTRIE-MAP, a special variable ACCUM (initially NIL)
+  is available for accumulation of a result value which will be returned after
+  the completion of the CTRIE-MAP call.  If ATOMIC is non-NIL, the operation will
+  be performed on a read-only atomic snapshot of CTRIE, which guarantees a
+  consistent, point-in-time representation of the entries present in CTRIE
+
+
 _[function]_         `CTRIE-MAP-KEYS  (CTRIE FN &KEY ATOMIC)`
+
+> Applies a function one argument, FN, to each key present in CTRIE.
+  During the extent of CTRIE-MAP-KEYS, a special variable
+  ACCUM (initially NIL) is available for accumulation of a result
+  value which will be returned after the completion of the
+  CTRIE-MAP-KEYS call.  If ATOMIC is non-NIL, the operation will be
+  performed on a read-only atomic snapshot of CTRIE, which guarantees
+  a consistent, point-in-time representation of the keys present in
+  CTRIE
+
 
 _[function]_         `CTRIE-MAP-VALUES  (CTRIE FN &KEY ATOMIC)`
 
+> Applies a function one argument, FN, to each value present in CTRIE.
+  During the extent of CTRIE-MAP-VALUES, a special variable
+  ACCUM (initially NIL) is available for accumulation of a result
+  value which will be returned after the completion of the
+  CTRIE-MAP-VALUES call.  If ATOMIC is non-NIL, the operation will be
+  performed on a read-only atomic snapshot of CTRIE, which guarantees
+  a consistent, point-in-time representation of the values present in
+  CTRIE
+
+
 _[function]_         `CTRIE-KEYS  (CTRIE &KEY ATOMIC)`
+
+> Construct and return a list containing all keys present in CTRIE.
+  If ATOMIC is non-NIL, the operation will be performed on a read-only
+  atomic snapshot of CTRIE, which guarantees a consistent,
+  point-in-time representation of the keys present in CTRIE
+
 
 _[function]_         `CTRIE-VALUES  (CTRIE &KEY ATOMIC)`
 
-_[function]_         `CTRIE-SIZE  (CTRIE &AUX (ACCUM 0))`
+> Construct and return a list containing all values present in CTRIE.
+  If ATOMIC is non-NIL, the operation will be performed on a read-only
+  atomic snapshot of CTRIE, which guarantees a consistent,
+  point-in-time representation of the values present in CTRIE
+
+
+_[function]_         `CTRIE-SIZE  (CTRIE &KEY ATOMIC &AUX (ACCUM 0))`
+
+> Return the number of entries present in CTRIE.  If ATOMIC is non-NIL,
+  the operation will be performed on a read-only atomic snapshot of CTRIE,
+  which guarantees a consistent, point-in-time representation of CTRIE
+
 
 _[function]_         `CTRIE-CLEAR  (CTRIE)`
 
+> Atomically clear all entries stored in CTRIE, returning it to a condition
+  which returns `T` when tested with predicate `CTRIE-EMPTY-P`
+
+
 _[function]_         `CTRIE-PPRINT  (CTRIE &OPTIONAL (STREAM T))`
+
+> Pretty-print a representation of CTRIE as an alist containing
+  all (key . value) pairs found in it.  Atomicity is not guaranteed
+
 
 _[function]_         `CTRIE-TO-ALIST  (CTRIE &KEY ATOMIC)`
 
-_[function]_         `CTRIE-TO-HASHTABLE  (CTRIE &KEY ATOMIC)`
+> Return an alist containing all (key . value) pairs found in CTRIE.
+  If ATOMIC is non-NIL, the operation will be performed on a read-only
+  atomic snapshot of CTRIE, which guarantees a consistent,
+  point-in-time representation of the entries in CTRIE
 
-_[function]_         `CTRIE-FROM-HASHTABLE  (HASHTABLE &KEY CTRIE)`
 
-> create a new ctrie containing the same (k . v) pairs and equivalent
-  test function as HASHTABLE
+_[function]_         `CTRIE-TO-HASHTABLE  (CTRIE &KEY ATOMIC HASH-TABLE &AUX
+                                           (ACCUM
+                                            (OR HASH-TABLE
+                                                (MAKE-HASH-TABLE :TEST
+                                                                 (CTRIE-TEST
+                                                                  CTRIE)
+                                                                 :HASH-FUNCTION
+                                                                 (CTRIE-HASH
+                                                                  CTRIE)
+                                                                 :SYNCHRONIZED
+                                                                 ATOMIC))))`
+
+> Return a hash-table containing all (key . value) pairs found in CTRIE.
+  If ATOMIC is non-NIL, the operation will be performed on a read-only
+  atomic snapshot of CTRIE, which guarantees a consistent,
+  point-in-time representation of the entries in CTRIE. If HASH-TABLE
+  is specified, it will be used as the destination hash-table.
+  Otherwise, a new hash-table will be created with hash-function and
+  test identical to that of CTRIE.  It will be created as synchronized
+  if ATOMIC is not NIL
+
+
+_[function]_         `CTRIE-FROM-HASHTABLE  (HASH-TABLE &KEY CTRIE)`
+
+> Return a CTRIE containing all (key . value) pairs found in HASH-TABLE.
+  If CTRIE is specified, it will be used as the destination ctrie.
+  Otherwise, a new ctrie will be created with test identical to that
+  of HASH-TABLE. The hash-function will NOT be preserved, as that
+  information does not appear to be recoverable from a hash-table once
+  created
 
 
 _[function]_         `CTRIE-FROM-ALIST  (ALIST &KEY CTRIE)`
 
+> Return a CTRIE containing all (key . value) pairs found in ALIST.
+  If CTRIE is specified, it will be used as the destination ctrie.
+  Otherwise, a new ctrie will be created. Atomicity is not guaranteed
+
+
 _[function]_         `CTRIE-EMPTY-P  (CTRIE)`
 
+> Return T if CTRIE contains no entries, otherwise NIL. This function is
+  O(1) and is much more efficient than testing for `CTRIE-SIZE` of 0
+
+
+_[function]_         `CTRIE-MAX-DEPTH  (THING)`
+
+> Compute the maximum length of any arc. Useful as a diagnostic
+
+
+_[function]_         `CTRIE-MIN-DEPTH  (THING)`
+
+> Compute the minimum length of any arc. Useful as a diagnostic
+
+
 _[function]_         `CTRIE-SNAPSHOT  (CTRIE &KEY READ-ONLY)`
+
+> Atomically create a clone of CTRIE that may be operated upon
+  independently without affecting or being affected by operations or
+  content of the original CTRIE.  If READ-ONLY is NIL (the default),
+  the new CTRIE will be a READABLE/WRITABLE 'fork' of CTRIE (see
+  `CTRIE-FORK`) otherwise, the clone will be READABLE only, which has
+  considerable performance benefits in some circumstances, as the arcs
+  will not require `REFRESH` and should be the preferred mode when
+  updates (writability) of the clone are not required
+
+
+_[function]_         `CTRIE-FORK  (CTRIE)`
+
+> Atomically create a READABLE and WRITABLE clone of CTRIE that may
+  be operated upon independently without affecting or being affected
+  by the original CTRIE.
+
+
+_[macro]_            `CTRIE-LAMBDA  (&ONCE CTRIE &REST REST)`
+
+> Pandoric Object and Inter-Lexical Communication Protocol
+  this macro builds the most unencumbered and widely applicable
+  'purist edition' Of our PLAMBDA based form.  Even as such,
+  a lot of care has been given to many subtle ways it has been
+  refined to offer the most convenient and natural tool possible.
+  ```;;;
+     ;;; (plambda (#<CLOSURE (LAMBDA (&REST ARGS)) {100929EB1B}> )
+     ;;;
+     ;;; DISPATCHING to FUNCTIONAL MAPPING:
+     ;;;   (IF (REST ARGS)
+     ;;;          (APPLY ARG (REST ARGS))
+     ;;;          (FUNCALL ARG #'IDENTITY)) =>
+     ;;; ------------------------------------------------------------
+     ;;; INITIALIZING PLAMBDA
+     ;;; ------------------------------------------------------------
+     ;;;   IT => #S(CTRIE
+     ;;;               :READONLY-P NIL
+     ;;;               :TEST EQUAL
+     ;;;               :HASH SXHASH
+     ;;;               :STAMP #<CLOSURE (LAMBDA # :IN CONSTANTLY) {10092B516B}>
+     ;;;               :ROOT #S(INODE
+     ;;;                        :GEN #:|ctrie2196|
+     ;;;                        :REF #S(REF
+     ;;;                                :STAMP @2012-08-19T13:34:58.314457-04:00
+     ;;;                                :VALUE #S(CNODE :BITMAP 0 :ARCS #())
+     ;;;                                :PREV NIL)))
+     ;;;   PLIST => (:CONTAINER #<CLOSURE (LAMBDA #) {100929EACB}> 
+     ;;;             :TIMESTAMP @2012-08-19T13:34:58.314464-04:00)
+     ;;;   STACK => (#<CLOSURE (LAMBDA #) {100929EACB}>)
+     ;;; 
+     ;;; ------------------------------------------------------------
+     ;;;  #<CLOSURE (LAMBDA (&REST #:ARGS55)) {100929EACB}>
+     ;;;```
+
+
+_[generic-function]_ `CTRIE-LAMBDA-CTRIE  (CTRIE-LAMBDA-OBJECT)`
+
+> Returns and (with setf) changes the ctrie of the specified ctrie-lambda-object
+
+
+
+_[function]_         `CTRIE-LAMBDA-SPAWN  (SELF &KEY READ-ONLY)`
+
+> Causes the atomic clone of enclosed ctrie structure and builds a new
+  lexical closure to operate on it.  Does not bother to reproduce fancy
+  (expensive) object, class, bindings, but provides almost identical
+  functionality.  May be used to more efficintly distribute workload
+  in parallel
+
 
 _[macro]_            `DEFINE-CTRIE  (NAME CTRIE &REST ARGS &KEY (OBJECT T) SPEC)`
 
@@ -427,63 +616,6 @@ _[macro]_            `DEFINE-CTRIE  (NAME CTRIE &REST ARGS &KEY (OBJECT T) SPEC)
   ;;;     =>  (0 1 2 3 4 5 6 7 8 9 10 11)
   ```
 
-
-_[function]_         `CTRIE-LAMBDA-SPAWN  (SELF &KEY READ-ONLY)`
-
-> Causes the atomic clone of enclosed ctrie structure and builds a new
-  lexical closure to operate on it.  Does not bother to reproduce fancy
-  (expensive) object, class, bindings, but provides almost identical
-  functionality.  May be used to more efficintly distribute workload
-  in parallel
-
-
-_[macro]_            `CTRIE-LAMBDA  (&ONCE CTRIE &REST REST)`
-
-> Pandoric Object and Inter-Lexical Communication Protocol
-  this macro builds the most unencumbered and widely applicable
-  'purist edition' Of our PLAMBDA based form.  Even as such,
-  a lot of care has been given to many subtle ways it has been
-  refined to offer the most convenient and natural tool possible.
-  ```;;;
-     ;;; (plambda (#<CLOSURE (LAMBDA (&REST ARGS)) {100929EB1B}> )
-     ;;;
-     ;;; DISPATCHING to FUNCTIONAL MAPPING:
-     ;;;   (IF (REST ARGS)
-     ;;;          (APPLY ARG (REST ARGS))
-     ;;;          (FUNCALL ARG #'IDENTITY)) =>
-     ;;; ------------------------------------------------------------
-     ;;; INITIALIZING PLAMBDA
-     ;;; ------------------------------------------------------------
-     ;;;   IT => #S(CTRIE
-     ;;;               :READONLY-P NIL
-     ;;;               :TEST EQUAL
-     ;;;               :HASH SXHASH
-     ;;;               :STAMP #<CLOSURE (LAMBDA # :IN CONSTANTLY) {10092B516B}>
-     ;;;               :ROOT #S(INODE
-     ;;;                        :GEN #:|ctrie2196|
-     ;;;                        :REF #S(REF
-     ;;;                                :STAMP @2012-08-19T13:34:58.314457-04:00
-     ;;;                                :VALUE #S(CNODE :BITMAP 0 :ARCS #())
-     ;;;                                :PREV NIL)))
-     ;;;   PLIST => (:CONTAINER #<CLOSURE (LAMBDA #) {100929EACB}> 
-     ;;;             :TIMESTAMP @2012-08-19T13:34:58.314464-04:00)
-     ;;;   STACK => (#<CLOSURE (LAMBDA #) {100929EACB}>)
-     ;;; 
-     ;;; ------------------------------------------------------------
-     ;;;  #<CLOSURE (LAMBDA (&REST #:ARGS55)) {100929EACB}>
-     ;;;```
-
-
-_[generic-function]_ `CTRIE-LAMBDA-DISPATCH  (CTRIE-LAMBDA-OBJECT)`
-
-> Returns and (with setf) changes the dispatch of the specified ctrie-lambda-object
-
-
-
-_[special-variable]_ `+SIMPLE-DISPATCH+  ((DLAMBDA (:FROM (ARG) ARG)
-                                                   (:TO (ARG) ARG)
-                                                   (:DOMAIN (ARG) ARG)
-                                                   (:RANGE (ARG) ARG)))`
 
 _[macro]_            `CTRIE-ERROR  (CONDITION &REST ARGS)`
 
@@ -609,6 +741,7 @@ _[macro]_            `MULTI-CATCH  (TAG-LIST &BODY FORMS)`
        -  TAG is NIl if evaluation of the FORMS completed normally
           or the tag thrown and cought.
     * EXAMPLE:
+    ```
     ;;; (multiple-value-bind (result tag)
     ;;;            (multi-catch (:a :b)
     ;;;                 ...FORMS...)
@@ -616,6 +749,7 @@ _[macro]_            `MULTI-CATCH  (TAG-LIST &BODY FORMS)`
     ;;;                 (:a ...)
     ;;;                 (:b ...)
     ;;;                 (t ...)))
+    ```
 
 
 _[macro]_            `CATCH-CASE  (FORM &REST CASES)`
@@ -632,23 +766,24 @@ _[structure]_        `CTRIE ()`
 > A CTRIE structure is the root container that uniquely identifies a CTRIE
   instance, and  contains the following perameters which specify the
   definable aspects of each CTRIE:
-   - `READONLY-P` if not `NIL` prohibits any future modification or
+
+  - `READONLY-P` if not `NIL` prohibits any future modification or
   cloning of this instance.
-   - `TEST` is a designator for an equality predicate that will be
+  - `TEST` is a designator for an equality predicate that will be
   applied to disambiguate and determine the equality of any two
   keys. It is recommened that this value be a symbol that is fboundp,
   to retain capability of externalization (save/restore). At present,
   though, this is not enforced and a function object or lambda
   expression will also be accepted, albeit without the ability of
   save/restore.
-   - `HASH` is a designator for a hash function, which may be
+  - `HASH` is a designator for a hash function, which may be
   desirable to customize when one has specific knowledge about the set
   of keys which will populate the table.  At this time, a 32-bit hash
   is recommended as this is what has been used for development and
   testing and has been shown to provide good performance in
   practice. As with `TEST` it is recommended that `HASH` be specified
   by a symbol that is fboundp.
-   - `ROOT` is the slot used internally for storage of the root inode
+  - `ROOT` is the slot used internally for storage of the root inode
   structure that maintains the reference to the contents of the ctrie
   proper.  The ctrie-root must only be accessed using the _RDCSS ROOT
   NODE PROTOCOL_ defined by the top-level entry-points `ROOT-NODE-ACCESS`
@@ -1277,7 +1412,21 @@ _[function]_         `ROOT-NODE-COMMIT  (CTRIE &OPTIONAL ABORT)`
 
 _[function]_         `CTRIE-SNAPSHOT  (CTRIE &KEY READ-ONLY)`
 
+> Atomically create a clone of CTRIE that may be operated upon
+  independently without affecting or being affected by operations or
+  content of the original CTRIE.  If READ-ONLY is NIL (the default),
+  the new CTRIE will be a READABLE/WRITABLE 'fork' of CTRIE (see
+  `CTRIE-FORK`) otherwise, the clone will be READABLE only, which has
+  considerable performance benefits in some circumstances, as the arcs
+  will not require `REFRESH` and should be the preferred mode when
+  updates (writability) of the clone are not required
+
+
 _[function]_         `CTRIE-CLEAR  (CTRIE)`
+
+> Atomically clear all entries stored in CTRIE, returning it to a condition
+  which returns `T` when tested with predicate `CTRIE-EMPTY-P`
+
 
 _[function]_         `CTRIE-PUT  (CTRIE KEY VALUE)`
 
@@ -1479,6 +1628,11 @@ _[function]_         `%INSERT  (INODE KEY VALUE LEVEL PARENT STARTGEN)`
 
 _[function]_         `CTRIE-GET  (CTRIE KEY)`
 
+> Find the entry in CTRIE whose key is KEY and returns the
+  associated value and T as multiple values, or returns NIL and NIL
+  if there is no such entry. Entries can be added using SETF.
+
+
 _[function]_         `%LOOKUP  (INODE KEY LEVEL PARENT STARTGEN)`
 
 > The general concept of the procedure for finding a given key within
@@ -1503,44 +1657,225 @@ _[function]_         `%LOOKUP  (INODE KEY LEVEL PARENT STARTGEN)`
 
 _[function]_         `CTRIE-DROP  (CTRIE KEY)`
 
-> Remove KEY and it's value from the CTRIE.
+> Remove KEY and it's associated value from CTRIE. Returns as multiple
+  values the value associated with KEY and T if there was such an entry,
+  otherewise NIL and NIL
 
 
 _[function]_         `%REMOVE  (INODE KEY LEVEL PARENT STARTGEN)`
 
 _[function]_         `CTRIE-MAP  (CTRIE FN &KEY ATOMIC &AUX ACCUM)`
 
+> Applies a function two arguments, FN, to each (key . value) pair present in
+  CTRIE.  During the extent of CTRIE-MAP, a special variable ACCUM (initially NIL)
+  is available for accumulation of a result value which will be returned after
+  the completion of the CTRIE-MAP call.  If ATOMIC is non-NIL, the operation will
+  be performed on a read-only atomic snapshot of CTRIE, which guarantees a
+  consistent, point-in-time representation of the entries present in CTRIE
+
+
 _[macro]_            `CTRIE-DO  ((KEY VALUE CTRIE &KEY ATOMIC) &BODY BODY)`
 
-> Iterate over (key . value) in ctrie in the manner of dolist.
+> Iterate over the contents of CTRIE in the manner of dolist. For each
+  (key . value) pair present in CTRIE, BODY (implicit PROGN) will be
+  evaluated with the symbols specified for KEY and VALUE will be bound
+  to the respective entry constituents.  A special variable
+  ACCUM (initially NIL) is available for accumulation of a result
+  value which will be returned after the completion of the CTRIE-DO
+  call.  If ATOMIC is non-NIL, the operation will be performed on a
+  read-only atomic snapshot of CTRIE, which guarantees a consistent,
+  point-in-time representation of the entries present in CTRIE.
+  ```
   ;;;  EXAMPLE: (ctrie-do (k v ctrie)
   ;;;             (format t "~&~8S => ~10S~%" k v))
+  ```
 
 
 _[function]_         `CTRIE-MAP-KEYS  (CTRIE FN &KEY ATOMIC)`
 
+> Applies a function one argument, FN, to each key present in CTRIE.
+  During the extent of CTRIE-MAP-KEYS, a special variable
+  ACCUM (initially NIL) is available for accumulation of a result
+  value which will be returned after the completion of the
+  CTRIE-MAP-KEYS call.  If ATOMIC is non-NIL, the operation will be
+  performed on a read-only atomic snapshot of CTRIE, which guarantees
+  a consistent, point-in-time representation of the keys present in
+  CTRIE
+
+
 _[function]_         `CTRIE-MAP-VALUES  (CTRIE FN &KEY ATOMIC)`
+
+> Applies a function one argument, FN, to each value present in CTRIE.
+  During the extent of CTRIE-MAP-VALUES, a special variable
+  ACCUM (initially NIL) is available for accumulation of a result
+  value which will be returned after the completion of the
+  CTRIE-MAP-VALUES call.  If ATOMIC is non-NIL, the operation will be
+  performed on a read-only atomic snapshot of CTRIE, which guarantees
+  a consistent, point-in-time representation of the values present in
+  CTRIE
+
 
 _[function]_         `CTRIE-KEYS  (CTRIE &KEY ATOMIC)`
 
+> Construct and return a list containing all keys present in CTRIE.
+  If ATOMIC is non-NIL, the operation will be performed on a read-only
+  atomic snapshot of CTRIE, which guarantees a consistent,
+  point-in-time representation of the keys present in CTRIE
+
+
 _[function]_         `CTRIE-VALUES  (CTRIE &KEY ATOMIC)`
 
-_[function]_         `CTRIE-SIZE  (CTRIE &AUX (ACCUM 0))`
+> Construct and return a list containing all values present in CTRIE.
+  If ATOMIC is non-NIL, the operation will be performed on a read-only
+  atomic snapshot of CTRIE, which guarantees a consistent,
+  point-in-time representation of the values present in CTRIE
+
+
+_[function]_         `CTRIE-SIZE  (CTRIE &KEY ATOMIC &AUX (ACCUM 0))`
+
+> Return the number of entries present in CTRIE.  If ATOMIC is non-NIL,
+  the operation will be performed on a read-only atomic snapshot of CTRIE,
+  which guarantees a consistent, point-in-time representation of CTRIE
+
 
 _[function]_         `CTRIE-EMPTY-P  (CTRIE)`
 
+> Return T if CTRIE contains no entries, otherwise NIL. This function is
+  O(1) and is much more efficient than testing for `CTRIE-SIZE` of 0
+
+
 _[function]_         `CTRIE-TO-ALIST  (CTRIE &KEY ATOMIC)`
 
-_[function]_         `CTRIE-TO-HASHTABLE  (CTRIE &KEY ATOMIC)`
+> Return an alist containing all (key . value) pairs found in CTRIE.
+  If ATOMIC is non-NIL, the operation will be performed on a read-only
+  atomic snapshot of CTRIE, which guarantees a consistent,
+  point-in-time representation of the entries in CTRIE
+
+
+_[function]_         `CTRIE-TO-HASHTABLE  (CTRIE &KEY ATOMIC HASH-TABLE &AUX
+                                           (ACCUM
+                                            (OR HASH-TABLE
+                                                (MAKE-HASH-TABLE :TEST
+                                                                 (CTRIE-TEST
+                                                                  CTRIE)
+                                                                 :HASH-FUNCTION
+                                                                 (CTRIE-HASH
+                                                                  CTRIE)
+                                                                 :SYNCHRONIZED
+                                                                 ATOMIC))))`
+
+> Return a hash-table containing all (key . value) pairs found in CTRIE.
+  If ATOMIC is non-NIL, the operation will be performed on a read-only
+  atomic snapshot of CTRIE, which guarantees a consistent,
+  point-in-time representation of the entries in CTRIE. If HASH-TABLE
+  is specified, it will be used as the destination hash-table.
+  Otherwise, a new hash-table will be created with hash-function and
+  test identical to that of CTRIE.  It will be created as synchronized
+  if ATOMIC is not NIL
+
 
 _[function]_         `CTRIE-PPRINT  (CTRIE &OPTIONAL (STREAM T))`
 
+> Pretty-print a representation of CTRIE as an alist containing
+  all (key . value) pairs found in it.  Atomicity is not guaranteed
+
+
 _[function]_         `CTRIE-FROM-ALIST  (ALIST &KEY CTRIE)`
 
-_[function]_         `CTRIE-FROM-HASHTABLE  (HASHTABLE &KEY CTRIE)`
+> Return a CTRIE containing all (key . value) pairs found in ALIST.
+  If CTRIE is specified, it will be used as the destination ctrie.
+  Otherwise, a new ctrie will be created. Atomicity is not guaranteed
 
-> create a new ctrie containing the same (k . v) pairs and equivalent
-  test function as HASHTABLE
+
+_[function]_         `CTRIE-FROM-HASHTABLE  (HASH-TABLE &KEY CTRIE)`
+
+> Return a CTRIE containing all (key . value) pairs found in HASH-TABLE.
+  If CTRIE is specified, it will be used as the destination ctrie.
+  Otherwise, a new ctrie will be created with test identical to that
+  of HASH-TABLE. The hash-function will NOT be preserved, as that
+  information does not appear to be recoverable from a hash-table once
+  created
+
+
+_[function]_         `CTRIE-MAX-DEPTH  (THING)`
+
+> Compute the maximum length of any arc. Useful as a diagnostic
+
+
+_[function]_         `CTRIE-MIN-DEPTH  (THING)`
+
+> Compute the minimum length of any arc. Useful as a diagnostic
+
+
+_[function]_         `CTRIE-SNAPSHOT  (CTRIE &KEY READ-ONLY)`
+
+> Atomically create a clone of CTRIE that may be operated upon
+  independently without affecting or being affected by operations or
+  content of the original CTRIE.  If READ-ONLY is NIL (the default),
+  the new CTRIE will be a READABLE/WRITABLE 'fork' of CTRIE (see
+  `CTRIE-FORK`) otherwise, the clone will be READABLE only, which has
+  considerable performance benefits in some circumstances, as the arcs
+  will not require `REFRESH` and should be the preferred mode when
+  updates (writability) of the clone are not required
+
+
+_[function]_         `CTRIE-FORK  (CTRIE)`
+
+> Atomically create a READABLE and WRITABLE clone of CTRIE that may
+  be operated upon independently without affecting or being affected
+  by the original CTRIE.
+
+
+_[macro]_            `CTRIE-LAMBDA  (&ONCE CTRIE &REST REST)`
+
+> Pandoric Object and Inter-Lexical Communication Protocol
+  this macro builds the most unencumbered and widely applicable
+  'purist edition' Of our PLAMBDA based form.  Even as such,
+  a lot of care has been given to many subtle ways it has been
+  refined to offer the most convenient and natural tool possible.
+  ```;;;
+     ;;; (plambda (#<CLOSURE (LAMBDA (&REST ARGS)) {100929EB1B}> )
+     ;;;
+     ;;; DISPATCHING to FUNCTIONAL MAPPING:
+     ;;;   (IF (REST ARGS)
+     ;;;          (APPLY ARG (REST ARGS))
+     ;;;          (FUNCALL ARG #'IDENTITY)) =>
+     ;;; ------------------------------------------------------------
+     ;;; INITIALIZING PLAMBDA
+     ;;; ------------------------------------------------------------
+     ;;;   IT => #S(CTRIE
+     ;;;               :READONLY-P NIL
+     ;;;               :TEST EQUAL
+     ;;;               :HASH SXHASH
+     ;;;               :STAMP #<CLOSURE (LAMBDA # :IN CONSTANTLY) {10092B516B}>
+     ;;;               :ROOT #S(INODE
+     ;;;                        :GEN #:|ctrie2196|
+     ;;;                        :REF #S(REF
+     ;;;                                :STAMP @2012-08-19T13:34:58.314457-04:00
+     ;;;                                :VALUE #S(CNODE :BITMAP 0 :ARCS #())
+     ;;;                                :PREV NIL)))
+     ;;;   PLIST => (:CONTAINER #<CLOSURE (LAMBDA #) {100929EACB}> 
+     ;;;             :TIMESTAMP @2012-08-19T13:34:58.314464-04:00)
+     ;;;   STACK => (#<CLOSURE (LAMBDA #) {100929EACB}>)
+     ;;; 
+     ;;; ------------------------------------------------------------
+     ;;;  #<CLOSURE (LAMBDA (&REST #:ARGS55)) {100929EACB}>
+     ;;;```
+
+
+_[generic-function]_ `CTRIE-LAMBDA-CTRIE  (CTRIE-LAMBDA-OBJECT)`
+
+> Returns and (with setf) changes the ctrie of the specified ctrie-lambda-object
+
+
+
+_[function]_         `CTRIE-LAMBDA-SPAWN  (SELF &KEY READ-ONLY)`
+
+> Causes the atomic clone of enclosed ctrie structure and builds a new
+  lexical closure to operate on it.  Does not bother to reproduce fancy
+  (expensive) object, class, bindings, but provides almost identical
+  functionality.  May be used to more efficintly distribute workload
+  in parallel
 
 
 _[macro]_            `DEFINE-CTRIE  (NAME CTRIE &REST ARGS &KEY (OBJECT T) SPEC)`
@@ -1606,69 +1941,6 @@ _[macro]_            `DEFINE-CTRIE  (NAME CTRIE &REST ARGS &KEY (OBJECT T) SPEC)
   ;;;     =>  (0 1 2 3 4 5 6 7 8 9 10 11)
   ```
 
-
-_[generic-function]_ `CTRIE-LAMBDA-DISPATCH  (CTRIE-LAMBDA-OBJECT)`
-
-> Returns and (with setf) changes the dispatch of the specified ctrie-lambda-object
-
-
-
-_[function]_         `CTRIE-LAMBDA-SPAWN  (SELF &KEY READ-ONLY)`
-
-> Causes the atomic clone of enclosed ctrie structure and builds a new
-  lexical closure to operate on it.  Does not bother to reproduce fancy
-  (expensive) object, class, bindings, but provides almost identical
-  functionality.  May be used to more efficintly distribute workload
-  in parallel
-
-
-_[macro]_            `CTRIE-LAMBDA  (&ONCE CTRIE &REST REST)`
-
-> Pandoric Object and Inter-Lexical Communication Protocol
-  this macro builds the most unencumbered and widely applicable
-  'purist edition' Of our PLAMBDA based form.  Even as such,
-  a lot of care has been given to many subtle ways it has been
-  refined to offer the most convenient and natural tool possible.
-  ```;;;
-     ;;; (plambda (#<CLOSURE (LAMBDA (&REST ARGS)) {100929EB1B}> )
-     ;;;
-     ;;; DISPATCHING to FUNCTIONAL MAPPING:
-     ;;;   (IF (REST ARGS)
-     ;;;          (APPLY ARG (REST ARGS))
-     ;;;          (FUNCALL ARG #'IDENTITY)) =>
-     ;;; ------------------------------------------------------------
-     ;;; INITIALIZING PLAMBDA
-     ;;; ------------------------------------------------------------
-     ;;;   IT => #S(CTRIE
-     ;;;               :READONLY-P NIL
-     ;;;               :TEST EQUAL
-     ;;;               :HASH SXHASH
-     ;;;               :STAMP #<CLOSURE (LAMBDA # :IN CONSTANTLY) {10092B516B}>
-     ;;;               :ROOT #S(INODE
-     ;;;                        :GEN #:|ctrie2196|
-     ;;;                        :REF #S(REF
-     ;;;                                :STAMP @2012-08-19T13:34:58.314457-04:00
-     ;;;                                :VALUE #S(CNODE :BITMAP 0 :ARCS #())
-     ;;;                                :PREV NIL)))
-     ;;;   PLIST => (:CONTAINER #<CLOSURE (LAMBDA #) {100929EACB}> 
-     ;;;             :TIMESTAMP @2012-08-19T13:34:58.314464-04:00)
-     ;;;   STACK => (#<CLOSURE (LAMBDA #) {100929EACB}>)
-     ;;; 
-     ;;; ------------------------------------------------------------
-     ;;;  #<CLOSURE (LAMBDA (&REST #:ARGS55)) {100929EACB}>
-     ;;;```
-
-
-_[generic-function]_ `CTRIE-LAMBDA-DISPATCH  (CTRIE-LAMBDA-OBJECT)`
-
-> Returns and (with setf) changes the dispatch of the specified ctrie-lambda-object
-
-
-
-_[special-variable]_ `+SIMPLE-DISPATCH+  ((DLAMBDA (:FROM (ARG) ARG)
-                                                   (:TO (ARG) ARG)
-                                                   (:DOMAIN (ARG) ARG)
-                                                   (:RANGE (ARG) ARG)))`
 
 _[macro]_            `CTRIE-ERROR  (CONDITION &REST ARGS)`
 
