@@ -38,11 +38,19 @@
 ;; Table Abstraction Scaffolding
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+
 (defmacro with-skiplist-tables (&body body)
   `(flet ((make-table (&key (test #'eql))
             (cl-skip-list:make-skip-list :key-equal test :value-equal test))
            (table-clear (tbl)
-             (error "not supported"))
+             (cl-skip-list:map-skip-list (lambda (k v)
+                                           (declare (ignore v))
+                                           (cl-skip-list:skip-list-delete tbl k))
+               tbl))
+           (table-count (tbl)
+             (cl-skip-list:skip-list-length tbl))
+           (table-empty-p (tbl)
+             (cl-skip-list:skip-list-empty? tbl))
            (table-get (tbl k)
              (cl-skip-list:skip-list-lookup tbl k))
            (table-put (tbl k v)
@@ -60,6 +68,12 @@
            (table-clear (tbl)
              (sb-ext:with-locked-hash-table (tbl)
                (clrhash tbl)))
+           (table-count (tbl)
+             (sb-ext:with-locked-hash-table (tbl)
+               (hash-table-count tbl)))
+           (table-empty-p (tbl)
+             (sb-ext:with-locked-hash-table (tbl)
+               (eql 0 (hash-table-count tbl))))
            (table-get (tbl k)
              (sb-ext:with-locked-hash-table (tbl)
                (gethash k tbl)))
@@ -78,6 +92,12 @@
 (defmacro with-ctrie-tables (&body body)
   `(flet ((make-table (&key (test #'eql))
             (make-ctrie :test test))
+           (table-clear (tbl)
+             (ctrie-clear tbl))
+           (table-count (tbl)
+             (ctrie-size tbl))
+           (table-empty-p (tbl)
+             (ctrie-empty-p tbl))
            (table-get (tbl k)
              (ctrie-get tbl k))
            (table-put (tbl k v)
@@ -89,22 +109,24 @@
      ,@body))
 
 
-(define-test check-table-abstraction-fixtures
-  (assert-equalp (values "1" t)
-    (with-hash-tables
-      (let1 ht (make-table) 
-        (table-put ht 1 "1")
-        (table-get ht 1))))
-  (assert-equalp (values "1")
-    (with-skiplist-tables
-      (let1 ht (make-table) 
-        (table-put ht 1 "1")
-        (table-get ht 1))))
-  (assert-equalp (values "1" t)
-    (with-ctrie-tables
-      (let1 ct (make-table) 
-        (table-put ct 1 "1")
-        (table-get ct 1)))))
+(defmacro try-table-ops ()
+  `(let1 ht (make-table) 
+     (table-put ht 1 "1")
+     (assert-equalp "1" (table-get ht 1))
+     (assert-eql 1 (table-count ht))
+     (table-put ht 2 "2")
+     (assert-equalp "2" (table-get ht 2))
+     (assert-eql 2 (table-count ht))
+     (table-drop ht 2)
+     (assert-eql 1 (table-count ht))
+     (table-clear ht)
+     (assert-true (table-empty-p ht))))
+
+
+(define-test check-table-abstraction-fixtures ()
+  (with-hash-tables     (try-table-ops))
+  (with-ctrie-tables    (try-table-ops))
+  (with-skiplist-tables (try-table-ops)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -559,7 +581,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defvar *test-ctrie* (make-ctrie))
-(defvar *input*      (coerce (iota (expt 2 18)) 'vector))
+(defvar *input*      (shuffle (coerce (iota (expt 2 20)) 'vector)))
 (defvar *kernels*    (loop for i from 0 to 3
                           collect (lparallel:make-kernel (expt 2 i))))
 

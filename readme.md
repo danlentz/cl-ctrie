@@ -69,8 +69,8 @@ E5462 @ 2.80GHz), SBCL version 1.0.57.56-2273f3a, and Mac OS X Server
 version 10.6.8.
 
 ```
-Starting test run on Tuesday, September 4, 2012 09:02:59 PM EDT
----------------------------------------------------------------
+Starting test run on Wednesday, September 5, 2012 08:56:17 AM EDT
+-----------------------------------------------------------------
 
 CHECK-ALET-FSM: 7 assertions passed, 0 failed.
 CHECK-ATOMIC-CLEAR: 6 assertions passed, 0 failed.
@@ -85,17 +85,17 @@ CHECK-EXTENSION/RETRACTION/LNODE-CHAINING: 14 assertions passed, 0 failed.
 CHECK-FBIND: 3 assertions passed, 0 failed.
 CHECK-FLAG-ARC-POSITION: 165 assertions passed, 0 failed.
 CHECK-FLAG-COMPUTATION: 12 assertions passed, 0 failed.
-CHECK-LNODE-INSERTED/REMOVED: 218 assertions passed, 0 failed.
+CHECK-LNODE-INSERTED/REMOVED: 288 assertions passed, 0 failed.
 CHECK-LNODE-LENGTH/ENLIST: 8 assertions passed, 0 failed.
 CHECK-LNODE-SEARCH: 4 assertions passed, 0 failed.
-CHECK-PARALLEL-INSERT-PARALLEL-DROP: 1048588 assertions passed, 0 failed.
-CHECK-PARALLEL-INSERT-PARALLEL-LOOKUP: 1048584 assertions passed, 0 failed.
+CHECK-PARALLEL-INSERT-PARALLEL-DROP: 4194316 assertions passed, 0 failed.
+CHECK-PARALLEL-INSERT-PARALLEL-LOOKUP: 4194312 assertions passed, 0 failed.
 CHECK-SIMPLE-INSERT/LOOKUP: 170 assertions passed, 0 failed.
 CHECK-SIMPLE-INSERT/LOOKUP/DROP: 255 assertions passed, 0 failed.
-CHECK-TABLE-ABSTRACTION-FIXTURES: 3 assertions passed, 0 failed.
+CHECK-TABLE-ABSTRACTION-FIXTURES: 18 assertions passed, 0 failed.
 CHECK-TIMING-COLLECTION-FIXTURES: 18 assertions passed, 0 failed.
 
-TOTAL: 4195390 assertions passed, 0 failed, 0 execution errors.
+TOTAL: 10,486,931 assertions passed, 0 failed, 0 execution errors.
 ```
 
 ### Ideosyncrasies
