@@ -9,26 +9,36 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defparameter *alternative-package-exports*
-  '(:get :put :drop :make :do :keys :values :size :test :hash :readonly-p
+  '(:get :put :drop :make :new :do :keys :values :size :test :hash :readonly-p
      :map :map-keys :map-values :clear :pprint :error :to-alist :to-hashtable
      :from-hashtable :from-alist :empty-p :save :load :export :import :snapshot :fork
      :lambda :lambda-ctrie :lambda-class :lambda-object :lambda-spawn :define
-     :max-depth :min-depth)
+     :max-depth :min-depth :enable-pooling :disable-pooling :pooling-enabled-p)
   "defines the symbols exported by the alternative packaging style experiment")
 
-(defun internal-symbols (package)
+
+(defun internal-symbols (package &optional (return-type 'list))
   (let ((acc (make-array 100 :adjustable t :fill-pointer 0))
         (used (package-use-list package)))
     (do-symbols (symbol (find-package package))
       (unless (find (symbol-package symbol) used)
         (vector-push-extend symbol acc)))
-    acc))
+    (coerce acc return-type)))
 
-(defun external-symbols (package)
+(defun external-symbols (package &optional (return-type 'list))
   (let ((acc (make-array 100 :adjustable t :fill-pointer 0)))
     (do-external-symbols (symbol (find-package package))
       (vector-push-extend symbol acc))
-    acc))
+    (coerce acc return-type)))
+
+(defun home-symbols (package &optional (return-type 'list))
+  (coerce (loop for sym being the present-symbols in package
+            when (eq (find-package package) (symbol-package sym))
+            collect sym)
+    return-type))
+    
+(defun home-functions (package)
+  (remove-if-not #'fboundp (home-symbols package)))
 
 
 (defun generate-alternative-package ()
@@ -47,10 +57,10 @@
     (make-package :ctrie :use nil)
     (mapc (lambda (sym) (export (intern (string sym) :ctrie) :ctrie))
       *alternative-package-exports*)      
-    (loop for alt across (sort (external-symbols :ctrie) #'string<)
+    (loop for alt in (sort (external-symbols :ctrie) #'string<)
       for sym = (symbolicate "CTRIE-" alt)
       for xsym = (symbolicate alt "-CTRIE")
-      do (format t "~&~20S -> " alt)
+      do (format t "~&~23S -> " alt)
       when #3=(find-class sym nil) do (format t "C: ~A " (setf (find-class alt) #3#))
       do (if #1=(macro-function sym)
            (format t "M: ~A " (setf (macro-function alt) #1#))
@@ -67,6 +77,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Some Helpful Utility Functions and Macros
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 
 #+swank 
 (defun ^ (thing &optional wait)
@@ -144,6 +155,33 @@
 	      then (append form (list ->>form))
 	    finally (return ->>form))))
 |#
+
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; map-update 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun map-update (fun src &rest lists)
+  (funcall
+    (reduce (lambda (cont list-elms)
+              (lambda ()
+                (apply fun (funcall cont) list-elms) ))
+            (apply #'mapcar #'list lists)
+            :initial-value (constantly src) )))
+
+
+(defun subst-all (to-list from-list src)
+  "```
+   ;;; (subst-all '(1 2 3) '(a b c) '(a b c d c b a))
+   ;;;  => '(1 2 3 d 3 2 1)
+   ```"
+  (map-update
+    (lambda (src from to) (subst to from src))
+    src from-list to-list))
+
+
 
 
 
@@ -274,72 +312,93 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; macrology originating from LMJ's excellent LPARALLEL http://www.lparallel.com
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(eval-when (:load-toplevel :compile-toplevel :execute)
+  (defmacro let1 (var value &body body)
+    "Make a single `let' binding, heroically saving three columns."
+    `(let ((,var ,value))
+       ,@body))
 
-(defmacro let1 (var value &body body)
-  "Make a single `let' binding, heroically saving three columns."
-  `(let ((,var ,value))
-     ,@body))
+  (defmacro defun/inline (name args &body body)
+    "define a function automatically declared to be INLINE"
+    `(progn
+       (declaim (inline ,name))
+       (defun ,name ,args ,@body)))
 
-(defmacro defun/inline (name args &body body)
-  "define a function automatically declared to be INLINE"
-  `(progn
-     (declaim (inline ,name))
-     (defun ,name ,args ,@body)))
+  (defmacro once-only-1 (var &body body)
+    (let ((tmp (gensym (symbol-name var))))
+      ``(let ((,',tmp ,,var))
+          ,(let ((,var ',tmp))
+             ,@body))))
 
-(defmacro once-only-1 (var &body body)
-  (let ((tmp (gensym (symbol-name var))))
-    ``(let ((,',tmp ,,var))
-        ,(let ((,var ',tmp))
-           ,@body))))
-
-(defmacro once-only (vars &body body)
-  (if vars
+  (defmacro once-only (vars &body body)
+    (if vars
       `(once-only-1 ,(car vars)
          (once-only ,(cdr vars)
            ,@body))
       `(progn ,@body)))
 
-(defun unsplice (form)
-  (if form (list form) nil))
+  (defun unsplice (form)
+    (if form (list form) nil))
 
-(defun has-docstring-p (body)
-  (and (stringp (car body)) (cdr body)))
+  (defun has-docstring-p (body)
+    (and (stringp (car body)) (cdr body)))
 
-(defun has-declare-p (body)
-  (and (consp (car body)) (eq (caar body) 'declare)))
+  (defun has-declare-p (body)
+    (and (consp (car body)) (eq (caar body) 'declare)))
 
-(defmacro with-preamble ((preamble body-var) &body body)
-  "Pop docstring and declarations off `body-var' and assign them to `preamble'."
-  `(let ((,preamble (loop
-                       :while (or (has-docstring-p ,body-var)
-                                  (has-declare-p ,body-var))
-                       :collect (pop ,body-var))))
-     ,@body))
+  (defmacro with-preamble ((preamble body-var) &body body)
+    "Pop docstring and declarations off `body-var' and assign them to `preamble'."
+    `(let ((,preamble (loop
+                        :while (or (has-docstring-p ,body-var)
+                                 (has-declare-p ,body-var))
+                        :collect (pop ,body-var))))
+       ,@body))
 
-(defmacro defmacro/once (name params &body body)
-  "Like `defmacro' except that params which are immediately preceded
+  (defmacro defmacro/once (name params &body body)
+    "Like `defmacro' except that params which are immediately preceded
    by `&once' are passed to a `once-only' call which surrounds `body'."
-  (labels ((once-keyword-p (obj)
-             (and (symbolp obj) (equalp (symbol-name obj) "&once")))
-           (remove-once-keywords (params)
-             (mapcar (lambda (x) (if (consp x) (remove-once-keywords x) x))
-                     (remove-if #'once-keyword-p params)))
-           (find-once-params (params)
-             (mapcon (lambda (x)
-                       (cond ((consp (first x))
-                              (find-once-params (first x)))
-                             ((once-keyword-p (first x))
+    (labels ((once-keyword-p (obj)
+               (and (symbolp obj) (equalp (symbol-name obj) "&once")))
+              (remove-once-keywords (params)
+                (mapcar (lambda (x) (if (consp x) (remove-once-keywords x) x))
+                  (remove-if #'once-keyword-p params)))
+              (find-once-params (params)
+                (mapcon (lambda (x)
+                          (cond ((consp (first x))
+                                  (find-once-params (first x)))
+                            ((once-keyword-p (first x))
                               (unless (and (cdr x) (atom (cadr x)))
                                 (error "`&once' without parameter in ~a" name))
                               (list (second x)))
-                             (t
+                            (t
                               nil)))
-                     params)))
-    (with-preamble (preamble body)
-      `(defmacro ,name ,(remove-once-keywords params)
-         ,@preamble
-         (once-only ,(find-once-params params)
-           ,@body)))))
+                  params)))
+      (with-preamble (preamble body)
+        `(defmacro ,name ,(remove-once-keywords params)
+           ,@preamble
+           (once-only ,(find-once-params params)
+             ,@body)))))
+  )
+
+
+
+(defmacro/once build-list (&once n &body body)
+  "Execute `body' `n' times, collecting the results into a list."
+  `(loop :repeat ,n :collect (progn ,@body)))
+
+
+(defmacro/once build-vector (&once n &body body)
+  "Execute `body' `n' times, collecting the results into a vector."
+  (with-gensyms (result index)
+    `(let1 ,result (make-array ,n)
+       (dotimes (,index ,n ,result)
+         (setf (aref ,result ,index) (progn ,@body))))))
+
+
+(defmacro with-thread ((&key bindings name) &body body)
+  `(let1 bt:*default-special-bindings* ,bindings
+     (bt:make-thread (lambda () ,@body)
+       :name ,name)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -417,6 +476,9 @@
     `(setf ,@(loop for place in places
                append `(,place ,value)))))
 
+(defmacro nilf (&rest places)
+  "Set PLACES to nil"
+  `(multiple-setf nil ,@places))
 
 (defmacro aconsf (place key value &environment env)
   "CONS is to PUSH as ACONS is to ACONSF; it pushes (cons KEY VALUE) to the PLACE."
@@ -873,33 +935,42 @@ For any other use, contact Erik Naggum."
 ;; Licensed under Apache License 2.0 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defvar *printv-output* (make-broadcast-stream))
+
+(defun printv-enable ()
+  (setf *printv-output* *trace-output*))
+
+(defun printv-disable ()
+  (setf *printv-output* (make-broadcast-stream)))
+
+
 (defun printv-minor-separator ()
-  (format *trace-output* "~&;;; ~72,,,'-<-~>~%")
-  (force-output *trace-output*))
+  (format *printv-output* "~&;;; ~72,,,'-<-~>~%")
+  (force-output *printv-output*))
 
 (defun printv-major-separator ()
-  (format *trace-output* "~&;;;~%")
+  (format *printv-output* "~&;;;~%")
   (princ
     (concatenate 'string ";;;"
       (make-string (- *print-right-margin* 5)
-        :initial-element #\=)) *trace-output*)
-  (force-output *trace-output*))
+        :initial-element #\=)) *printv-output*)
+  (force-output *printv-output*))
 
 (defun printv-form-printer (form)
   (typecase form
     ;; String (label):
-    (string (format *trace-output* "~&;;; ~a~%" form))
+    (string (format *printv-output* "~&;;; ~a~%" form))
     ;; Evaluated form:
     ((or cons (and symbol (not keyword)))
-      (format *trace-output* "~&;;;   ~w =>" form))
-    (vector (format *trace-output* "~&;;   ~s~%" form)) 
+      (format *printv-output* "~&;;;   ~w =>" form))
+    (vector (format *printv-output* "~&;;   ~s~%" form)) 
     ;; Self-evaluating form:
-    (t (format *trace-output* "~&;;;   ~s~%" form)))
-  (force-output *trace-output*))
+    (t (format *printv-output* "~&;;;   ~s~%" form)))
+  (force-output *printv-output*))
 
 (defun printv-values-printer (values-list)
-  (format *trace-output* "~:[ [returned 0 values]~;~:*~{ ~w~^;~}~]~%"  values-list)
-  (force-output *trace-output*))
+  (format *printv-output* "~:[ [returned 0 values]~;~:*~{ ~w~^;~}~]~%"  values-list)
+  (force-output *printv-output*))
 
 
 (defmacro vlet* (bind-forms &body body)
@@ -923,6 +994,15 @@ For any other use, contact Erik Naggum."
                        form))
            bind-forms)
      ,@body))
+
+
+(defmacro vcond (&body clauses)
+  `(cond ,@(mapcar #'(lambda (clause)
+		      `((let ((x ,(car clause)))
+			  (printv (list ',(car clause) '=> x))
+			  x)
+			,@(cdr clause)))
+             clauses)))
 
 
 (defun printv-expander (forms &optional values-trans-fn) ;; Allow for customized printv'ers:
@@ -949,6 +1029,15 @@ For any other use, contact Erik Naggum."
                             (case (car form)
                               (let (vlet `,(rest form)))
                               (let* (vlet* `,(rest form))))))))))
+             
+             ;; COND form:
+             ((and (consp form) (eq (car form) 'cond)) 
+               `((printv-form-printer ',form)
+                  (printv-values-printer
+                    (setf ,result-sym ,(if values-trans-fn
+                                         `(funcall ,values-trans-fn
+                                            (multiple-value-list (vcond `,(rest form))))
+                                         `(multiple-value-list (vcond `,(rest form))))))))
              
              ;; Evaluated form:
              ((or (consp form) (and (symbolp form) (not (keywordp form))))
