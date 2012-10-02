@@ -65,22 +65,39 @@
                      this is not necessarily a high priority for the initial development
                      cycle."
   
-  :weakly-depends-on (:cl-store :donuts :cldoc :cl-ppcre)
-  :depends-on (:closer-mop :contextl :alexandria  
-                :lisp-unit :local-time)
+  :weakly-depends-on (:cl-store :donuts :cldoc :cl-ppcre :drakma)
+  :depends-on (:closer-mop :contextl :alexandria :lisp-unit :local-time :flexi-streams
+                :cffi-objects :osicat  :hu.dwim.serializer :flexi-streams :unicly
+                :rucksack :cl-store)
   :components ((:static-file  "cl-ctrie.asd")
                 (:static-file "readme.md")
+                (:file "common-io")
+                (:file "common-pointer")
+                (:file "common-array")
                 (:file "ctrie-package")
                 (:file "ctrie-cas")
                 (:file "ctrie-util")
                 (:file "ctrie")
                 (:file "ctrie-lambda")
-        #+cldoc (:file "ctrie-doc")))
+                #+cldoc (:file "ctrie-doc")
+                (:file "mmap-package")
+                (:file "mmap-codec")
+                ))
 
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; PACKAGING
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defmethod asdf:perform :after ((o asdf:load-op) (c (eql (asdf:find-system :cl-ctrie))))
   (let ((*package* (find-package :cl-ctrie)))
     (funcall (intern (symbol-name :generate-alternative-package) (find-package :cl-ctrie)))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; DOCUMENTATION
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 #+cldoc
 (defmethod asdf:perform ((o asdf::doc-op) (c (eql (asdf:find-system :cl-ctrie))))
@@ -91,20 +108,27 @@
 (defmethod asdf:operation-done-p ((o asdf::doc-op) (c (eql (asdf:find-system :cl-ctrie))))
   nil)
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; TESTING
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (defclass test-file (asdf:cl-source-file)
   ())
 
 (defmethod perform ((op asdf:load-op) (c test-file))
-  (call-next-method))
+  (let ((*load-verbose* nil)
+         (*compile-verbose* nil))
+    (call-next-method)))
 
 (defmethod perform ((op asdf:compile-op) (c test-file))
-  (call-next-method))
-
-
+  (let ((*load-verbose* nil)
+         (*compile-verbose* nil))
+    (call-next-method)))
 
 (asdf:defsystem :cl-ctrie-test
   :serial t
-  :depends-on (:cl-ctrie :lparallel :cl-skip-list)
+  :depends-on (:cl-ctrie :lparallel)
   :components ((:test-file "ctrie-test")))
 
 
@@ -120,9 +144,9 @@
            (*error-output*    (make-broadcast-stream *error-output* log-stream)))      
       (funcall (intern (symbol-name :run-ctrie-tests) (find-package :cl-ctrie-test))))))
 
+
 (defmethod asdf:perform ((o asdf:test-op) (c (eql (asdf:find-system :cl-ctrie-test))))
   (asdf:test-system :cl-ctrie))
-
 
 (defmethod asdf:operation-done-p ((o asdf:test-op) (c (eql (asdf:find-system :cl-ctrie))))
   nil)
