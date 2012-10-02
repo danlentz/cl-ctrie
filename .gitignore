@@ -1,2 +1,14 @@
 doc/other
 tmp
+
+in/common-tty.lisp
+
+out/ctrie-doc.lisp
+
+out/ctrie-test.lisp
+
+out/ctrie-package.lisp
+
+out/ctrie-util.lisp
+
+out/ctrie.lisp

@@ -1,11 +1,9 @@
 ;;;;; -*- mode: common-lisp;   common-lisp-style: modern;    coding: utf-8; -*-
 ;;;;;
 
-
 #-sbcl (cl:error "~A not supportred" (cl:lisp-implementation-type))
 
-(defpackage :cl-ctrie
-  ;; (:nicknames :ctrie)
+(defpackage :cl-ctrie  
   (:documentation "This is a common-lisp implementation of the CTrie
      unordered map data-structure described in the paper 'Concurrent
      Tries with Efficient Non-Blocking Snapshots, (c) ACM 2-25-2012'
@@ -52,7 +50,11 @@
     :ctrie-lambda-spawn
     :ctrie-lambda-class
     :ctrie-lambda-object
-    :define-ctrie    
+    :new-ctrie
+    :define-ctrie
+    :ctrie-enable-pooling
+    :ctrie-disable-pooling
+    :ctrie-pooling-enabled-p
     :ctrie-error
     :ctrie-structural-error
     :ctrie-operational-error
@@ -62,5 +64,8 @@
     :ctrie-invalid-dynamic-context
     :ctrie-generational-mismatch
     :ctrie-modification-failed))
+
+
+
 
   

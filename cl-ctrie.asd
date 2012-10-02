@@ -65,10 +65,9 @@
                      this is not necessarily a high priority for the initial development
                      cycle."
   
-  :weakly-depends-on (:cl-store :donuts :cldoc :cl-ppcre :drakma)
+  :weakly-depends-on (:cl-store :donuts :cldoc :cl-ppcre :drakma :uuid :unicly)
   :depends-on (:closer-mop :contextl :alexandria :lisp-unit :local-time :flexi-streams
-                :cffi-objects :osicat  :hu.dwim.serializer :flexi-streams :unicly
-                :rucksack :cl-store)
+                :cffi-objects :osicat :hu.dwim.serializer :rucksack :cl-store)
   :components ((:static-file  "cl-ctrie.asd")
                 (:static-file "readme.md")
                 (:file "common-io")

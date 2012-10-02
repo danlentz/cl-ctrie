@@ -31,6 +31,10 @@
      ctrie-lambda-class
      ctrie-lambda-object
      define-ctrie
+     new-ctrie
+     ctrie-enable-pooling
+     ctrie-disable-pooling
+     ctrie-pooling-enabled-p
      ctrie-error ctrie-structural-error
      ctrie-operational-error ctrie-operation-retries-exceeded
      ctrie-not-implemented ctrie-not-supported
@@ -76,13 +80,24 @@
      ctrie-lambda-spawn
      ctrie-lambda-class
      ctrie-lambda-object
+     new-ctrie
      define-ctrie
+     ctrie-enable-pooling
+     ctrie-disable-pooling
+     ctrie-pooling-enabled-p
+     *pool-high-water*
+     cnode-pool
+     pool-queue
+     pool-worker
+     allocate-cnode     
+     fill-pool
+     fill-all-pools     
      ctrie-error ctrie-structural-error ctrie-operational-error
      ctrie-modification-failed
      ctrie-operation-retries-exceeded ctrie-not-implemented
      ctrie-not-supported ctrie-invalid-dynamic-context
      ctrie-generational-mismatch readme readme-quietly apidoc princ-apidoc
-     collect-docs define-diagram))
+     collect-docs define-diagram generate-alternative-package))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

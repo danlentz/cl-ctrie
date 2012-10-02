@@ -21,7 +21,8 @@
   part of most user-level ctrie operations.  If this value is not set, then
   the hash will simply be computed on demand and processing will continue
   unaffected.  Use of this variable is simply an optional performace
-  optimization techniqie.")
+  optimization techniqie. For additional detail, refer to the documentation
+  for functions `FLAG` and `CTHASH`")
 
 (defparameter *retries*        16
   "Establishes the number of restarts permitted to a CTRIE operation
@@ -47,6 +48,12 @@
 (defparameter *debug*         nil
   "Debugging flag, not used in production, to enable generation of
   additional diagnostic and reporting information.")
+
+(defparameter *timestamps-enabled* nil)
+
+(defparameter *pool-enabled*    t)
+
+(defparameter *pool-high-water* (expt 2 10))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -164,7 +171,7 @@
        -  TAG is NIl if evaluation of the FORMS completed normally
           or the tag thrown and cought.
     * EXAMPLE:
-        ```
+    ```
         ;;; (multiple-value-bind (result tag)
         ;;;            (multi-catch (:a :b)
         ;;;                 ...FORMS...)
@@ -172,7 +179,7 @@
         ;;;                 (:a ...)
         ;;;                 (:b ...)
         ;;;                 (t ...)))
-        ```"
+    ```"
     (let ((block-name (gensym)))
       `(block ,block-name
          ,(multi-catch-1 block-name tag-list forms))))
@@ -206,6 +213,74 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; CTRIE Root Container
+;;
+;; the root container is now declared early to avoid performance penalties
+;; incurred for structure slot accessors that are referenced prior to the
+;; actual structure definition.  The consequence is that this requires several
+;; forward references to other functions defined later in this file.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+(defstruct (ctrie (:constructor %make-ctrie))
+  "A CTRIE structure is the root container that uniquely identifies a CTRIE
+  instance, and  contains the following perameters which specify the
+  definable aspects of each CTRIE:
+  - `READONLY-P` if not `NIL` prohibits any future modification or
+  cloning of this instance.
+  - `TEST` is a designator for an equality predicate that will be
+  applied to disambiguate and determine the equality of any two
+  keys. It is recommened that this value be a symbol that is fboundp,
+  to retain capability of externalization (save/restore). At present,
+  though, this is not enforced and a function object or lambda
+  expression will also be accepted, albeit without the ability of
+  save/restore.
+  - `HASH` is a designator for a hash function, which may be
+  desirable to customize when one has specific knowledge about the set
+  of keys which will populate the table.  At this time, a 32-bit hash
+  is recommended as this is what has been used for development and
+  testing and has been shown to provide good performance in
+  practice. As with `TEST` it is recommended that `HASH` be specified
+  by a symbol that is fboundp.
+  - `ROOT` is the slot used internally for storage of the root inode
+  structure that maintains the reference to the contents of the ctrie
+  proper.  The ctrie-root must only be accessed using the _RDCSS ROOT
+  NODE PROTOCOL_ defined by the top-level entry-points `ROOT-NODE-ACCESS`
+  and `ROOT-NODE-REPLACE`"
+  (readonly-p  nil)
+  (test       'equal  :read-only t)
+  (hash       'sxhash :read-only t)
+  (stamp      (if *timestamps-enabled* #'local-time:now (constantly nil)))
+  (root       (make-inode (make-cnode) (gensym "ctrie"))))
+
+
+(defun make-ctrie (&rest args &key root (readonly-p nil) (test 'equal) (hash 'sxhash)
+                    (stamp (if *timestamps-enabled* #'local-time:now (constantly nil)))
+                     &allow-other-keys)
+  "CREATE a new CTRIE instance. This is the entry-point constructor 
+  intended for use by the end-user."
+  (declare (ignorable readonly-p test hash root stamp))
+  (apply #'%make-ctrie args))
+
+
+(defmacro/once with-ctrie (&once ctrie &body body)
+  "Configure the dynamic environment with the appropriate condition
+  handlers, control fixtures, and instrumentation necessary to execute
+  the operations in BODY on the specified CTRIE. Unless specifically
+  documented, the particular configuration of this dynamic environment
+  should be considered an implementation detail and not relied upon. A
+  particular exception, however, is that within the dynamic extent of
+  a WITH-CTRIE form, the code implementing a CTRIE operation may
+  expect that the special variable `*CTRIE*` will be bound to the root
+  container of subject CTRIE.  See also the documentation for
+  `*CTRIE*`"
+  `(let* ((*ctrie* (if (typep ,ctrie 'function)
+                     (funcall ,ctrie #'identity)
+                     ,ctrie)))
+     ,@body))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Flag Vector / Bitmap Operations
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -222,7 +297,7 @@
 
 
 (defun ctstamp ()
-  (when t ;;*debug*
+  (when *timestamps-enabled*
     (if *ctrie*
       (funcall (ctrie-stamp *ctrie*))
       (local-time:now))))
@@ -232,9 +307,17 @@
   "For a given depth, LEVEL, within a CTRIE, extract the correspondant
   sequence of bits from the computed hash of KEY that indicate the
   logical index of the arc on the path to which that key may be found.
-  Note that the logical index of the arc is most likely not the same
-  as the physical index where it is actually located -- for that see
-  `FLAG-ARC-POSITION`"
+  If USE-CACHED-P is non-NIL and the special-variable `*HASH-CODE*` is
+  non-NIL as well, the hash will not be recomputed, but instead the
+  value bound to `*HASH-CODE*` will be used as an optimization to
+  reduce unnecessary recomputation of hash function -- an expensive
+  operation.  This value is NOT checked and assumed to be valid and
+  appropriate to the given situation -- care must be taken to use this
+  cached value correctly.  When in doubt, recomputing hash may be a
+  performance penalty, but is guaranteed to always work in any
+  situation.  Note that the logical index of the arc is most likely
+  not the same as the physical index where it is actually located --
+  for that see `FLAG-ARC-POSITION`"
   (ash 1 (logand (ash (or (when use-cached-p *hash-code*) (cthash key))
                    (- level)) #x1f)))
 
@@ -378,8 +461,13 @@
   ;;       #\( :has-prev? (not (null (ref-prev (inode-ref o)))) #\)
   ;;       :=> (ref-value (inode-ref o))))
   ;;     (terpri stream))
-  (call-next-method))
-;;)
+  (if *debug*
+    (call-next-method)
+    (print-unreadable-object (o stream :identity t)
+      (format stream
+         "~a ~a ~s"
+         :inode (inode-gen o) (ref-stamp (inode-ref o))))))
+
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -634,6 +722,20 @@
 ;; CNODE
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defvar *cnode-pool*       nil)
+(defvar *pool-worker*      nil)
+(defvar *pool-queue*       nil)
+
+(defun ctrie-enable-pooling ()
+  (setf *pool-enabled* t))
+
+(defun ctrie-disable-pooling ()
+  (setf *pool-enabled* nil))
+
+(defun ctrie-pooling-enabled-p ()
+  (not (null *pool-enabled*)))
+
+
 (defstruct (cnode
              (:constructor %make-cnode)
              (:copier nil))
@@ -652,8 +754,85 @@
   value of BITMAP during initialization
    - `BITMAP`
    - `ARCS` "
-  (bitmap 0           :read-only t)
-  (arcs   %empty-map% :read-only t))
+  (bitmap 0           )  ;;:read-only t)
+  (arcs   %empty-map% )) ;;:read-only t))
+
+
+(defun/inline cnode-pool ()
+  (or *cnode-pool*
+    (setf *cnode-pool*
+      (make-array 33 :initial-contents
+        (loop repeat 33 collect (cons nil nil))))))
+
+(define-symbol-macro cnp
+  (loop for p across (cnode-pool) collect (length (cdr p))))
+
+(defun/inline pool-queue ()
+  (or *pool-queue* 
+    (setf *pool-queue*
+      (sb-concurrency:make-mailbox :name "pool-queue"))))
+
+
+(defun destroy-cnode-pool ()
+  (setf *cnode-pool* nil))
+
+(defun destroy-pool-queue ()
+  (setf *pool-queue* nil))
+
+
+(defun fill-pool (size)
+  (let1 pool (svref (cnode-pool) size)
+    (unless (cdr pool)
+      ;;(printv "filling pool" size "")
+      (sb-thread::with-cas-lock ((car pool))
+        (setf (cdr pool)
+          (loop repeat *pool-high-water*
+            collect (%make-cnode :arcs (make-array size))))))))
+
+(defun fill-all-pools ()
+  (dolist (size (iota 33 :start 0))
+    (sb-concurrency:send-message (pool-queue) size)))
+
+
+(defun do-pool-work ()
+  (loop with terminate until terminate
+    for request = (sb-concurrency:receive-message (pool-queue))
+    if (minusp request) do (setf terminate t)
+    else do (fill-pool request)))
+
+
+(defun/inline pool-worker ()
+  (if (and *pool-worker* (sb-thread:thread-alive-p *pool-worker*))
+    *pool-worker*
+    (setf *pool-worker*
+      (sb-thread:make-thread
+        (lambda ()
+          (fill-all-pools)
+          (do-pool-work)
+          (destroy-cnode-pool)
+          (destroy-pool-queue)
+          (setf *pool-worker* nil)
+          (sb-thread:terminate-thread sb-thread:*current-thread*))
+        :name "pool-worker"))))
+
+
+(defun/inline allocate-cnode (size)
+  (if (minusp size)
+    (sb-concurrency:send-message (pool-queue) size) 
+    (flet ((bail ()
+             (pool-worker)
+             (sb-concurrency:send-message (pool-queue) size)
+             (return-from allocate-cnode
+               (%make-cnode :arcs (make-array size)))))   
+      (let1 pool (svref (cnode-pool) size)
+        (when (null (cdr pool)) (bail))
+        (sb-thread::with-cas-lock ((car pool))
+          (unless (cdr pool) (bail))
+          (prog1 (pop (cdr pool))
+            (unless (cdr pool)
+              (pool-worker)
+              (sb-concurrency:send-message (pool-queue) size))))))))
+
 
 
 (defun make-cnode (&optional (bitmap 0))
@@ -664,9 +843,10 @@
   the CTRIE.  This constructor is otherwise never called directly, but
   is invoked during the course of higher-level operations such as
   `CNODE-EXTENDED` `CNODE-UPDATED` `CNODE-TRUNCATED` and `MAP-CNODE`"
-  (%make-cnode
-    :bitmap bitmap
-    :arcs  (make-array (logcount bitmap))))
+  (if *pool-enabled*
+    (aprog1 (allocate-cnode (logcount bitmap))
+      (setf (cnode-bitmap it) bitmap))
+    (%make-cnode :bitmap bitmap :arcs (make-array (logcount bitmap)))))
 
 
 (defun cnode-extended (cnode flag position new-arc)
@@ -911,73 +1091,14 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; CTRIE Root Container
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defstruct (ctrie (:constructor %make-ctrie))
-  "A CTRIE structure is the root container that uniquely identifies a CTRIE
-  instance, and  contains the following perameters which specify the
-  definable aspects of each CTRIE:
-
-  - `READONLY-P` if not `NIL` prohibits any future modification or
-  cloning of this instance.
-  - `TEST` is a designator for an equality predicate that will be
-  applied to disambiguate and determine the equality of any two
-  keys. It is recommened that this value be a symbol that is fboundp,
-  to retain capability of externalization (save/restore). At present,
-  though, this is not enforced and a function object or lambda
-  expression will also be accepted, albeit without the ability of
-  save/restore.
-  - `HASH` is a designator for a hash function, which may be
-  desirable to customize when one has specific knowledge about the set
-  of keys which will populate the table.  At this time, a 32-bit hash
-  is recommended as this is what has been used for development and
-  testing and has been shown to provide good performance in
-  practice. As with `TEST` it is recommended that `HASH` be specified
-  by a symbol that is fboundp.
-  - `ROOT` is the slot used internally for storage of the root inode
-  structure that maintains the reference to the contents of the ctrie
-  proper.  The ctrie-root must only be accessed using the _RDCSS ROOT
-  NODE PROTOCOL_ defined by the top-level entry-points `ROOT-NODE-ACCESS`
-  and `ROOT-NODE-REPLACE`"
-  (readonly-p  nil)
-  (test       'equal  :read-only t)
-  (hash       'sxhash :read-only t)
-  (stamp      (if *debug* #'local-time:now (constantly nil)))
-  (root       (make-inode (make-cnode) (gensym "ctrie"))))
-
-
-(defun make-ctrie (&rest args &key name root (readonly-p nil)
-                    (test 'equal) (hash 'sxhash) &allow-other-keys)
-  "CREATE a new CTRIE instance. This is the entry-point constructor 
-  intended for use by the end-user."
-  (declare (ignorable name readonly-p test hash root))
-  (apply #'%make-ctrie args))
-
-
-(defmacro/once with-ctrie (&once ctrie &body body)
-  "Configure the dynamic environment with the appropriate condition
-  handlers, control fixtures, and instrumentation necessary to execute
-  the operations in BODY on the specified CTRIE. Unless specifically
-  documented, the particular configuration of this dynamic environment
-  should be considered an implementation detail and not relied upon. A
-  particular exception, however, is that within the dynamic extent of
-  a WITH-CTRIE form, the code implementing a CTRIE operation may
-  expect that the special variable `*CTRIE*` will be bound to the root
-  container of subject CTRIE.  See also the documentation for
-  `*CTRIE*`"
-  `(let* ((*ctrie* (if (typep ,ctrie 'function)
-                     (funcall ,ctrie #'identity)
-                     ,ctrie)))
-     ,@body))
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; RDCSS root-inode protocol
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-   
-(defgeneric find-ctrie-root (ctrie-designator)
-  (:documentation "FIND-CTRIE-ROOT is a subprimitive used by the
+
+;;; Reimplemented as a regular function in order to reduce the cost
+;;; of generic dispatch, as this is heavily used.
+
+(defun/inline find-ctrie-root (ctrie-designator)
+  "FIND-CTRIE-ROOT is a subprimitive used by the
   internal CTRIE implementation to access the root inode of a given
   ctrie root-container. It does not provide safe access to the
   contents of that inode and should not be referenced by the
@@ -985,11 +1106,26 @@
   FIND-CTRIE-ROOT is to incorporate a level of indirection specialized
   on the class of the root container to facilitate future extension
   with alternate storage models, e.g., an external persistent disk-based
-  store. See also `(cas cl-ctrie::find-ctrie-root)`")
-  (:method ((ctrie ctrie))
-    (ctrie-root ctrie))
-  (:method ((ctrie function))
-    (find-ctrie-root (funcall ctrie #'identity))))
+  store. See also `(cas cl-ctrie::find-ctrie-root)`"
+  (if (functionp ctrie-designator)
+    (ctrie-root (funcall ctrie-designator #'identity))
+    (ctrie-root ctrie-designator)))
+
+
+;; (defgeneric find-ctrie-root (ctrie-designator)
+;;   (:documentation "FIND-CTRIE-ROOT is a subprimitive used by the
+;;   internal CTRIE implementation to access the root inode of a given
+;;   ctrie root-container. It does not provide safe access to the
+;;   contents of that inode and should not be referenced by the
+;;   higher-level implementation or end-user code.  The purpose of
+;;   FIND-CTRIE-ROOT is to incorporate a level of indirection specialized
+;;   on the class of the root container to facilitate future extension
+;;   with alternate storage models, e.g., an external persistent disk-based
+;;   store. See also `(cas cl-ctrie::find-ctrie-root)`")
+;;   (:method ((ctrie ctrie))
+;;     (ctrie-root ctrie))
+;;   (:method ((ctrie function))
+;;     (find-ctrie-root (funcall ctrie #'identity))))
 
 
 ;; (defgeneric (cas find-ctrie-root) (ctrie-designator old new)
@@ -1044,9 +1180,14 @@
   processed by `INODE-READ` in order to still properly comply with the
   underlying GCAS protocol implementation requirements common to all
   inodes"
-  (atypecase (find-ctrie-root ctrie)
-    (inode it)
-    (t (root-node-commit ctrie abort))))
+  (let1 node (find-ctrie-root ctrie)
+    (if (inode-p node)
+      node
+      (root-node-commit ctrie abort))))
+
+  ;; (atypecase (find-ctrie-root ctrie)
+  ;;   (inode it)
+  ;;   (t (root-node-commit ctrie abort))))
 
 
 (defun root-node-replace (ctrie ov ovmain nv)
