@@ -21,7 +21,7 @@
 
 
 (defpackage :mmap
-  (:shadow :pointer-address :incf-pointer :decf-pointer)
+  (:shadow :pointer-address :incf-pointer :decf-pointer :last-elt-p)
   (:use :closer-common-lisp :closer-mop :contextl :cffi-objects :alexandria)
   (:shadowing-import-from :cl-ctrie  :deflex :defmacro/once :once-only :with-gensyms
      :aconsf :let1 :aprog1 :awhen  :? :ppmx :printv) 

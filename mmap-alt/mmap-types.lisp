@@ -7,20 +7,28 @@
 ;; UUID Types
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defcstruct* unique-id
-  (bytes :uint8 :count 16))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (when (find-package :uuid)
+    (push :uuid *features*)))
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defcstruct* unique-id
+    (bytes :uint8 :count 16)))
 
 (defmethod pointer:deref ((unique-id unique-id) &optional
                            (type 'unicly:unique-universal-identifier) &rest args)
   (declare (ignore args))
   (case type
-    (unicly:unique-universal-identifier  (unicly:uuid-from-bit-vector 
-                                           (unicly:uuid-byte-array-to-bit-vector
-                                             (bytes unique-id))))
+    #+unicly
+    (unicly:unique-universal-identifier
+      (unicly:uuid-from-bit-vector 
+        (unicly:uuid-byte-array-to-bit-vector
+          (bytes unique-id))))
     #+uuid
-    (uuid:uuid                           (uuid:byte-array-to-uuid (bytes unique-id)))
-    (vector                              (bytes unique-id))))
+    (uuid:uuid
+      (uuid:byte-array-to-uuid (bytes unique-id)))
+    (vector
+      (bytes unique-id))))
 
 ;; (pointer:deref (make-instance 'unique-id :bytes (create-unique-id-byte-vector)))
 ;;   d12dd006-5876-4edf-9f23-68a2d72a20fa
@@ -51,11 +59,11 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Timestamp Types
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
+(eval-when (:compile-toplevel :load-toplevel :execute)
 (defcstruct* timestamp
   (day  :int)
   (sec  :uint16)
-  (nsec :uint32))
+  (nsec :uint32)))
 
 (defmethod pointer:deref ((timestamp timestamp) &optional (type 'local-time:timestamp) &rest args)
   (declare (ignorable type args))
@@ -88,11 +96,18 @@
   :set
   :map
   :seq)
-      
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
 (defcstruct* typed-pointer
   (element-type   pointer-type)
   (element-count  :uint)
-  (element-offset :uint))
+  (element-offset :uint)))
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+(defcstruct* pair
+  (head typed-pointer)
+  (tail  typed-pointer)))
+
 
 (defcenum action
   :none
@@ -107,7 +122,7 @@
 ;; Header Types
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-
+(eval-when (:compile-toplevel :load-toplevel :execute)
 (defcstruct* standard-indexed-data-file-header
   (cookie              :uint)
   (unique-id           :uint8 :count 16)
@@ -117,13 +132,13 @@
   (free-space-start    :uint)
   (root-class          pointer-type)
   (footer-offset       :uint))
-
+)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Footer-Types
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-
+(eval-when (:compile-toplevel :load-toplevel :execute)
 (defcstruct* standard-indexed-data-file-footer
   (cookie                 :uint)
   (serial                 :uint)
@@ -132,13 +147,14 @@
   (previous-footer-offset :uint)
   (root-offset            :uint)
   (root-class             pointer-type))
+)
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Segmented Extent List
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-
+#|
 (defcstruct* segmented-extent-list
   (first-elt         :uint)
   (last-elt          :uint)
@@ -157,7 +173,7 @@
 (defcstruct* data-block
   (segment-info sequence-elt)
   (segment-storage :uint8 :count 4000))
-
+|#
 
 ;; (foreign-type-size 'segmented-extent-list)
 ;; 16

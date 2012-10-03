@@ -84,7 +84,7 @@
   (declare (ignore args))
   (multiple-value-bind
     (return-content return-code) (drakma:http-request uri :force-binary t :want-stream t)
-      (log:debug "http-request [~A]: ~D" uri return-code)
+    (format *trace-output* "http-request [~A]: ~D" uri return-code)
     (values
       (case type
         (stream return-content)

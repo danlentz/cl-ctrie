@@ -752,7 +752,7 @@ _[macro]_            `MULTI-CATCH  (TAG-LIST &BODY FORMS)`
        -  TAG is NIl if evaluation of the FORMS completed normally
           or the tag thrown and cought.
     * EXAMPLE:
-        ```
+    ```
         ;;; (multiple-value-bind (result tag)
         ;;;            (multi-catch (:a :b)
         ;;;                 ...FORMS...)
@@ -760,7 +760,7 @@ _[macro]_            `MULTI-CATCH  (TAG-LIST &BODY FORMS)`
         ;;;                 (:a ...)
         ;;;                 (:b ...)
         ;;;                 (t ...)))
-        ```
+    ```
 
 
 _[macro]_            `CATCH-CASE  (FORM &REST CASES)`
@@ -855,9 +855,17 @@ _[function]_         `FLAG  (KEY LEVEL &OPTIONAL USE-CACHED-P)`
 > For a given depth, LEVEL, within a CTRIE, extract the correspondant
   sequence of bits from the computed hash of KEY that indicate the
   logical index of the arc on the path to which that key may be found.
-  Note that the logical index of the arc is most likely not the same
-  as the physical index where it is actually located -- for that see
-  `FLAG-ARC-POSITION`
+  If USE-CACHED-P is non-NIL and the special-variable `*HASH-CODE*` is
+  non-NIL as well, the hash will not be recomputed, but instead the
+  value bound to `*HASH-CODE*` will be used as an optimization to
+  reduce unnecessary recomputation of hash function -- an expensive
+  operation.  This value is NOT checked and assumed to be valid and
+  appropriate to the given situation -- care must be taken to use this
+  cached value correctly.  When in doubt, recomputing hash may be a
+  performance penalty, but is guaranteed to always work in any
+  situation.  Note that the logical index of the arc is most likely
+  not the same as the physical index where it is actually located --
+  for that see `FLAG-ARC-POSITION`
 
 
 _[function]_         `FLAG-PRESENT-P  (FLAG BITMAP)`

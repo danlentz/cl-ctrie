@@ -55,6 +55,7 @@
 
 (defparameter *pool-high-water* (expt 2 10))
 
+(defparameter *default-mmap-dir* nil)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Conditions
@@ -221,7 +222,23 @@
 ;; forward references to other functions defined later in this file.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(clear-layer-caches)
 
+(deflayer allocation)
+(deflayer transient  (allocation))
+(deflayer persistent (allocation)
+  ((dir :initarg :dir  :accessor dir ;;:special t
+     :initform (apply #'mm:ensure-manardb (ensure-list *default-mmap-dir*)))))
+
+(defun persistent-dir ()
+  (if (find 'persistent (active-layers ) :key #'layer-name)
+    (dir (find-layer 'persistent))
+    (with-active-layers (persistent)
+      (dir (find-layer 'persistent)))))
+
+
+
+#+()
 (defstruct (ctrie (:constructor %make-ctrie))
   "A CTRIE structure is the root container that uniquely identifies a CTRIE
   instance, and  contains the following perameters which specify the
@@ -253,15 +270,92 @@
   (stamp      (if *timestamps-enabled* #'local-time:now (constantly nil)))
   (root       (make-inode (make-cnode) (gensym "ctrie"))))
 
+(defun nix ()
+  (constantly nil))
 
-(defun make-ctrie (&rest args &key root (readonly-p nil) (test 'equal) (hash 'sxhash)
-                    (stamp (if *timestamps-enabled* #'local-time:now (constantly nil)))
+(defun new-transient-root ()
+  (make-inode (make-cnode) (gensym "ctrie")))
+
+
+(defun new-persistent-root ()
+  (make-persistent-inode (make-persistent-cnode) (gensym "ctrie")))
+
+
+(defclass transient-ctrie ()
+  ((readonly-p
+     :initform nil
+     :type boolean
+     :accessor ctrie-readonly-p
+     :initarg :readonly-p)
+    (test
+      :initform 'equal
+      :type symbol
+      :accessor ctrie-test
+      :initarg :test)
+    (hash
+      :initform 'sxhash
+      :type symbol
+      :accessor ctrie-hash
+      :initarg :hash)
+    (stamp
+      :initform 'nix
+      :type symbol
+      :accessor ctrie-stamp
+      :initarg :stamp)
+    (root
+      :initform (new-transient-root)
+      :accessor ctrie-root
+      :initarg :root)))
+
+
+(mm:defmmclass persistent-ctrie ()
+  ((readonly-p
+     :initform nil
+     :type boolean
+     :accessor ctrie-readonly-p
+     :initarg :readonly-p
+     :persistent t)
+    (test
+      :initform 'equal
+      :type symbol
+      :accessor ctrie-test
+      :initarg :test
+      :persistent t)
+    (hash
+      :initform 'sxhash
+      :type symbol
+      :accessor ctrie-hash
+      :initarg :hash
+      :persistent t)
+    (stamp
+      :initform 'nix
+      :type symbol
+      :accessor ctrie-stamp
+      :initarg :stamp
+      :persistent t)
+    (root
+      :initform (new-persistent-root)
+      :accessor ctrie-root
+      :initarg :root
+      :persistent nil)))
+
+(deftype ctrie ()
+  '(or transient-ctrie persistent-ctrie))
+    
+(defun make-ctrie (&rest args &key persistent root (readonly-p nil) (test 'equal) (hash 'sxhash)
+                    (stamp 'nix) #+()(if *timestamps-enabled* 'local-time:now (constantly nil))
                      &allow-other-keys)
   "CREATE a new CTRIE instance. This is the entry-point constructor 
   intended for use by the end-user."
   (declare (ignorable readonly-p test hash root stamp))
-  (apply #'%make-ctrie args))
+  (let ((arglist  (remove-from-plist args :persistent)))
+    (if persistent
+      (with-active-layers (persistent)        
+        (apply #'make-instance 'persistent-ctrie arglist))
+      (with-active-layers (transient)
+        (apply #'make-instance 'transient-ctrie arglist)))))
 
+ 
 
 (defmacro/once with-ctrie (&once ctrie &body body)
   "Configure the dynamic environment with the appropriate condition
@@ -364,7 +458,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; INODE
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
+#+()
 (defstruct (ref
              (:copier nil))
   "Atomically Stamped Reference structure _[Herlithy, TAOMP]_ that
@@ -387,7 +481,62 @@
   (value t   :type t      :read-only t)
   (prev  nil :type t))
 
+(defclass transient-ref ()
+  ((prev
+      :initform nil
+      :accessor ref-prev
+      :initarg :prev)
+    (stamp 
+     :initform (ctstamp)
+     :accessor ref-stamp
+     :initarg :stamp)
+    (value
+      :initform t
+      :accessor ref-value
+      :initarg :value)
+    ))
 
+
+(mm:defmmclass persistent-ref ()
+  ((prev
+      :initform nil
+      :accessor ref-prev
+      :initarg :prev
+     :persistent t)
+    (stamp 
+     :initform (ctstamp)
+     :accessor ref-stamp
+     :initarg :stamp
+     :persistent t)
+    (value
+      :initform t
+      :accessor ref-value
+      :initarg :value
+      :persistent t)))
+
+(deftype ref ()
+  '(or transient-ref persistent-ref))
+
+(defun ref-p (thing)
+  (typep thing 'ref))
+  
+(define-layered-function make-ref (&key stamp value prev &allow-other-keys))
+
+(define-layered-method make-ref :in t (&key stamp value prev persistent)
+  (if persistent
+    (with-active-layers (persistent)
+      (funcall #'make-instance 'persistent-ref :stamp stamp :value value :prev prev))
+    (with-active-layers (transient)
+      (funcall #'make-instance 'transient-ref :stamp stamp :value value :prev prev))))
+
+(define-layered-method make-ref :in transient (&key stamp value prev)
+  (funcall #'make-instance 'transient-ref :stamp stamp :value value :prev prev))
+
+(define-layered-method make-ref :in persistent (&key stamp value prev)
+  (funcall #'make-instance 'persistent-ref :stamp stamp :value value :prev prev))
+
+
+#+()
 (defstruct (failed-ref
              (:include ref)
              (:copier nil))
@@ -396,7 +545,35 @@
   detects a `FAILED-REF` will immediately invoke a commit to restore the
   inode to the state recorded in `FAILED-REF-PREV`")
 
+(defclass transient-failed-ref (transient-ref)
+  ())
 
+(mm:defmmclass persistent-failed-ref (persistent-ref)
+  ())
+
+(deftype failed-ref ()
+  '(or transient-failed-ref persistent-failed-ref))
+
+(defun failed-ref-p (thing)
+  (typep thing 'failed-ref))
+
+(define-layered-function make-failed-ref (&key stamp value prev &allow-other-keys))
+
+(define-layered-method make-failed-ref :in t (&key stamp value prev persistent)
+  (if persistent
+    (with-active-layers (persistent)
+      (funcall #'make-instance 'persistent-failed-ref :stamp stamp :value value :prev prev))
+    (with-active-layers (transient)
+      (funcall #'make-instance 'transient-failed-ref :stamp stamp :value value :prev prev))))
+
+(define-layered-method make-failed-ref :in transient (&key stamp value prev)
+  (funcall #'make-instance 'transient-failed-ref :stamp stamp :value value :prev prev))
+
+(define-layered-method make-failed-ref :in persistent (&key stamp value prev)
+  (funcall #'make-instance 'persistent-failed-ref :stamp stamp :value value :prev prev))
+
+
+#+()
 (defstruct (inode
              (:constructor %make-inode)
              (:copier nil))
@@ -422,7 +599,35 @@
   (gen nil :read-only t)
   (ref nil))
 
+(defclass transient-inode ()
+  ((ref
+      :initform nil
+      :accessor inode-ref
+      :initarg :ref)
+    (gen
+     :initform nil
+     :accessor inode-gen
+     :initarg :gen)))
 
+(mm:defmmclass persistent-inode ()
+  ((ref
+      :initform nil
+      :accessor inode-ref
+      :initarg :ref
+     :persistent t)
+    (gen
+     :initform nil
+     :accessor inode-gen
+     :initarg :gen
+     :persistent t)))
+
+(deftype inode ()
+  '(or transient-inode persistent-inode))
+
+(defun inode-p (thing)
+  (typep thing 'inode))
+
+#+()
 (defun make-inode (link-to &optional gen stamp prev)
   "Construct a new INODE that represents a reference to the value
   provided by argument LINK-TO, optionally augmented with a specified
@@ -432,6 +637,37 @@
     :ref (make-ref :value link-to :stamp (or stamp (ctstamp)) :prev prev)))
 
 
+(define-layered-function make-inode (link-to &optional gen stamp prev persistent))
+
+
+(define-layered-method make-inode :in t (link-to &optional gen stamp prev persistent)
+  (if persistent
+    (with-active-layers (persistent)
+      (funcall #'make-instance 'persistent-inode
+        :gen (or gen (gensym "ctrie"))
+        :ref (make-ref :value link-to :stamp (or stamp (ctstamp)) :prev prev)))
+    (with-active-layers (transient)
+      (funcall #'make-instance 'transient-inode
+        :gen (or gen (gensym "ctrie"))
+        :ref (make-ref :value link-to :stamp (or stamp (ctstamp)) :prev prev)))))
+
+
+(define-layered-method make-inode :in transient (link-to &optional gen stamp prev persistent)
+  (declare (ignore persistent))
+    (funcall #'make-instance 'transient-inode
+      :gen (or gen (gensym "ctrie"))
+      :ref (make-ref :value link-to :stamp (or stamp (ctstamp)) :prev prev)))
+
+
+(define-layered-method make-inode :in persistent (link-to &optional gen stamp prev persistent)
+  (declare (ignore persistent))
+  (with-active-layers (persistent)
+    (funcall #'make-instance 'persistent-inode
+      :gen (or gen (gensym "ctrie"))
+      :ref (make-ref :value link-to :stamp (or stamp (ctstamp)) :prev prev))))
+
+
+#+()
 (defmethod print-object ((o inode) stream)
   "Print a helpful representation of an INODE that can be easily
   understood by quick visual inspection. This should only be used
@@ -482,12 +718,45 @@
   `(let ((ref (inode-ref ,obj)))
      (and
        (if *debug* (local-time:timestamp= (ref-stamp ref) ,expected-stamp) t)
-       (eql (ref-value ref) ,expected)
-       (eq  (sb-ext:compare-and-swap (inode-ref ,obj) ref
-              (make-ref :value ,new :stamp ,new-stamp :prev ,prev))
-         ref))))
+       (typecase ,obj
+         (transient-inode
+           (with-active-layers (transient)
+             (printv (ref-value ref) ,expected)
+             (and (printv  (eql (ref-value ref) ,expected))
+               (eq  (sb-ext:compare-and-swap (slot-value ,obj 'ref) (printv ref)
+                      (printv  (make-ref :value ,new :stamp ,new-stamp :prev ,prev)))
+                 ref))))
+         (persistent-inode
+           (with-active-layers (persistent)
+             (let ((ref-ptr (mm:mptr ref)))
+               (printv (mm:mptr (ref-value ref)) (mm:mptr ,expected))
+               (and (printv  (eql (mm:mptr (ref-value ref)) (mm:mptr ,expected)))
+                 (eq (cas-word-sap (mm::mm-object-pointer ,obj) ref-ptr
+                       (mm:mptr
+                         (make-ref :value ,new :stamp ,new-stamp :prev ,prev)))
+                   ref-ptr)))))))))
 
 
+(define-test check-simple-gcas-cas ()
+  (assert-false
+    (with-active-layers (persistent)
+      (gcas-compare-and-set 
+        #1=#.(with-active-layers (persistent) (make-inode (make-inode t))) 
+        (ref-value (inode-ref (make-inode (make-inode t)))) :x nil nil nil)))
+  (assert-true
+    (with-active-layers (persistent)
+      (gcas-compare-and-set 
+        #2=#.(with-active-layers (persistent) (make-inode (make-inode t))) 
+        (ref-value (inode-ref #2#)) :x nil nil nil)))
+  (assert-false
+    (gcas-compare-and-set
+      (make-inode (make-ctrie))
+      (ref-value (inode-ref (make-inode (make-ctrie)))) :x nil nil nil))
+  (assert-true
+    (gcas-compare-and-set
+      #3=#.(make-inode (make-ctrie)) (ref-value (inode-ref #3#)) :x nil nil nil))) 
+  
+  
 (defun/inline INODE-READ (inode)
   "INODE-READ provides the top-level interface to the inode _GCAS ACCESS_
   api, which is the mechanism which must be used to gain access to the
@@ -528,6 +797,28 @@
       (return-from inode-mutate
         nil))))
 
+(defmacro cas-failed-ref (inode ref)
+  `(typecase ,inode
+     (transient-inode (with-active-layers (transient)
+                        (let ((prev (ref-prev ,ref)))
+                          (eq (cas (slot-value ,inode 'ref) ,ref (failed-ref-prev prev)) ,ref))))
+     (persistent-inode (with-active-layers (persistent)
+                         (let ((prev (ref-prev ,ref))
+                                (ref-mptr (mm:mptr ,ref)))
+                           (eql (cas-word-sap (mm::mm-object-pointer ,inode) ref-mptr
+                                  (mm:mptr (failed-ref-prev prev))) ref-mptr))))))
+
+(defmacro cas-ref-prev (ref prev new-generator)
+  `(typecase ,ref
+     (transient-ref  (with-active-layers (transient)
+                       (cas (slot-value ,ref 'prev) ,prev (funcall ,new-generator))))
+     (persistent-ref (with-active-layers (persistent)
+                       (let* ((ref-prev-ptr (mm::mm-object-pointer ,ref))
+                               (prev-mptr (mm:mptr ,prev))
+                               (new (funcall ,new-generator))
+                               (new-mptr  (if new (mm:mptr new) 0)))
+                         (cas-word-sap ref-prev-ptr prev-mptr new-mptr))))))
+                                           
 
 (defun INODE-COMMIT (inode ref)
   "INODE-COMMIT implements the _GCAS COMMIT_ protocol which is invoked
@@ -548,32 +839,37 @@
            (root-node-access ctrie t)))
     (let1 prev (ref-prev ref)
       (typecase prev
-        (null        (return-from inode-commit ref))
-        (failed-ref  (if (cas (inode-ref inode) ref (failed-ref-prev prev))
-                       (return-from inode-commit
-                         (failed-ref-prev prev))
-                       (return-from inode-commit
-                         (inode-commit inode (inode-ref inode)))))
-        (t            (if (and (not (ctrie-readonly-p *ctrie*))
-                            (eql (inode-gen (ABORTABLE-READ *ctrie*))
-                              (inode-gen inode)))
-                        (if (cas (ref-prev ref) prev nil)
-                          (return-from inode-commit ref)
-                          (return-from inode-commit
-                            (inode-commit inode ref)))
-                        (progn (cas (ref-prev ref) prev
-                                 (make-failed-ref
-                                   :value (ref-value prev)
-                                   :stamp (ref-stamp prev)
-                                   :prev  (ref-prev  prev)))
-                          (return-from inode-commit
-                            (inode-commit inode (inode-ref inode))))))))))
+        (null
+          (return-from inode-commit ref))
+        (failed-ref
+          (if (cas-failed-ref inode ref)     ;; (cas (inode-ref inode) ref (failed-ref-prev prev))
+            (return-from inode-commit
+              (failed-ref-prev prev))
+            (return-from inode-commit
+              (inode-commit inode (inode-ref inode)))))
+        (t
+          (if (and (not (ctrie-readonly-p *ctrie*))
+                (eql (inode-gen (ABORTABLE-READ *ctrie*))
+                  (inode-gen inode)))
+            (if (cas-ref-prev ref prev (constantly nil))  ;; (cas (ref-prev ref) prev nil)
+              (return-from inode-commit ref)
+              (return-from inode-commit
+                (inode-commit inode ref)))
+            (progn (cas-ref-prev ref prev    ;; (cas (ref-prev ref) prev
+                     (lambda ()
+                       (make-failed-ref
+                       :value (ref-value prev)
+                       :stamp (ref-stamp prev)
+                       :prev  (ref-prev  prev))))
+              (return-from inode-commit
+                (inode-commit inode (inode-ref inode))))))))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; SNODE 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+#+()
 (defstruct (snode
              (:copier nil))
   "SNODE, i.e., 'Storage Node', is the LEAF-NODE structure ultimately
@@ -584,7 +880,137 @@
   (key   nil  :read-only t)
   (value nil  :read-only t))
 
+(defclass transient-snode ()
+  ((key
+     :initform nil
+     :accessor %snode-key
+     :initarg :key)
+    (value
+      :initform nil
+      :accessor %snode-value
+      :initarg :value)))
 
+(mm:defmmclass persistent-snode ()
+  ((key
+     :initform nil
+     :accessor %snode-key
+     :initarg :key
+     :persistent t)
+    (value
+      :initform nil
+      :accessor %snode-value
+      :initarg :value
+      :persistent t)))
+
+(deftype snode ()
+  '(or transient-snode persistent-snode))
+
+(defun snode-p (thing)
+  (typep thing 'snode))
+
+
+(mm:defmmclass serial-box (mm:marray)
+  ())
+
+(define-layered-function maybe-box (thing))
+
+(define-layered-method maybe-box :in t (thing)
+  thing)
+
+(define-layered-method maybe-box :in persistent ((thing t))
+  (let ((bytes   (hu.dwim.serializer:serialize thing)))
+    (mm:make-marray (length bytes)
+      :initial-contents (coerce bytes 'list)
+      :marray-class 'serial-box)))
+
+(define-layered-method maybe-box :in persistent ((thing mm:mm-object))
+  thing)
+
+(define-layered-method maybe-box :in persistent ((thing fixnum))
+  thing)
+
+(define-layered-method maybe-box :in persistent ((thing symbol))
+  thing)
+
+(define-layered-method maybe-box :in persistent ((thing null))
+  thing)
+
+(define-layered-method maybe-box :in persistent ((thing string))
+  (mm:make-mm-fixed-string (length thing) :value thing))
+
+
+(define-layered-function maybe-unbox (thing))
+
+(define-layered-method maybe-unbox :in t (thing)
+  thing)
+
+(define-layered-method maybe-unbox :in t ((bytes serial-box))
+  (hu.dwim.serializer:deserialize (coerce (mm:marray-to-list bytes) 'vector)))
+
+(define-layered-method maybe-unbox :in persistent ((bytes serial-box))
+  (hu.dwim.serializer:deserialize (coerce (mm:marray-to-list bytes) 'vector)))
+
+(define-layered-method maybe-unbox :in persistent ((thing t))
+  thing)
+
+(define-layered-method maybe-unbox :in persistent ((thing mm::mm-fixed-string))
+  (mm:mm-fixed-string-value thing))
+
+  
+(define-layered-function snode (key value &key &allow-other-keys))
+
+(define-layered-method snode :in t (key value &key persistent)
+  (if persistent
+    (with-active-layers (persistent)
+      (funcall #'make-instance 'persistent-snode :key (maybe-box key) :value (maybe-box value)))
+    (with-active-layers (transient)
+      (funcall #'make-instance 'transient-snode :key key :value value))))
+
+(define-layered-method snode :in transient (key value &key)
+  (funcall #'make-instance 'transient-snode :key key :value value))
+
+(define-layered-method snode :in persistent (key value &key)
+  (funcall #'make-instance 'persistent-snode :key (maybe-box key) :value (maybe-box value)))
+
+
+(defgeneric snode-key (snode))
+
+(defmethod snode-key ((snode transient-snode))
+  (%snode-key snode))
+
+(defmethod snode-key ((snode persistent-snode))
+  (maybe-unbox (%snode-key snode)))
+
+(defgeneric (setf snode-key) (value snode))
+
+(defmethod (setf snode-key) (value (snode transient-snode))
+  (setf (%snode-key snode) value))
+
+(defmethod (setf snode-key) (value (snode persistent-snode))
+  (prog1 value
+    (setf (%snode-key snode) (maybe-box value))))
+
+
+(defgeneric snode-value (snode))
+
+(defmethod snode-value ((snode transient-snode))
+  (%snode-value snode))
+
+(defmethod snode-value ((snode persistent-snode))
+  (maybe-unbox (%snode-value snode)))
+
+(defgeneric (setf snode-value) (value snode))
+
+(defmethod (setf snode-value) (value (snode transient-snode))
+  (setf (%snode-value snode) value))
+
+(defmethod (setf snode-value) (value (snode persistent-snode))
+  (prog1 value
+    (setf (%snode-value snode) (maybe-box value))))
+
+
+
+#+()
 (defun snode (key value)
   "Construct a new SNODE which represents the mapping from
   domain-element KEY to range-element VALUE."
@@ -595,6 +1021,7 @@
 ;; LNODE
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+#+()
 (defstruct (lnode
              (:copier nil))
   "LNODE, i.e., 'List Node', is a special structure used to enclose
@@ -610,6 +1037,53 @@
      `NIL` if no further LNODES remain."
   (elt  nil :read-only t) 
   (next nil :read-only t))
+
+(defclass transient-lnode ()
+  ((elt
+     :initform nil
+     :accessor lnode-elt
+     :initarg :elt)
+    (next
+      :initform nil
+      :accessor lnode-next
+      :initarg :next)))
+
+
+(mm:defmmclass persistent-lnode ()
+  ((elt
+     :initform nil
+     :accessor lnode-elt
+     :initarg :elt
+     :persistent t)
+    (next
+      :initform nil
+      :accessor lnode-next
+      :initarg :next
+      :persistent t)))
+
+(deftype lnode ()
+  '(or transient-lnode persistent-lnode))
+
+(defun lnode-p (thing)
+  (typep thing 'lnode))
+
+
+(define-layered-function make-lnode (&key elt next &allow-other-keys)) 
+
+(define-layered-method make-lnode :in t (&key elt next persistent) 
+  (if persistent
+    (with-active-layers (persistent)
+      (funcall #'make-instance 'persistent-lnode :elt elt :next next))
+    (with-active-layers (transient)
+      (funcall #'make-instance 'transient-lnode :elt elt :next next))))
+
+(define-layered-method make-lnode :in transient  (&key elt next persistent)
+  (declare (ignore persistent))
+  (funcall #'make-instance 'transient-lnode :elt elt :next next))
+
+(define-layered-method make-lnode :in persistent  (&key elt next persistent)
+  (declare (ignore persistent))
+  (funcall #'make-instance 'persistent-lnode :elt elt :next next))
 
 
 (defun enlist (&rest rest)
@@ -672,6 +1146,7 @@
 ;; TNODE 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+#+()
 (defstruct (tnode
              (:copier nil))
   "A TNODE, or 'Tomb Node', is a special node structure used to preserve
@@ -685,7 +1160,29 @@
       Only LNODE and SNODE type nodes are ever entombed"
   (cell nil :type (or snode lnode) :read-only t))
 
+(defclass transient-tnode ()
+  ((cell
+     :initform nil
+     :accessor tnode-cell
+     :initarg :cell)))
 
+(mm:defmmclass persistent-tnode ()
+  ((cell
+     :initform nil
+     :accessor tnode-cell
+     :initarg :cell
+     :persistent t)))
+
+(deftype tnode ()
+  '(or transient-tnode persistent-tnode))
+
+(defun tnode-p (thing)
+  (typep thing 'tnode))
+
+
+
+
+  
 (defgeneric entomb (node)
   (:documentation "Return a newly constructed TNODE enclosing the argument
   LEAF-NODE structure `NODE`"))
@@ -2125,7 +2622,7 @@
   using an atomic, point-in-time snapshot of CTRIE."))
 
 (defmethod  ctrie-save :around (ctrie place &key)
-  (log:info "Saving ctrie to ~A" place)
+;;  (log:info "Saving ctrie to ~A" place)
   (call-next-method))
 
 

@@ -104,8 +104,8 @@
     (let ((fn (merge-pathnames (byte-vector-to-hex-string unique-id)
                            *indexed-data-file-pathname-cache-directory*)))
       (setf (pointer:deref fn) (prin1-to-string thing))
-      (log:info "registered ~S and cached pathname to ~S"
-        (read-from-string (pointer:deref fn)) fn) 
+      ;; (log:info "registered ~S and cached pathname to ~S"
+      ;;   (read-from-string (pointer:deref fn)) fn) 
       )))
 
 (defun find-indexed-data-file (unique-id)
@@ -204,12 +204,12 @@
   pointer)
 
 (defmethod  pointer-address ((pointer typed-pointer))
-  (ref pointer))
+  (element-offset pointer))
 
 (defgeneric set-pointer-address (addr pointer-designator))
 
 (defmethod  set-pointer-address (addr (pointer typed-pointer))
-  (setf (ref pointer) (pointer-address addr)))
+  (setf (element-offset pointer) (pointer-address addr)))
 
 (defgeneric pointer-element-type (pointer-designator))
 

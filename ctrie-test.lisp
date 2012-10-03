@@ -3,24 +3,80 @@
 
 (in-package :cl-user)
 
-(eval-when (:load-toplevel :compile-toplevel :execute)
-  (macrolet ((define-package (name docs &rest packages)
-               `(defpackage ,name
-                  (:documentation ,docs)
-                  (:use :closer-common-lisp :closer-mop :lisp-unit #+():lparallel ,@packages)
-                  (:export
-                    :run-ctrie-tests
-                    :run-ctrie-benchmarks
-                    :run-ctrie-deterministic-profile
-                    :run-ctrie-statistical-profile)
-                  ,@(loop :for pkg :in packages :collect
-                      `(:import-from ,pkg ,@(loop :for sym :being :the :symbols :in pkg
-                                              :collect (make-symbol (string sym))))))))
-    (define-package :cl-ctrie-test
-      "This is a testing sandbox for the system :cl-ctrie"
-      :cl-ctrie))) 
+
+(defpackage :cl-ctrie-test
+  (:shadow :once-only)
+  (:use :closer-common-lisp :closer-mop :alexandria :lisp-unit :cl-ctrie)
+  (:shadowing-import-from :lisp-unit :set-equal)
+  (:import-from :sb-ext :get-cas-expansion :define-cas-expander :cas
+    :compare-and-swap :atomic-incf :atomic-decf :defcas :defglobal)
+  (:import-from :cl-ctrie
+    :let1 :flag :flag-arc-position :catch-case
+    :create-unique-id-byte-vector
+    :hex-string-to-byte-vector
+    :byte-vector-to-hex-string
+    :random-string
+    :gensym-list
+    :printv
+    :printv-enable
+    :printv-disable
+    :defmacro/once
+    :defun/inline
+    :deflex
+    :ppmx
+    :multiple-setf
+    :nilf
+    :conc1f
+    :aconsf
+    :?
+    :?^
+    :^
+    :internal-symbols
+    :external-symbols
+    :home-symbols
+    :home-functions
+    :atomic-update     
+    :enlist
+    :snode
+    :lnode-search
+    :lnode-length
+    :lnode-inserted
+    :lnode-removed
+    :fbind
+    :awhen
+    :atypecase
+    :alet
+    :it
+    :*debug*
+    :*ctrie*
+    :with-ctrie
+    :*hash-code*
+    :alet-fsm
+    :state
+    :ppmx)
+  (:export
+    :fixture
+    :define-fixture
+    :$
+    :run-ctrie-tests
+    :run-ctrie-benchmarks
+    :run-ctrie-deterministic-profile
+    :run-ctrie-statistical-profile))
+
+
+
 
 (in-package :cl-ctrie-test)
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Special Variables
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defvar +cores+ 8)
+(define-symbol-macro -runs- (log +cores+ 2))
+
+(defparameter *thread-count* '(1 2 4 8))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -40,23 +96,74 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Fixtures
+;; Utils
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-(defvar *test-ctrie* (make-ctrie))
-(defvar *input*      (shuffle (coerce (iota (expt 2 20)) 'vector)))
-(defvar *input-256k* (shuffle (coerce (iota (expt 2 18)) 'vector)))
-(defvar *kernels*    (loop for i from 0 to 3
-                       collect (lparallel:make-kernel (expt 2 i))))
-(defvar *table*)
-(defvar *table-type*)
-(defvar *table-test*)
+(defmacro/once build-list (&once n &body body)
+  "Execute `body' `n' times, collecting the results into a list."
+  `(loop :repeat ,n :collect (progn ,@body)))
+
+
+(defmacro/once build-vector (&once n &body body)
+  "Execute `body' `n' times, collecting the results into a vector."
+  (with-gensyms (result index)
+    `(let1 ,result (make-array ,n)
+       (dotimes (,index ,n ,result)
+         (setf (aref ,result ,index) (progn ,@body))))))
+
+
+(defmacro with-thread ((&key bindings name) &body body)
+  `(let1 bt:*default-special-bindings* ,bindings
+     (bt:make-thread (lambda () ,@body)
+       :name ,name)))
+
+
+#+lparallel
+(defmacro with-new-kernel ((&rest make-kernel-args) &body body)
+  `(let1 lparallel:*kernel* (lparallel:make-kernel ,@make-kernel-args)
+     (unwind-protect
+          (progn ,@body)
+       (lparallel:end-kernel :wait t))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Fixtures
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defglobal *fixtures* (make-ctrie))
+  (define-ctrie fixture *fixtures*))
+
+(defmacro define-fixture (name &body body)
+  `(progn
+     (let1 *trace-output* (make-broadcast-stream)
+       (fixture ',name ,@body)
+       ',name)))
+
+(defmacro $ (name)
+  `(let1 *trace-output* (make-broadcast-stream)
+     (fixture ',name)))
+
+(define-fixture c0        (make-ctrie :test 'eql))
+(define-fixture h0        (make-hash-table :test 'eql :synchronized t))
+(define-fixture c1        (make-ctrie :test 'equal))
+(define-fixture h1        (make-hash-table :test 'equal :synchronized t))
+
+(define-fixture iota-64k  (shuffle (coerce (iota (expt 2 16)) 'vector)))
+(define-fixture iota-256k (shuffle (coerce (iota (expt 2 18)) 'vector)))
+(define-fixture iota-1mil (shuffle (coerce (iota (expt 2 20)) 'vector)))
+(define-fixture gensym-8k (shuffle (coerce (make-gensym-list (expt 2 13)) 'vector)))
+(define-fixture string-8k (make-array (expt 2 13) :element-type 'string
+                            :adjustable nil :fill-pointer nil :initial-contents
+                            (loop repeat (expt 2 13) collect
+                              (cl-ctrie::random-string :length 16))))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Table Abstraction Scaffolding
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+#+()
 (defmacro with-skiplist-tables (&body body)
   `(flet ((make-table (&key (test #'eql))
             (cl-skip-list:make-skip-list
@@ -146,8 +253,8 @@
 
 (define-test check-table-abstraction-fixtures ()
   (with-hash-tables     (try-table-ops))
-  (with-ctrie-tables    (try-table-ops))
-  (with-skiplist-tables (try-table-ops)))
+  (with-ctrie-tables    (try-table-ops)))
+
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -299,7 +406,8 @@
                    (:d (report it :D (incf d)))
                    (t  "T")))
                (assert-eql iterations (+ a b c d)))
-               (when *debug* (list :a a :b b :c c :d d)))))
+             ;;(when *debug* (list :a a :b b :c c :d d))
+             )))
     (loop repeat 128 do (test-catch-case 256))))
 
 
@@ -531,8 +639,8 @@
     (assert-true (funcall (ctrie-test c) (ctrie-drop c "whiz") "bang"))
     (assert-true (funcall (ctrie-test c) (ctrie-drop c "wow") "man"))
     (assert-true (funcall (ctrie-test c) (ctrie-drop c "yow") "wee"))
-    (assert-true (ctrie-empty-p c))
-    (values :pass c)))
+    (assert-true (ctrie-empty-p c))))
+
 
 
 (define-test check-simple-insert/lookup ()
@@ -565,8 +673,8 @@
                              :test #'equalp)))))
     (dolist (symbol list)
       (assert-equalp (values (princ-to-string symbol) t) (ctrie-drop c symbol)))
-    (assert-true (ctrie-empty-p c))
-    c))
+    (assert-true (ctrie-empty-p c))))
+   
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -592,8 +700,8 @@
     (assert-eql (values nil nil) (ctrie-get c 0))
     (loop for i from 1 to num
       do (assert-eql (values i t) (ctrie-drop c i)))
-    (assert-true (ctrie-empty-p c))
-    c))
+    (assert-true (ctrie-empty-p c))))
+   
 
 
 
@@ -601,21 +709,39 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Profiling
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-
-(defun run-ctrie-deterministic-profile ()
+#+()
+(defun try-exercise ( &optional (input *input*))
+  (let1 *test-ctrie* (make-ctrie)
   (ctrie-clear *test-ctrie*)
+  (loop for i across input do (ctrie-put *test-ctrie* i i))
+  (assert (eql (ctrie-size *test-ctrie*) (length input)))
+  (loop for i across input do (ctrie-get  *test-ctrie* i))
+  (loop for i across input do (ctrie-drop *test-ctrie* i))
+  (assert (ctrie-empty-p *test-ctrie*))))
+
+
+#+() ;;swank
+(defun run-ctrie-deterministic-profile ()
   (swank:profile-reset)
   (swank:unprofile-all)
   (swank:profile-package (find-package :cl-ctrie) t t)
+  (try-exercise)
+  (swank:profile-report)
+  (swank:unprofile-all))
+
+
+#+() 
+(defun run-ctrie-statistical-profile ()
+  (ctrie-clear *test-ctrie*)
+  (sb-sprof:reset)
+  (sb-sprof:start-profiling)  
   (loop for i across *input* do (ctrie-put  *test-ctrie* i i))
   (assert (eql (ctrie-size *test-ctrie*) (length *input*)))
   (loop for i across *input* do (ctrie-get  *test-ctrie* i))
   (loop for i across *input* do (ctrie-drop *test-ctrie* i))
   (assert (ctrie-empty-p *test-ctrie*))
-  (swank:profile-report)
-  (swank:unprofile-all))
-
+  (sb-sprof:stop-profiling)                   
+  (sb-sprof:report))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -623,25 +749,42 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-(defun end-kernels ()
-  (loop for kernel in *kernels*
-    do (let1 lparallel:*kernel* kernel
-         (lparallel:end-kernel :wait t))))
+;; (defun end-kernels ()
+;;   (loop for kernel in *kernels*
+;;     do (let1 lparallel:*kernel* kernel
+;;          (lparallel:end-kernel :wait t))))
+
+#+()
+(fixture :work (sb-concurrency:make-mailbox
+                :name "work"
+                 :initial-contents (coerce ($ iota-1mil) 'list)))
+
+(defun make-kernel-name ()
+  (format nil "~A" lisp-unit::*test-name*))
 
 
 (define-test check-parallel-insert-parallel-lookup ()
-  (loop for kernel in *kernels* do
-    (let1 lparallel:*kernel* kernel
-      (ctrie-clear *test-ctrie*)
-      (assert-true (ctrie-empty-p *test-ctrie*))
-      (lparallel:pmap nil #'(lambda (i) (ctrie-put *test-ctrie* i i)) *input*)
-      (assert-eql (length *input*) (ctrie-size *test-ctrie*))
-      (lparallel:pmap nil #'(lambda (i) (assert-eql i (ctrie-get *test-ctrie* i))) *input*)
-      (loop for i across *input*
-        do (assert-eql (values i t) (ctrie-get *test-ctrie* i)))
-      )))
+  (loop
+    with ctrie = ($ c0)
+    with work  = ($ iota-1mil)
+    for count in *thread-count* do
+    (with-new-kernel (count :name (make-kernel-name)
+                       :bindings `((*standard-output* ,@*standard-output*)
+                                    (*error-output* ,@*error-output*)
+                                    (*trace-output* ,@*trace-output*)
+                                    (work  ,@work)
+                                    (ctrie ,@ctrie)))
+      (ctrie-clear ctrie)
+      (assert-true (ctrie-empty-p ctrie))
+      (lparallel:pmap nil #'(lambda (i) (ctrie-put ctrie i i)) work)
+      (assert-eql (length work) (ctrie-size ctrie))
+      (lparallel:pmap nil #'(lambda (i) (assert-eql i (ctrie-get ctrie i))) work)
+      (loop for i across work
+        do (assert-eql (values i t) (ctrie-get ctrie i)))
+      (ctrie-clear ctrie))))
+     
 
-
+#+()
 (define-test check-parallel-insert-parallel-drop ()
   (loop for kernel in *kernels* do
     (let1 lparallel:*kernel* kernel
@@ -652,6 +795,22 @@
       (loop for i across *input*
         do (assert-eql (values i t) (ctrie-get *test-ctrie* i)))
       (lparallel:pmap nil #'(lambda (i) (ctrie-drop *test-ctrie* i)) *input*)
+      (assert-true (ctrie-empty-p *test-ctrie*))
+      )))
+
+
+#+()
+(define-test check-parallel-interleaved-insert/lookup/drop ()
+  (loop for kernel in *kernels* do
+    (let1 lparallel:*kernel* kernel
+      (ctrie-clear *test-ctrie*)
+      (assert-true (ctrie-empty-p *test-ctrie*))
+      (lparallel:pmap nil #'(lambda (i)
+                              (ctrie-put *test-ctrie* i i)
+                              (ctrie-get *test-ctrie* i)
+                              (ctrie-drop *test-ctrie* i)) *input*)                              
+      (loop for i across *input*
+        do (assert-eql (values nil nil) (ctrie-get *test-ctrie* i)))
       (assert-true (ctrie-empty-p *test-ctrie*))
       )))
 
@@ -694,6 +853,37 @@
     (ctrie-clear c)
     (assert-true (ctrie-empty-p c))
     (assert-eql 0 (ctrie-size c))))
+
+
+(define-test check-snapshot/parent-integrity ()
+  (let ((ctrie (make-ctrie :test 'eql))
+         (work ($ iota-1mil)))
+    (loop for i across work do (ctrie-put ctrie i i))
+    (let1 snap (ctrie-snapshot ctrie :read-only t)
+      (loop for i from 0 to (length work) do
+        (assert-eql (ctrie-get snap i) (ctrie-get ctrie i))))))
+
+
+(define-test check-fork/parent-integrity ()
+  (let ((ctrie (make-ctrie :test 'eql))
+         (work ($ iota-1mil)))
+    (loop for i across work do (ctrie-put ctrie i i))
+    (let1 fork (ctrie-fork ctrie)
+      (loop for i from 0 to (length work) do
+        (assert-eql (ctrie-get fork i) (ctrie-get ctrie i))))))
+
+#+()
+(define-test check-snapshot/parent-isolation ()
+  (let ((c (make-ctrie)))
+    (loop for i across *input* do (ctrie-put c i i))
+    (let1 d (ctrie-snapshot c :read-only t)
+      (loop for i across (sort *input* #'<) do
+        (assert-eql (values i t) (ctrie-get d i))
+        (ctrie-drop c i)
+        (assert-eql (values nil nil) (ctrie-get c i))
+        (assert-eql (values i t) (ctrie-get d i)))
+      (assert-true (ctrie-empty-p c))
+      (assert-eql (length *input*) (ctrie-size d)))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -757,33 +947,74 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;(table-clear *table*)
-
-(defmacro try-bench-insert ()
-  `(progn
-;     (defparameter *table* (make-table))
-;     (defparameter *table-type* (type-of *table*))
-;     (defparameter *table-test* :insert)
-     (loop for kernel in *kernels* do 
-       (setf *table* (make-table))
-       (setf *table-type* (type-of *table*))
-       (setf *table-test* :insert)
-       collect (let1 lparallel:*kernel* kernel         
-                 (list*
-                   :bench *table-test*
-                   :type  *table-type*
-                   :threads (lparallel:kernel-worker-count)
-                   (collate-timing
-                     (with-timing-collected-runs (3)
-                       (lparallel:pmap nil (lambda (i)
-                                             (table-put *table* i i))
-                         *input*))))))))
+#+()
+(defmacro try-bench-insert (&optional (input *input*))
+  `(loop for kernel in *kernels* collect
+     (let* ((*table* (make-table))
+             (*table-type* (type-of *table*))
+             (*table-test* :insert)
+             (lparallel:*kernel* kernel))         
+       (list*
+         :bench *table-test* :type *table-type*
+         :threads (lparallel:kernel-worker-count)
+         (collate-timing
+           (with-timing-collected-runs (3)
+             (lparallel:pmap nil (lambda (i) (table-put *table* i i))
+               ,input)))))))
 
 
-(defun benchmark-insert ()
-  ;; (declare (optimize (speed 3)))
-  ;; (sb-ext:gc) 
-  (append
-    (print (with-hash-tables     (try-bench-insert))) (terpri)
-    (print (with-ctrie-tables    (try-bench-insert))) (terpri)
-    (print (with-skiplist-tables (try-bench-insert))) (terpri)))
+;; (defun benchmark-insert ()  
+;;   (print
+;;     (with-ctrie-tables
+;;       (loop for i from 0 to 3 collect
+;;         (let1 lparallel:*kernel*
+;;           (lparallel:make-kernel (expt 2 i) :bindings `((table ,@(make-table))
+;;                                                          (input ,@*input*)))
+       
+;;             (collate-timing
+;;               (with-timing-collected-runs (3)
+;;                 (lparallel:pmap nil (lambda (i) (table-put table i i))
+;;                   *input*))))))))
+;;   (print
+;;     (with-hash-tables
+;;       (loop for i from 0 to 3 collect
+;;         (let1 lparallel:*kernel*
+;;           (lparallel:make-kernel (expt 2 i) :bindings `((table ,@(make-table))(input ,@*input*)))
+;;           (list*
+;;             :bench :insert :type 'hash
+;;             :threads (lparallel:kernel-worker-count)
+;;             (collate-timing
+;;               (with-timing-collected-runs (3)
+;;                 (lparallel:pmap nil (lambda (i) (table-put table i i))
+;;                   *input*)))))))))
+
+#+()
+(defun benchmark-insert ()  
+  (loop for kernel in *kernels* collect
+    (let1 lparallel:*kernel* kernel
+      (list*
+        :bench :insert :type 'ctrie
+        :threads (lparallel:kernel-worker-count)
+        (collate-timing
+          (with-timing-collected-runs (3)
+            
+            (ctrie-clear *test-ctrie*)
+            (assert-true (ctrie-empty-p *test-ctrie*))
+            (lparallel:pmap nil #'(lambda (i) (ctrie-put *test-ctrie* i i)) *input*)))))))
+
+
+  ;; ;; (assert-eql (length *input*) (ctrie-size *test-ctrie*))
+  ;; (lparallel:pmap nil #'(lambda (i) (assert-eql i (ctrie-get *test-ctrie* i))) *input*)
+  ;; (loop for i across *input*
+  ;;   do (assert-eql (values i t) (ctrie-get *test-ctrie* i)))
+  ;; )))
+
+
+
+  ;; ;; (terpri)
+  ;; ;; (print
+  ;; ;;  (with-hash-tables     (try-bench-insert))) (terpri))
+
+    
+;;    (print (with-skiplist-tables (try-bench-insert))) (terpri)))
 

@@ -321,7 +321,7 @@
                     (IT ME AT THIS PLIST STACK  ,@REST)
                 
                 (printv :hr " ")
-                (format *trace-output* "~%;;; (plambda (~S~{ ~S~})~%;;;"
+                (format *printv-output* "~%;;; (plambda (~S~{ ~S~})~%;;;"
                   arg (rest args))
 
                 (typecase arg
@@ -573,8 +573,13 @@
        ',name)))
 
 
+(defun new-ctrie (&key (hash 'sxhash) (test 'equal))
+  (let* ((ctrie (make-ctrie :hash hash :test test))
+          (fn (ctrie-lambda ctrie))
+          (obj (make-instance 'ctrie-lambda-object)))
+    (prog1 obj
+      (sb-mop:set-funcallable-instance-function obj fn))))
 
-;;(ppmx (define-ctrie c (make-ctrie)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

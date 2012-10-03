@@ -67,7 +67,7 @@
   
   :weakly-depends-on (:cl-store :donuts :cldoc :cl-ppcre :drakma :uuid :unicly)
   :depends-on (:closer-mop :contextl :alexandria :lisp-unit :local-time :flexi-streams
-                :cffi-objects :osicat :hu.dwim.serializer :rucksack :cl-store)
+                :cffi :osicat :hu.dwim.serializer :manardb :cl-store)
   :components ((:static-file  "cl-ctrie.asd")
                 (:static-file "readme.md")
                 (:file "common-io")
@@ -79,8 +79,6 @@
                 (:file "ctrie")
                 (:file "ctrie-lambda")
                 #+cldoc (:file "ctrie-doc")
-                (:file "mmap-package")
-                (:file "mmap-codec")
                 ))
 
 
