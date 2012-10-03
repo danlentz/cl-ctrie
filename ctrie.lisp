@@ -55,7 +55,14 @@
 
 (defparameter *pool-high-water* (expt 2 10))
 
+(defvar       *pool-list*        nil)
+
+(defvar       *pool-worker*      nil)
+
+(defvar       *pool-queue*       nil)
+
 (defparameter *default-mmap-dir* nil)
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Conditions
@@ -211,6 +218,124 @@
                collect `(,(if (eq (first case) t) t  
                             `(eql ,tag ,(first case)))
                           ,@(rest case))))))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Pre-Allocation Pooling
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun ctrie-enable-pooling ()
+  (setf *pool-enabled* t))
+
+(defun ctrie-disable-pooling ()
+  (setf *pool-enabled* nil))
+
+(defun ctrie-pooling-enabled-p ()
+  (not (null *pool-enabled*)))
+
+(defun pool-sizes (class-name)
+  (get class-name :pool-sizes))
+
+(defun (setf pool-sizes) (value class-name)
+  (setf (get class-name :pool-sizes) value))
+
+(defun pool-alloc (class-name)
+  (get class-name :pool-alloc))
+
+(defun (setf pool-alloc) (fn class-name)
+  (setf (get class-name :pool-alloc) fn))
+
+(defun find-pool (class-name)
+  (or (getf *pool-list* class-name)
+    (setf (getf *pool-list* class-name)
+      (let1 sizes (pool-sizes class-name)
+        (make-array sizes :initial-contents
+          (loop repeat sizes collect (cons nil nil)))))))
+
+(defmacro/once define-pool (&once name (&optional (sizes 0)) &body body)
+  `(progn
+     (setf (pool-alloc ',name) (lambda (&optional size)
+                                 (declare (ignorable size))
+                                 ,@body))
+     (setf (pool-sizes ',name) ,sizes)
+     (find-pool ',name)))
+
+(defun ctrie-pool-status ()
+  (loop for class-name in *pool-list* by #'cddr
+    when class-name
+    collect (cons class-name
+              (coerce (loop for p across (find-pool class-name)
+                        collect (length (cdr p)))
+                'vector))))
+  
+(defun ps ()
+  (ctrie-pool-status))
+
+(defun ctrie-ps ()
+  (ctrie-pool-status))
+ 
+(defun/inline pool-queue ()
+  (or *pool-queue* 
+    (setf *pool-queue*
+      (sb-concurrency:make-mailbox :name "pool-queue"))))
+
+(defun destroy-pool-list ()
+  (setf *pool-list* nil))
+
+(defun destroy-pool-queue ()
+  (setf *pool-queue* nil))
+
+(defun fill-pool (class-name &optional (size 0))
+  (let1 pool (svref (find-pool class-name) size)
+    (unless (cdr pool)
+      ;;(printv "filling pool" size "")
+      (sb-thread::with-cas-lock ((car pool))
+        (setf (cdr pool)
+          (loop repeat *pool-high-water*
+            collect (apply (pool-alloc class-name) (ensure-list (unless (zerop size) size)))))))))
+
+(defun fill-all-pools ()
+  (loop for class-name in *pool-list* by #'cddr
+    when class-name
+    do (dolist (size (iota (pool-sizes class-name) :start 0))
+         (sb-concurrency:send-message (pool-queue) (cons class-name size)))))
+
+(defun pool-work-loop ()
+  (loop with terminate until terminate
+    for request = (ensure-list (sb-concurrency:receive-message (pool-queue)))
+    if (and (cdr request) (minusp (cdr request))) do (setf terminate t)
+    else do (fill-pool (car request) (or (cdr request) 0))))
+
+(defun/inline pool-worker ()
+  (if (and *pool-worker* (sb-thread:thread-alive-p *pool-worker*))
+    *pool-worker*
+    (setf *pool-worker*
+      (sb-thread:make-thread
+        (lambda ()
+          (fill-all-pools)
+          (pool-work-loop)
+          (destroy-pool-list)
+          (destroy-pool-queue)
+          (setf *pool-worker* nil)
+          (sb-thread:terminate-thread sb-thread:*current-thread*))
+        :name "pool-worker"))))
+
+(defun/inline allocate (class-name &optional (size 0))
+  (if (minusp size)
+    (sb-concurrency:send-message (pool-queue) (cons class-name size)) 
+    (flet ((bail ()
+             (pool-worker)
+             (sb-concurrency:send-message (pool-queue) (cons class-name size)) 
+             (return-from allocate
+               (apply (pool-alloc class-name) (ensure-list (unless (zerop size) size))))))
+      (let1 pool (svref (find-pool class-name) size)
+        (when (null (cdr pool)) (bail))
+        (sb-thread::with-cas-lock ((car pool))
+          (unless (cdr pool) (bail))
+          (prog1 (pop (cdr pool))
+            (unless (cdr pool)
+              (pool-worker)
+              (sb-concurrency:send-message (pool-queue) (cons class-name size))))))))) 
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -535,7 +660,8 @@
 (define-layered-method make-ref :in persistent (&key stamp value prev)
   (funcall #'make-instance 'persistent-ref :stamp stamp :value value :prev prev))
 
-
+(define-pool transient-ref
+  
 #+()
 (defstruct (failed-ref
              (:include ref)
@@ -1180,7 +1306,22 @@
   (typep thing 'tnode))
 
 
+(define-layered-function make-tnode (&key cell &allow-other-keys)) 
 
+(define-layered-method make-tnode :in t (&key cell persistent) 
+  (if persistent
+    (with-active-layers (persistent)
+      (funcall #'make-instance 'persistent-tnode :cell cell))
+    (with-active-layers (transient)
+      (funcall #'make-instance 'transient-tnode :cell cell))))
+
+(define-layered-method make-tnode :in transient  (&key cell persistent)
+  (declare (ignore persistent))
+  (funcall #'make-instance 'transient-tnode :cell cell))
+
+(define-layered-method make-tnode :in persistent  (&key cell persistent)
+  (declare (ignore persistent))
+  (funcall #'make-instance 'persistent-tnode :cell cell))
 
   
 (defgeneric entomb (node)
@@ -1193,10 +1334,27 @@
     at an undefined state and cannot continue processing."
   (error "Entombment of ~A (type ~S) is undefined." node (type-of node)))
 
-(defmethod entomb ((lnode lnode))
+(defmethod entomb ((lnode transient-lnode))
   "Entomb an LNODE in a newly created TNODE"
-  (make-tnode :cell lnode))
+  (with-active-layers (transient)
+    (make-tnode :cell lnode)))
 
+(defmethod entomb ((lnode persistent-lnode))
+  "Entomb an LNODE in a newly created TNODE"
+  (with-active-layers (persistent)
+    (make-tnode :cell lnode)))
+
+(defmethod entomb ((snode transient-snode))
+  "Entomb an SNODE in a newly created TNODE"
+  (with-active-layers (transient)
+    (make-tnode :cell snode)))
+
+(defmethod entomb ((snode persistent-snode))
+  "Entomb an SNODE in a newly created TNODE"
+  (with-active-layers (persistent)
+    (make-tnode :cell snode)))
+
+#+()
 (defmethod entomb ((snode snode))
   "Entomb an SNODE in a newly created TNODE"
   (make-tnode :cell snode))
@@ -1209,30 +1367,33 @@
   any other node is simply itself.")
   (:method (node)
     node)
-  (:method ((node inode))
+  (:method ((node transient-inode))
+    (atypecase (inode-read node)
+      (tnode (tnode-cell it))
+      (t     node)))
+  (:method ((node persistent-inode))
     (atypecase (inode-read node)
       (tnode (tnode-cell it))
       (t     node))))
+
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; CNODE
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defvar *cnode-pool*       nil)
-(defvar *pool-worker*      nil)
-(defvar *pool-queue*       nil)
-
-(defun ctrie-enable-pooling ()
-  (setf *pool-enabled* t))
-
-(defun ctrie-disable-pooling ()
-  (setf *pool-enabled* nil))
-
-(defun ctrie-pooling-enabled-p ()
-  (not (null *pool-enabled*)))
+(defclass transient-cnode ()
+  ((bitmap
+     :initform 0
+     :accessor cnode-bitmap
+     :initarg :bitmap)
+    (arcs
+      :initform %empty-map%
+      :accessor cnode-arcs
+      :initarg :arcs)))
 
 
+#+()
 (defstruct (cnode
              (:constructor %make-cnode)
              (:copier nil))
@@ -1253,82 +1414,6 @@
    - `ARCS` "
   (bitmap 0           )  ;;:read-only t)
   (arcs   %empty-map% )) ;;:read-only t))
-
-
-(defun/inline cnode-pool ()
-  (or *cnode-pool*
-    (setf *cnode-pool*
-      (make-array 33 :initial-contents
-        (loop repeat 33 collect (cons nil nil))))))
-
-(define-symbol-macro cnp
-  (loop for p across (cnode-pool) collect (length (cdr p))))
-
-(defun/inline pool-queue ()
-  (or *pool-queue* 
-    (setf *pool-queue*
-      (sb-concurrency:make-mailbox :name "pool-queue"))))
-
-
-(defun destroy-cnode-pool ()
-  (setf *cnode-pool* nil))
-
-(defun destroy-pool-queue ()
-  (setf *pool-queue* nil))
-
-
-(defun fill-pool (size)
-  (let1 pool (svref (cnode-pool) size)
-    (unless (cdr pool)
-      ;;(printv "filling pool" size "")
-      (sb-thread::with-cas-lock ((car pool))
-        (setf (cdr pool)
-          (loop repeat *pool-high-water*
-            collect (%make-cnode :arcs (make-array size))))))))
-
-(defun fill-all-pools ()
-  (dolist (size (iota 33 :start 0))
-    (sb-concurrency:send-message (pool-queue) size)))
-
-
-(defun do-pool-work ()
-  (loop with terminate until terminate
-    for request = (sb-concurrency:receive-message (pool-queue))
-    if (minusp request) do (setf terminate t)
-    else do (fill-pool request)))
-
-
-(defun/inline pool-worker ()
-  (if (and *pool-worker* (sb-thread:thread-alive-p *pool-worker*))
-    *pool-worker*
-    (setf *pool-worker*
-      (sb-thread:make-thread
-        (lambda ()
-          (fill-all-pools)
-          (do-pool-work)
-          (destroy-cnode-pool)
-          (destroy-pool-queue)
-          (setf *pool-worker* nil)
-          (sb-thread:terminate-thread sb-thread:*current-thread*))
-        :name "pool-worker"))))
-
-
-(defun/inline allocate-cnode (size)
-  (if (minusp size)
-    (sb-concurrency:send-message (pool-queue) size) 
-    (flet ((bail ()
-             (pool-worker)
-             (sb-concurrency:send-message (pool-queue) size)
-             (return-from allocate-cnode
-               (%make-cnode :arcs (make-array size)))))   
-      (let1 pool (svref (cnode-pool) size)
-        (when (null (cdr pool)) (bail))
-        (sb-thread::with-cas-lock ((car pool))
-          (unless (cdr pool) (bail))
-          (prog1 (pop (cdr pool))
-            (unless (cdr pool)
-              (pool-worker)
-              (sb-concurrency:send-message (pool-queue) size))))))))
 
 
 
