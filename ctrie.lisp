@@ -3,339 +3,6 @@
 
 (in-package :cl-ctrie)
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Special Variables
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defvar       *ctrie*         nil
-  "Within the dynamic extent of a CTRIE operation this variable will
-  be bound to the root-container CTRIE operand.  It is an error if an
-  operation is defined that attempts access to a CTRIE without this
-  binding, which is properly established by wrapping the operation in
-  an appropriate WITH-CTRIE form.")
-
-(defvar       *hash-code*     nil
-  "Special variable used to store the hash-code that corresponds to the
-  current operation.  Used as a means of improving efficiency by eliminating
-  needless recomputation of the hash function, which is the most expensive
-  part of most user-level ctrie operations.  If this value is not set, then
-  the hash will simply be computed on demand and processing will continue
-  unaffected.  Use of this variable is simply an optional performace
-  optimization techniqie. For additional detail, refer to the documentation
-  for functions `FLAG` and `CTHASH`")
-
-(defparameter *retries*        16
-  "Establishes the number of restarts permitted to a CTRIE operation
-  established by a WITH-CTRIE form before a condition of type
-  CTRIE-OPERATION-RETRIES-EXCEEDED will be signaled, aborting the
-  operatation, and requiring operator intervention to resume
-  processing.")
-
-
-(defparameter *timeout*         2
-  "Establishes the duration (in seconds) allotted to a CTRIE operation
-  established by a WITH-CTRIE form before a condition of type
-  CTRIE-OPERATION-TIMEOUT-EXCEEDED will be signaled, aborting the
-  operatation, and requiring operator intervention to resume
-  processing.")
-
-
-(defparameter *context*       nil
-  "Diagnostic value, not used in production, used to maintain
-  additional information tracking the current dynamic state.")
-
-
-(defparameter *debug*         nil
-  "Debugging flag, not used in production, to enable generation of
-  additional diagnostic and reporting information.")
-
-(defparameter *timestamps-enabled* nil)
-
-(defparameter *pool-enabled*    t)
-
-(defparameter *pool-high-water* (expt 2 10))
-
-(defvar       *pool-list*        nil)
-
-(defvar       *pool-worker*      nil)
-
-(defvar       *pool-queue*       nil)
-
-(defparameter *default-mmap-dir* nil)
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Conditions
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(define-condition ctrie-error (error) 
-  ((ctrie :initform *ctrie* :initarg :ctrie :reader ctrie-of))
-  (:documentation "Abstract superclass of CTRIE related conditions."))
-
-
-(define-condition ctrie-structural-error (ctrie-error)
-  ((node :initarg :node :reader node-of))
-  (:documentation "Condition designating that the CTRIE data structure
-   has been determined to be invalid."))
-
-
-(define-condition ctrie-generational-mismatch (ctrie-structural-error)
-  ((expected :initarg :expected :reader expected)
-    (found   :initarg :found    :reader found))
-  (:documentation "Condition indicating an operation encountered an
-   outdated or inconsistent node during its attempted traversal"))
-
-
-(define-condition ctrie-operational-error (ctrie-error)
-  ((op :initarg :op :reader op-of))
-  (:documentation "Condition for when an operational failure or
-  inconsistency has occurred."))
-
-
-(define-condition ctrie-modification-failed  (ctrie-operational-error)
-  ((place   :initarg :place  :reader place-of)
-    (reason :initarg :reason :reader reason-of))
-  (:report
-    (lambda (condition stream)
-      (with-slots (ctrie op place reason) condition
-        (format stream "CTRIE MODIFICATION FAILED~%")
-        (format stream "-------------------------~%~%")
-        (format stream "FAILURE: Operation ~S failed to modify ~S in CTRIE at #x~X~%~%"
-          op place (if ctrie (sb-kernel:get-lisp-obj-address ctrie) 0))
-        (format stream "CAUSE:   ~A~%~%" reason)
-        (format stream "ABOUT:   ~A~%~%"
-          (documentation (type-of condition) 'type)))))
-  (:documentation
-        "This condition indicates an unhandled failure of an attempt to
-         perform stateful modification to CTRIE.  The most common case in
-         which this might occur is when such an attempt is mode on a CTRIE
-         designated as READONLY-P.  In any case, this condition represents an
-         exception from which processing cannot continue and requires
-         interactive user intervention in order to recover."))
-
-
-(define-condition ctrie-invalid-dynamic-context (ctrie-operational-error)
-  ((ctrie-context :initform *ctrie* :initarg :ctrie-context :reader ctrie-context)
-    (gen-context  :initarg :gen-context   :reader gen-context))
-  (:documentation "Condition indicating an operation was attempted
-   outside the dynamic extent of a valid enclosing WITH-CTRIE form"))
-
-
-(define-condition ctrie-operation-timeout-exceeded (ctrie-operational-error)
-  ((seconds :initform *timeout* :initarg :seconds :reader seconds-of))
-  (:documentation "Condition indicating an operation has failed the
-   maximum number of times specified by the s-variable *retries*"))
-
-
-(define-condition ctrie-operation-retries-exceeded (ctrie-operational-error)
-  ((retries :initform *retries* :initarg :retries :reader retries-of))
-  (:documentation "Condition indicating an operation has failed the
-   maximum number of times specified by the special-variable
-   *retries*"))
-
-
-(define-condition ctrie-not-implemented (ctrie-error) ()
-  (:documentation "Condition designating functionality for which the
-   implementation has not been written, but has not been deliberately
-   excluded."))
-
-
-(define-condition ctrie-not-supported (ctrie-error) ()
-  (:documentation "Condition designating functionality that is
-  deliberately not supported."))
-
-
-(defmacro ctrie-error (condition &rest args)
-  "Signal a CTRIE related condition."
-  `(error ',condition :ctrie *ctrie* ,@args))
-
-
-(defun ctrie-modification-failed (reason &key op place)
-  "Signal a modification failure with the appropriate attendant metadata."
-  (ctrie-error ctrie-modification-failed :op op :place place :reason reason))
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Multi-Catch/Case
-;; experimenting with catch/throw as possibly a lighter-weight mechanism
-;; than the condition system to deal with the unusual, case-wise exceptions
-;; and non-local control-flow described by some of the ctrie algorithms.
-;; I believe this originated with cilk (?) by radshaw (?) Terry but i need to
-;; check on that and then attribute correctly.  The intent is to have a lighter
-;; weight vehicle for control flow than would be possible with conditions and
-;; handlers for use in tight CAS loops, as in some cases I've seen that the
-;; condition system of many lisp implementations does not seem to be highly
-;; optimized for performance-critical regions.   
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(eval-when (:compile-toplevel :load-toplevel :execute)
-
-  (defmacro multi-catch (tag-list &body forms)
-    "Macro allowing catch of multiple tags at once and
-    finding out which tag was thrown.
-    * RETURNS: (values RESULT TAG)
-       -  RESULT is either the result of evaluationg FORMS or the value
-          thrown by the throw form.
-       -  TAG is NIl if evaluation of the FORMS completed normally
-          or the tag thrown and cought.
-    * EXAMPLE:
-    ```
-        ;;; (multiple-value-bind (result tag)
-        ;;;            (multi-catch (:a :b)
-        ;;;                 ...FORMS...)
-        ;;;              (case tag 
-        ;;;                 (:a ...)
-        ;;;                 (:b ...)
-        ;;;                 (t ...)))
-    ```"
-    (let ((block-name (gensym)))
-      `(block ,block-name
-         ,(multi-catch-1 block-name tag-list forms))))
-
-  
-  (defun multi-catch-1 (block-name tag-list forms)
-    "Helper for multi-catch macro"
-    (if (null tag-list) `(progn ,@forms)
-      (let ((tmp (gensym)))
-        `(let ((,tmp (catch ,(first tag-list)
-                       (return-from ,block-name 
-                         (values ,(multi-catch-1 block-name (rest tag-list) forms))))))
-           (return-from ,block-name (values ,tmp ,(first tag-list)))))))
-
-  
-  (defmacro catch-case (form &rest cases)
-    "User api encapsulating the MULTI-CATCH control-structure in a
-    syntactic format that is identical to that of the familiar CASE
-    statement, with the addition that within the scope of each CASE
-    clause, a lexical binding is established between the symbol IT and
-    the value caught from the throw form."
-    (let ((tags (remove t (mapcar #'first cases)))
-           (tag (gensym)))
-      `(multiple-value-bind (it ,tag)
-         (multi-catch ,tags ,form)
-         (cond 
-           ,@(loop for case in cases
-               collect `(,(if (eq (first case) t) t  
-                            `(eql ,tag ,(first case)))
-                          ,@(rest case))))))))
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Pre-Allocation Pooling
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defun ctrie-enable-pooling ()
-  (setf *pool-enabled* t))
-
-(defun ctrie-disable-pooling ()
-  (setf *pool-enabled* nil))
-
-(defun ctrie-pooling-enabled-p ()
-  (not (null *pool-enabled*)))
-
-(defun pool-sizes (class-name)
-  (get class-name :pool-sizes))
-
-(defun (setf pool-sizes) (value class-name)
-  (setf (get class-name :pool-sizes) value))
-
-(defun pool-alloc (class-name)
-  (get class-name :pool-alloc))
-
-(defun (setf pool-alloc) (fn class-name)
-  (setf (get class-name :pool-alloc) fn))
-
-(defun find-pool (class-name)
-  (or (getf *pool-list* class-name)
-    (setf (getf *pool-list* class-name)
-      (let1 sizes (pool-sizes class-name)
-        (make-array sizes :initial-contents
-          (loop repeat sizes collect (cons nil nil)))))))
-
-(defmacro/once define-pool (&once name (&optional (sizes 0)) &body body)
-  `(progn
-     (setf (pool-alloc ',name) (lambda (&optional size)
-                                 (declare (ignorable size))
-                                 ,@body))
-     (setf (pool-sizes ',name) ,sizes)
-     (find-pool ',name)))
-
-(defun ctrie-pool-status ()
-  (loop for class-name in *pool-list* by #'cddr
-    when class-name
-    collect (cons class-name
-              (coerce (loop for p across (find-pool class-name)
-                        collect (length (cdr p)))
-                'vector))))
-  
-(defun ps ()
-  (ctrie-pool-status))
-
-(defun ctrie-ps ()
-  (ctrie-pool-status))
- 
-(defun/inline pool-queue ()
-  (or *pool-queue* 
-    (setf *pool-queue*
-      (sb-concurrency:make-mailbox :name "pool-queue"))))
-
-(defun destroy-pool-list ()
-  (setf *pool-list* nil))
-
-(defun destroy-pool-queue ()
-  (setf *pool-queue* nil))
-
-(defun fill-pool (class-name &optional (size 0))
-  (let1 pool (svref (find-pool class-name) size)
-    (unless (cdr pool)
-      ;;(printv "filling pool" size "")
-      (sb-thread::with-cas-lock ((car pool))
-        (setf (cdr pool)
-          (loop repeat *pool-high-water*
-            collect (apply (pool-alloc class-name) (ensure-list (unless (zerop size) size)))))))))
-
-(defun fill-all-pools ()
-  (loop for class-name in *pool-list* by #'cddr
-    when class-name
-    do (dolist (size (iota (pool-sizes class-name) :start 0))
-         (sb-concurrency:send-message (pool-queue) (cons class-name size)))))
-
-(defun pool-work-loop ()
-  (loop with terminate until terminate
-    for request = (ensure-list (sb-concurrency:receive-message (pool-queue)))
-    if (and (cdr request) (minusp (cdr request))) do (setf terminate t)
-    else do (fill-pool (car request) (or (cdr request) 0))))
-
-(defun/inline pool-worker ()
-  (if (and *pool-worker* (sb-thread:thread-alive-p *pool-worker*))
-    *pool-worker*
-    (setf *pool-worker*
-      (sb-thread:make-thread
-        (lambda ()
-          (fill-all-pools)
-          (pool-work-loop)
-          (destroy-pool-list)
-          (destroy-pool-queue)
-          (setf *pool-worker* nil)
-          (sb-thread:terminate-thread sb-thread:*current-thread*))
-        :name "pool-worker"))))
-
-(defun/inline allocate (class-name &optional (size 0))
-  (if (minusp size)
-    (sb-concurrency:send-message (pool-queue) (cons class-name size)) 
-    (flet ((bail ()
-             (pool-worker)
-             (sb-concurrency:send-message (pool-queue) (cons class-name size)) 
-             (return-from allocate
-               (apply (pool-alloc class-name) (ensure-list (unless (zerop size) size))))))
-      (let1 pool (svref (find-pool class-name) size)
-        (when (null (cdr pool)) (bail))
-        (sb-thread::with-cas-lock ((car pool))
-          (unless (cdr pool) (bail))
-          (prog1 (pop (cdr pool))
-            (unless (cdr pool)
-              (pool-worker)
-              (sb-concurrency:send-message (pool-queue) (cons class-name size))))))))) 
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1905,6 +1572,72 @@
 ;;;;                                                                         ;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Multi-Catch/Case
+;; experimenting with catch/throw as possibly a lighter-weight mechanism
+;; than the condition system to deal with the unusual, case-wise exceptions
+;; and non-local control-flow described by some of the ctrie algorithms.
+;; I believe this originated with cilk (?) by radshaw (?) Terry but i need to
+;; check on that and then attribute correctly.  The intent is to have a lighter
+;; weight vehicle for control flow than would be possible with conditions and
+;; handlers for use in tight CAS loops, as in some cases I've seen that the
+;; condition system of many lisp implementations does not seem to be highly
+;; optimized for performance-critical regions.   
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+
+  (defmacro multi-catch (tag-list &body forms)
+    "Macro allowing catch of multiple tags at once and
+    finding out which tag was thrown.
+    * RETURNS: (values RESULT TAG)
+       -  RESULT is either the result of evaluationg FORMS or the value
+          thrown by the throw form.
+       -  TAG is NIl if evaluation of the FORMS completed normally
+          or the tag thrown and cought.
+    * EXAMPLE:
+    ```
+        ;;; (multiple-value-bind (result tag)
+        ;;;            (multi-catch (:a :b)
+        ;;;                 ...FORMS...)
+        ;;;              (case tag 
+        ;;;                 (:a ...)
+        ;;;                 (:b ...)
+        ;;;                 (t ...)))
+    ```"
+    (let ((block-name (gensym)))
+      `(block ,block-name
+         ,(multi-catch-1 block-name tag-list forms))))
+
+  
+  (defun multi-catch-1 (block-name tag-list forms)
+    "Helper for multi-catch macro"
+    (if (null tag-list) `(progn ,@forms)
+      (let ((tmp (gensym)))
+        `(let ((,tmp (catch ,(first tag-list)
+                       (return-from ,block-name 
+                         (values ,(multi-catch-1 block-name (rest tag-list) forms))))))
+           (return-from ,block-name (values ,tmp ,(first tag-list)))))))
+
+  
+  (defmacro catch-case (form &rest cases)
+    "User api encapsulating the MULTI-CATCH control-structure in a
+    syntactic format that is identical to that of the familiar CASE
+    statement, with the addition that within the scope of each CASE
+    clause, a lexical binding is established between the symbol IT and
+    the value caught from the throw form."
+    (let ((tags (remove t (mapcar #'first cases)))
+           (tag (gensym)))
+      `(multiple-value-bind (it ,tag)
+         (multi-catch ,tags ,form)
+         (cond 
+           ,@(loop for case in cases
+               collect `(,(if (eq (first case) t) t  
+                            `(eql ,tag ,(first case)))
+                          ,@(rest case))))))))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; PUT/INSERT
