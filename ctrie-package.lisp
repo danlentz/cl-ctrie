@@ -9,7 +9,7 @@
      Tries with Efficient Non-Blocking Snapshots, (c) ACM 2-25-2012'
      by Prokopec, Bronson, Bagwell, and Odersky.")
   (:shadow :once-only)
-  (:use :closer-common-lisp :closer-mop :alexandria :lisp-unit)
+  (:use :closer-common-lisp :closer-mop :contextl :alexandria :lisp-unit)
   (:shadowing-import-from :lisp-unit :set-equal)
   (:import-from :sb-ext :get-cas-expansion :define-cas-expander :cas
     :compare-and-swap :atomic-incf :atomic-decf :defcas :defglobal)

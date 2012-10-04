@@ -6,21 +6,17 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; CTRIE Root Container
-;;
-;; the root container is now declared early to avoid performance penalties
-;; incurred for structure slot accessors that are referenced prior to the
-;; actual structure definition.  The consequence is that this requires several
-;; forward references to other functions defined later in this file.
+;; Layered Allocation Context
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(clear-layer-caches)
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (clear-layer-caches)
+  (deflayer allocation)
+  (deflayer transient  (allocation))
+  (deflayer persistent (allocation)
+    ((dir :initarg :dir  :accessor dir ;;:special t
+       :initform (apply #'mm:ensure-manardb (ensure-list *default-mmap-dir*))))))
 
-(deflayer allocation)
-(deflayer transient  (allocation))
-(deflayer persistent (allocation)
-  ((dir :initarg :dir  :accessor dir ;;:special t
-     :initform (apply #'mm:ensure-manardb (ensure-list *default-mmap-dir*)))))
 
 (defun persistent-dir ()
   (if (find 'persistent (active-layers ) :key #'layer-name)
@@ -28,6 +24,15 @@
     (with-active-layers (persistent)
       (dir (find-layer 'persistent)))))
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; CTRIE Root Container
+;;
+;; the root container is now declared early to avoid performance penalties
+;; incurred for structure slot accessors that are referenced prior to the
+;; actual structure definition.  The consequence is that this requires several
+;; forward references to other functions defined later in this file.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
 #+()
@@ -133,7 +138,11 @@
 
 (deftype ctrie ()
   '(or transient-ctrie persistent-ctrie))
-    
+
+(defun ctrie-p (thing)
+  (typep thing 'ctrie))
+
+
 (defun make-ctrie (&rest args &key persistent root (readonly-p nil) (test 'equal) (hash 'sxhash)
                     (stamp 'nix) #+()(if *timestamps-enabled* 'local-time:now (constantly nil))
                      &allow-other-keys)
@@ -163,7 +172,11 @@
   `(let* ((*ctrie* (if (typep ,ctrie 'function)
                      (funcall ,ctrie #'identity)
                      ,ctrie)))
-     ,@body))
+     (typecase *ctrie*
+       (mm:mm-object (with-active-layers (persistent)
+                       ,@body))
+       (t            (with-active-layers (transient)
+                       ,@body)))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -285,9 +298,7 @@
     (value
       :initform t
       :accessor ref-value
-      :initarg :value)
-    ))
-
+      :initarg :value)))
 
 (mm:defmmclass persistent-ref ()
   ((prev
@@ -306,28 +317,47 @@
       :initarg :value
       :persistent t)))
 
+
 (deftype ref ()
   '(or transient-ref persistent-ref))
 
 (defun ref-p (thing)
   (typep thing 'ref))
-  
+
+(define-pool transient-ref (0)
+  (make-instance 'transient-ref :stamp nil :value nil :prev nil))
+
+(define-pool persistent-ref (0)
+  (make-instance 'persistent-ref :stamp nil :value nil :prev nil))
+
+
 (define-layered-function make-ref (&key stamp value prev &allow-other-keys))
 
-(define-layered-method make-ref :in t (&key stamp value prev persistent)
+(define-layered-method   make-ref :in t (&key stamp value prev persistent)
   (if persistent
     (with-active-layers (persistent)
-      (funcall #'make-instance 'persistent-ref :stamp stamp :value value :prev prev))
+      (make-ref :stamp stamp :value value :prev prev))
     (with-active-layers (transient)
-      (funcall #'make-instance 'transient-ref :stamp stamp :value value :prev prev))))
+      (make-ref :stamp stamp :value value :prev prev))))
 
-(define-layered-method make-ref :in transient (&key stamp value prev)
-  (funcall #'make-instance 'transient-ref :stamp stamp :value value :prev prev))
+(define-layered-method   make-ref :in transient (&key stamp value prev)
+  (if (ctrie-pooling-enabled-p)
+    (aprog1 (allocate 'transient-ref)
+      (setf
+        (ref-stamp it) stamp
+        (ref-value it) value
+        (ref-prev  it) prev))
+    (funcall #'make-instance 'transient-ref :stamp stamp :value value :prev prev)))
 
-(define-layered-method make-ref :in persistent (&key stamp value prev)
-  (funcall #'make-instance 'persistent-ref :stamp stamp :value value :prev prev))
+(define-layered-method   make-ref :in persistent (&key stamp value prev)
+  (if (ctrie-pooling-enabled-p)
+    (aprog1 (allocate 'persistent-ref)
+      (setf
+        (ref-stamp it) stamp
+        (ref-value it) value
+        (ref-prev  it) prev))  
+    (funcall #'make-instance 'persistent-ref :stamp stamp :value value :prev prev)))
 
-(define-pool transient-ref
   
 #+()
 (defstruct (failed-ref
@@ -392,6 +422,7 @@
   (gen nil :read-only t)
   (ref nil))
 
+
 (defclass transient-inode ()
   ((ref
       :initform nil
@@ -414,11 +445,23 @@
      :initarg :gen
      :persistent t)))
 
+
+
 (deftype inode ()
   '(or transient-inode persistent-inode))
 
 (defun inode-p (thing)
   (typep thing 'inode))
+
+
+
+(define-pool transient-inode (0)
+  (make-instance 'transient-inode))
+
+(define-pool persistent-inode (0)
+  (make-instance 'persistent-inode))
+
+
 
 #+()
 (defun make-inode (link-to &optional gen stamp prev)
@@ -432,29 +475,33 @@
 
 (define-layered-function make-inode (link-to &optional gen stamp prev persistent))
 
-
-(define-layered-method make-inode :in t (link-to &optional gen stamp prev persistent)
+(define-layered-method   make-inode :in t (link-to &optional gen stamp prev persistent)
   (if persistent
     (with-active-layers (persistent)
-      (funcall #'make-instance 'persistent-inode
-        :gen (or gen (gensym "ctrie"))
-        :ref (make-ref :value link-to :stamp (or stamp (ctstamp)) :prev prev)))
+      (make-inode link-to gen stamp prev))
     (with-active-layers (transient)
-      (funcall #'make-instance 'transient-inode
-        :gen (or gen (gensym "ctrie"))
-        :ref (make-ref :value link-to :stamp (or stamp (ctstamp)) :prev prev)))))
+      (make-inode link-to gen stamp prev))))
 
 
 (define-layered-method make-inode :in transient (link-to &optional gen stamp prev persistent)
   (declare (ignore persistent))
+  (if (ctrie-pooling-enabled-p)
+    (aprog1 (allocate 'transient-inode)
+      (setf
+        (inode-gen it) (or gen (gensym "ctrie"))
+        (inode-ref it) (make-ref :value link-to :stamp (or stamp (ctstamp)) :prev prev)))
     (funcall #'make-instance 'transient-inode
       :gen (or gen (gensym "ctrie"))
-      :ref (make-ref :value link-to :stamp (or stamp (ctstamp)) :prev prev)))
+      :ref (make-ref :value link-to :stamp (or stamp (ctstamp)) :prev prev))))
 
 
 (define-layered-method make-inode :in persistent (link-to &optional gen stamp prev persistent)
   (declare (ignore persistent))
-  (with-active-layers (persistent)
+  (if (ctrie-pooling-enabled-p)
+    (aprog1 (allocate 'persistent-inode)
+      (setf
+        (inode-gen it) (or gen (gensym "ctrie"))
+        (inode-ref it) (make-ref :value link-to :stamp (or stamp (ctstamp)) :prev prev)))
     (funcall #'make-instance 'persistent-inode
       :gen (or gen (gensym "ctrie"))
       :ref (make-ref :value link-to :stamp (or stamp (ctstamp)) :prev prev))))
@@ -529,7 +576,7 @@
                          (make-ref :value ,new :stamp ,new-stamp :prev ,prev)))
                    ref-ptr)))))))))
 
-
+#+()
 (define-test check-simple-gcas-cas ()
   (assert-false
     (with-active-layers (persistent)
@@ -658,49 +705,10 @@
                 (inode-commit inode (inode-ref inode))))))))))
 
 
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; SNODE 
+;; Serial Boxes
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-#+()
-(defstruct (snode
-             (:copier nil))
-  "SNODE, i.e., 'Storage Node', is the LEAF-NODE structure ultimately
-  used for the storage of each key/value pair contained in the CTRIE.
-  An SNODE is considered to be immutable during its lifetime.
-   - `KEY` defines the slot containing an element of the map's domain.
-   - `VALUE` defines the slot containing the range-element mapped to `KEY`"
-  (key   nil  :read-only t)
-  (value nil  :read-only t))
-
-(defclass transient-snode ()
-  ((key
-     :initform nil
-     :accessor %snode-key
-     :initarg :key)
-    (value
-      :initform nil
-      :accessor %snode-value
-      :initarg :value)))
-
-(mm:defmmclass persistent-snode ()
-  ((key
-     :initform nil
-     :accessor %snode-key
-     :initarg :key
-     :persistent t)
-    (value
-      :initform nil
-      :accessor %snode-value
-      :initarg :value
-      :persistent t)))
-
-(deftype snode ()
-  '(or transient-snode persistent-snode))
-
-(defun snode-p (thing)
-  (typep thing 'snode))
-
 
 (mm:defmmclass serial-box (mm:marray)
   ())
@@ -750,20 +758,80 @@
   (mm:mm-fixed-string-value thing))
 
   
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; SNODE 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+#+()
+(defstruct (snode
+             (:copier nil))
+  "SNODE, i.e., 'Storage Node', is the LEAF-NODE structure ultimately
+  used for the storage of each key/value pair contained in the CTRIE.
+  An SNODE is considered to be immutable during its lifetime.
+   - `KEY` defines the slot containing an element of the map's domain.
+   - `VALUE` defines the slot containing the range-element mapped to `KEY`"
+  (key   nil  :read-only t)
+  (value nil  :read-only t))
+
+(defclass transient-snode ()
+  ((key
+     :initform nil
+     :accessor %snode-key
+     :initarg :key)
+    (value
+      :initform nil
+      :accessor %snode-value
+      :initarg :value)))
+
+(mm:defmmclass persistent-snode ()
+  ((key
+     :initform nil
+     :accessor %snode-key
+     :initarg :key
+     :persistent t)
+    (value
+      :initform nil
+      :accessor %snode-value
+      :initarg :value
+      :persistent t)))
+
+(deftype snode ()
+  '(or transient-snode persistent-snode))
+
+(defun snode-p (thing)
+  (typep thing 'snode))
+
+(define-pool transient-snode  (0)
+  (make-instance 'transient-snode))
+
+(define-pool persistent-snode (0)
+  (make-instance 'persistent-snode))
+
+
 (define-layered-function snode (key value &key &allow-other-keys))
 
 (define-layered-method snode :in t (key value &key persistent)
   (if persistent
     (with-active-layers (persistent)
-      (funcall #'make-instance 'persistent-snode :key (maybe-box key) :value (maybe-box value)))
+      (snode key value))
     (with-active-layers (transient)
-      (funcall #'make-instance 'transient-snode :key key :value value))))
+      (snode key value))))
 
 (define-layered-method snode :in transient (key value &key)
-  (funcall #'make-instance 'transient-snode :key key :value value))
+  (if (ctrie-pooling-enabled-p)
+    (aprog1 (allocate 'transient-snode)
+      (setf
+        (snode-key   it) key
+        (snode-value it) value))
+    (funcall #'make-instance 'transient-snode :key key :value value)))
 
 (define-layered-method snode :in persistent (key value &key)
-  (funcall #'make-instance 'persistent-snode :key (maybe-box key) :value (maybe-box value)))
+  (if (ctrie-pooling-enabled-p)
+    (aprog1 (allocate 'persistent-snode)
+      (setf
+        (snode-key   it) (maybe-box key)
+        (snode-value it) (maybe-box value)))
+    (funcall #'make-instance 'persistent-snode :key (maybe-box key) :value (maybe-box value))))
 
 
 (defgeneric snode-key (snode))
@@ -841,7 +909,6 @@
       :accessor lnode-next
       :initarg :next)))
 
-
 (mm:defmmclass persistent-lnode ()
   ((elt
      :initform nil
@@ -861,22 +928,37 @@
   (typep thing 'lnode))
 
 
+(define-pool transient-lnode (0)
+  (make-instance 'transient-lnode))
+
+(define-pool persistent-lnode (0)
+  (make-instance 'persistent-lnode))
+
+
 (define-layered-function make-lnode (&key elt next &allow-other-keys)) 
 
-(define-layered-method make-lnode :in t (&key elt next persistent) 
+(define-layered-method   make-lnode :in t (&key elt next persistent) 
   (if persistent
     (with-active-layers (persistent)
-      (funcall #'make-instance 'persistent-lnode :elt elt :next next))
+      (make-lnode :elt elt :next next))
     (with-active-layers (transient)
-      (funcall #'make-instance 'transient-lnode :elt elt :next next))))
+      (make-lnode :elt elt :next next))))
+  
+(define-layered-method make-lnode :in transient  (&key elt next)
+  (if (ctrie-pooling-enabled-p)
+    (aprog1 (allocate 'transient-lnode)
+      (setf
+        (lnode-elt  it) elt
+        (lnode-next it) next))
+    (funcall #'make-instance 'transient-lnode :elt elt :next next)))
 
-(define-layered-method make-lnode :in transient  (&key elt next persistent)
-  (declare (ignore persistent))
-  (funcall #'make-instance 'transient-lnode :elt elt :next next))
-
-(define-layered-method make-lnode :in persistent  (&key elt next persistent)
-  (declare (ignore persistent))
-  (funcall #'make-instance 'persistent-lnode :elt elt :next next))
+(define-layered-method make-lnode :in persistent  (&key elt next)
+  (if (ctrie-pooling-enabled-p)
+    (aprog1 (allocate 'persistent-lnode)
+      (setf
+        (lnode-elt  it) elt
+        (lnode-next it) next))
+    (funcall #'make-instance 'persistent-lnode :elt elt :next next)))
 
 
 (defun enlist (&rest rest)
@@ -972,25 +1054,39 @@
 (defun tnode-p (thing)
   (typep thing 'tnode))
 
+(define-pool transient-tnode (0)
+  (make-instance 'transient-tnode))
+
+(define-pool persistent-tnode (0)
+  (make-instance 'persistent-tnode))
+
 
 (define-layered-function make-tnode (&key cell &allow-other-keys)) 
 
-(define-layered-method make-tnode :in t (&key cell persistent) 
+(define-layered-method   make-tnode :in t (&key cell persistent) 
   (if persistent
     (with-active-layers (persistent)
-      (funcall #'make-instance 'persistent-tnode :cell cell))
+      (make-tnode :cell cell))
     (with-active-layers (transient)
-      (funcall #'make-instance 'transient-tnode :cell cell))))
+      (make-tnode :cell cell))))
 
-(define-layered-method make-tnode :in transient  (&key cell persistent)
-  (declare (ignore persistent))
-  (funcall #'make-instance 'transient-tnode :cell cell))
+(define-layered-method   make-tnode :in transient  (&key cell)
+  (if (ctrie-pooling-enabled-p)
+    (aprog1 (allocate 'transient-tnode)
+      (setf
+        (tnode-cell it) cell))
+    (funcall #'make-instance 'transient-tnode :cell cell)))
 
-(define-layered-method make-tnode :in persistent  (&key cell persistent)
-  (declare (ignore persistent))
-  (funcall #'make-instance 'persistent-tnode :cell cell))
+(define-layered-method   make-tnode :in persistent (&key cell)
+  (if (ctrie-pooling-enabled-p)
+    (aprog1 (allocate 'persistent-tnode)
+      (setf
+        (tnode-cell it) cell))
+    (funcall #'make-instance 'persistent-tnode :cell cell)))
 
-  
+
+
+
 (defgeneric entomb (node)
   (:documentation "Return a newly constructed TNODE enclosing the argument
   LEAF-NODE structure `NODE`"))
@@ -1059,6 +1155,56 @@
       :accessor cnode-arcs
       :initarg :arcs)))
 
+(mm:defmmclass persistent-cnode ()
+  ((bitmap
+     :initform 0
+     :accessor cnode-bitmap
+     :initarg :bitmap
+     :persistent t)
+    (arcs
+      :initform  (mm:make-marray 0)
+      :accessor cnode-arcs
+      :initarg :arcs
+      :persistent t)))
+
+(deftype cnode ()
+  '(or transient-cnode persistent-cnode))
+
+(defun cnode-p (thing)
+  (typep thing 'cnode))
+
+(define-pool transient-cnode (32)
+  (make-instance 'transient-cnode :arcs (make-array (or bucket 0)))) 
+
+(define-pool persistent-cnode (32)
+  (make-instance 'persistent-cnode :arcs (mm:make-marray (or bucket 0))))
+
+
+(define-layered-function make-cnode (&optional bitmap persistent)) 
+
+(define-layered-method   make-cnode :in t (&optional (bitmap 0) persistent) 
+  (if persistent
+    (with-active-layers (persistent)
+      (make-cnode bitmap))
+    (with-active-layers (transient)
+      (make-cnode bitmap))))
+
+(define-layered-method   make-cnode :in transient (&optional (bitmap 0) persistent)
+  (declare (ignore persistent))
+  (if (ctrie-pooling-enabled-p)
+    (aprog1 (allocate 'transient-cnode (logcount bitmap))
+      (setf (cnode-bitmap it) bitmap))
+    (make-instance 'transient-cnode :bitmap bitmap :arcs (make-array (logcount bitmap)))))
+
+(define-layered-method   make-cnode :in persistent (&optional (bitmap 0) persistent)
+  (declare (ignore persistent))
+  (if (ctrie-pooling-enabled-p)
+    (aprog1 (allocate 'persistent-cnode (logcount bitmap))
+      (setf (cnode-bitmap it) bitmap))
+    (make-instance 'persistent-cnode :bitmap bitmap :arcs (mm:make-marray (logcount bitmap)))))
+
+
+
 
 #+()
 (defstruct (cnode
@@ -1082,8 +1228,7 @@
   (bitmap 0           )  ;;:read-only t)
   (arcs   %empty-map% )) ;;:read-only t))
 
-
-
+#+()
 (defun make-cnode (&optional (bitmap 0))
   "Construct a CNODE with internal storage allocated for the number of
   arcs equal to the Hamming-Weight of the supplied BITMAP parameter.

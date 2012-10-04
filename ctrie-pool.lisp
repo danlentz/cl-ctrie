@@ -3,7 +3,6 @@
 
 (in-package :cl-ctrie)
 
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Threaded Pre-Allocation and Memory Pooling
 ;;

@@ -5,10 +5,13 @@
 
 (asdf:defsystem :cl-ctrie
   :serial t
-  :description      "CTrie: a lock-free, concurrent, key/value map"
+  :description      "CL-CTrie: a lock-free, concurrent, key/value index supporting
+                    both fast transient and efficient memory-mapped persistent storage
+                    models."
+  
   :author           "Dan Lentz <danlentz@gmail.com>"
   :license          "MIT"
-  :version          "0.0.8"
+  :version          "0.1.5"
   
   :long-description "This is a common-lisp implementation of the CTrie unordered map
                      data-structure described in the paper 'Concurrent Tries with
@@ -65,14 +68,34 @@
                      this is not necessarily a high priority for the initial development
                      cycle."
   
-  :weakly-depends-on (:cl-store :donuts :cldoc :cl-ppcre :drakma :uuid :unicly)
-  :depends-on (:closer-mop :contextl :alexandria :lisp-unit :local-time :flexi-streams
-                :cffi :osicat :hu.dwim.serializer :manardb :cl-store)
+  :weakly-depends-on (:cl-store :donuts :cldoc :cl-ppcre :drakma :uuid)
+  :depends-on        (:closer-mop :contextl :alexandria :lisp-unit :local-time :unicly
+                       :flexi-streams :osicat :hu.dwim.serializer :manardb :cl-store
+                       :iterate :cl-irregsexp)
+  
   :components ((:static-file  "cl-ctrie.asd")
                 (:static-file "readme.md")
                 (:file "common-io")
                 (:file "common-pointer")
                 (:file "common-array")
+                (:file "common-tty")
+                (:file "mmap-package")
+                (:file "mmap-widths")  
+                (:file "mmap-utils")   
+                (:file "mmap-struct")  
+                (:file "mmap-mop")     
+                (:file "mmap-mtagmap") 
+                (:file "mmap-class")   
+                (:file "mmap-types")   
+                (:file "mmap-iterator")
+                (:file "mmap-array")   
+                (:file "mmap-box")     
+                (:file "mmap-finalize")
+                (:file "mmap-filesystem")
+                (:file "mmap-string") 
+                (:file "mmap-mcons")        
+                (:file "mmap-gc1")           
+                (:file "mmap-gc2")
                 (:file "ctrie-package")
                 (:file "ctrie-special")
                 (:file "ctrie-conditions")
