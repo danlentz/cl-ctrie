@@ -353,7 +353,9 @@
 
 
 (defgeneric ctrie-lambda-ctrie (ctrie-designator)
-  (:method ((ctrie ctrie))
+  (:method ((ctrie transient-ctrie))
+    ctrie)
+  (:method ((ctrie persistent-ctrie))
     ctrie)
   (:method ((ctrie function))
     (with-pandoric-slots (it) ctrie
@@ -361,7 +363,11 @@
 
 
 (defgeneric ensure-lambda (ctrie-designator &key &allow-other-keys)
-  (:method ((ctrie ctrie) &key)
+  (:method ((ctrie transient-ctrie) &key)
+    (let* (ctrie lambda)
+      (setf lambda
+        (ctrie-lambda ctrie container lambda))))
+  (:method ((ctrie persistent-ctrie) &key)
     (let* (ctrie lambda)
       (setf lambda
         (ctrie-lambda ctrie container lambda))))

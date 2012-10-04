@@ -1,8 +1,7 @@
 ;;;;; -*- mode: common-lisp;   common-lisp-style: modern;    coding: utf-8; -*-
 ;;;;;
 
-(in-package :manardb)
-
+(in-package :cl-mmap)
 
 
 (defclass mm-metaclass (standard-class)
@@ -40,7 +39,9 @@
 
 (defun ptr (object)
   (declare (type mm-object object))
-  (the mptr (%ptr object)))
+  (%ptr object))
+
+;;  (the mptr (%ptr object)))
 
 #+(or)
 (define-compiler-macro ptr (object)

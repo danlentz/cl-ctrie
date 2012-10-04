@@ -546,14 +546,14 @@
 ;;                (local-time:format-rfc1123-timestring nil (ref-stamp (inode-ref inode))))))
 
 
-#+donuts
-(define-diagram cnode ()
-  (donuts:[]   "cnode"))
+;; #+donuts
+;; (define-diagram cnode ()
+;;   (donuts:[]   "cnode"))
 
 
-#+donuts
-(define-diagram tnode ()
-  (donuts:[&] (donuts:<> "tnode")))
+;; #+donuts
+;; (define-diagram tnode ()
+;;   (donuts:[&] (donuts:<> "tnode")))
 
 
 ;; (defmethod make-diagram ((thing snode) context &key)

@@ -21,9 +21,8 @@
                      by [Mathematical Systems Incorporated](http://www.msi.co.jp).
 
                      - Thanks to John Fremlin for a nice platform to hack and extend.
-                     - Thanks to Pascal Costanza for MOP conformance and other advice."
-  (:use :closer-common-lisp :contextl :iterate)
-  (:import-from :contextl :layer :layers :process-layered-access-slot-specification)
+                     - Thanks to Pascal Costanza for MOP conformance and other advice.")
+  (:use :closer-common-lisp :closer-mop :iterate)
   (:export
     :*mmap*
     :*mtagmaps-may-mmap*

@@ -1,7 +1,7 @@
 ;;;;; -*- mode: common-lisp;   common-lisp-style: modern;    coding: utf-8; -*-
 ;;;;;
 
-(in-package :manardb)
+(in-package :cl-mmap)
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -87,8 +87,11 @@
 ;; MM-SYMBOL
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defvar *gensyms* (make-hash-table  :synchronized t))
+
 (defmacro prop-for-mm-symbol (sym)
   `(get ,sym 'mm-symbol))
+
 
 (defvar *stored-symbols* nil)
 
@@ -103,16 +106,25 @@
                          :package (if pkg (package-name pkg) nil)
                          :symbol  (symbol-name object)))))
       (assert (not (zerop mptr)))
-      (when pkg 
-	(push object *stored-symbols*)
-	(setf (prop-for-mm-symbol object) mptr))
+      (if pkg
+        (progn
+          (push object *stored-symbols*)
+          (setf (prop-for-mm-symbol object) mptr))
+        (progn
+          (push object *stored-symbols*)
+          (setf (gethash (symbol-name object) *gensyms*) mptr)
+          (setf (gethash mptr *gensyms*) object)
+          ))
       mptr))
 
   (defun box-symbol (object)
     (declare (type symbol object))
     (cond
       ((not object) (make-mptr tag 0))
-      (t            (or (prop-for-mm-symbol object) (box-symbol-miss object)))))
+      (t            (or
+                      (prop-for-mm-symbol object)
+                      (gethash (symbol-name object) *gensyms*)
+                      (box-symbol-miss object)))))
   
   (defun unbox-symbol (index)
     (unless (zerop index)
@@ -121,11 +133,14 @@
                (symbol-name (mptr-to-lisp-object symbol-name)))
           (let ((sym (if package-name
                        (intern symbol-name (find-package package-name))
-                       (make-symbol symbol-name))))
-            (unless (prop-for-mm-symbol sym)
+                       (or (gethash (gethash symbol-name *gensyms*) *gensyms*) (make-symbol symbol-name)))))
+            (unless (or (prop-for-mm-symbol sym) (gethash symbol-name *gensyms*))
               (push sym *stored-symbols*)
-              (setf (prop-for-mm-symbol sym) (make-mptr tag index)))
+              (if package-name
+                (setf (prop-for-mm-symbol sym) (make-mptr tag index))
+                (setf (gethash (setf (gethash (symbol-name sym) *gensyms*) (make-mptr tag index)) *gensyms*) sym)))
             sym))))))
+
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

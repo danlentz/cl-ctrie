@@ -1,7 +1,7 @@
 ;;;;; -*- mode: common-lisp;   common-lisp-style: modern;    coding: utf-8; -*-
 ;;;;;
 
-(in-package :manardb)
+(in-package :mm)
 
 (defmacro define-lisp-object-to-mptr ()
   `(defun lisp-object-to-mptr (obj)

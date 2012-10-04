@@ -1,7 +1,7 @@
 ;;;;; -*- mode: common-lisp;   common-lisp-style: modern;    coding: utf-8; -*-
 ;;;;;
 
-(in-package :manardb)
+(in-package :mm)
 
 
 (defun mtagmap-byte (mtagmap index)

@@ -71,19 +71,24 @@
   (constantly nil))
 
 (defun new-transient-root ()
-  (make-inode (make-cnode) (gensym "ctrie")))
-
+  (with-active-layers (transient)
+    (make-inode (make-cnode) (gensym "ctrie"))))
 
 (defun new-persistent-root ()
-  (make-persistent-inode (make-persistent-cnode) (gensym "ctrie")))
+  (with-active-layers (persistent)
+    (make-inode (make-cnode) (gensym "ctrie"))))
 
 
 (defclass transient-ctrie ()
-  ((readonly-p
-     :initform nil
-     :type boolean
-     :accessor ctrie-readonly-p
-     :initarg :readonly-p)
+  ((root
+     :initform (new-transient-root)
+     :accessor ctrie-root
+     :initarg :root)
+    (readonly-p
+      :initform nil
+      :type boolean
+      :accessor ctrie-readonly-p
+      :initarg :readonly-p)
     (test
       :initform 'equal
       :type symbol
@@ -98,20 +103,21 @@
       :initform 'nix
       :type symbol
       :accessor ctrie-stamp
-      :initarg :stamp)
-    (root
-      :initform (new-transient-root)
-      :accessor ctrie-root
-      :initarg :root)))
+      :initarg :stamp)))
 
 
 (mm:defmmclass persistent-ctrie ()
-  ((readonly-p
-     :initform nil
-     :type boolean
-     :accessor ctrie-readonly-p
-     :initarg :readonly-p
+  ((root
+     :initform (new-persistent-root)
+     :accessor ctrie-root
+     :initarg :root
      :persistent t)
+    (readonly-p
+      :initform nil
+      :type boolean
+      :accessor ctrie-readonly-p
+      :initarg :readonly-p
+      :persistent t)
     (test
       :initform 'equal
       :type symbol
@@ -129,19 +135,13 @@
       :type symbol
       :accessor ctrie-stamp
       :initarg :stamp
-      :persistent t)
-    (root
-      :initform (new-persistent-root)
-      :accessor ctrie-root
-      :initarg :root
-      :persistent nil)))
+      :persistent t)))
 
 (deftype ctrie ()
   '(or transient-ctrie persistent-ctrie))
 
 (defun ctrie-p (thing)
   (typep thing 'ctrie))
-
 
 (defun make-ctrie (&rest args &key persistent root (readonly-p nil) (test 'equal) (hash 'sxhash)
                     (stamp 'nix) #+()(if *timestamps-enabled* 'local-time:now (constantly nil))
@@ -156,7 +156,11 @@
       (with-active-layers (transient)
         (apply #'make-instance 'transient-ctrie arglist)))))
 
- 
+(defun persistent-p (thing)
+  (typecase thing
+    (mm:mm-object t)
+    (t            nil)))
+
 
 (defmacro/once with-ctrie (&once ctrie &body body)
   "Configure the dynamic environment with the appropriate condition
@@ -373,6 +377,15 @@
 
 (mm:defmmclass persistent-failed-ref (persistent-ref)
   ())
+
+(defun failed-ref-prev (ref)
+  (ref-prev ref))
+
+(defun failed-ref-value (ref)
+  (ref-value ref))
+
+(defun failed-ref-stamp (ref)
+  (ref-stamp ref))
 
 (deftype failed-ref ()
   '(or transient-failed-ref persistent-failed-ref))
@@ -643,10 +656,9 @@
                         (let ((prev (ref-prev ,ref)))
                           (eq (cas (slot-value ,inode 'ref) ,ref (failed-ref-prev prev)) ,ref))))
      (persistent-inode (with-active-layers (persistent)
-                         (let ((prev (ref-prev ,ref))
-                                (ref-mptr (mm:mptr ,ref)))
-                           (eql (cas-word-sap (mm::mm-object-pointer ,inode) ref-mptr
-                                  (mm:mptr (failed-ref-prev prev))) ref-mptr))))))
+                         (let ((prev (ref-prev ,ref))) ;;(ref-mptr (mm:mptr ,ref)))
+                           (eql (cas-word-sap (mm::mm-object-pointer ,inode) (mm:mptr ,ref)
+                                  (mm:mptr (failed-ref-prev prev))) (mm:mptr ,ref))))))) ;; ref-mptr))))))
 
 (defmacro cas-ref-prev (ref prev new-generator)
   `(typecase ,ref
@@ -677,32 +689,32 @@
       :op 'inode-commit :place (describe-object inode nil)))
   (flet ((ABORTABLE-READ (ctrie)
            (root-node-access ctrie t)))
-    (let1 prev (ref-prev ref)
+    (let1 prev (printv (ref-prev ref))
       (typecase prev
         (null
           (return-from inode-commit ref))
         (failed-ref
-          (if (cas-failed-ref inode ref)     ;; (cas (inode-ref inode) ref (failed-ref-prev prev))
+         (printv  (if (cas-failed-ref inode ref)     ;; (cas (inode-ref inode) ref (failed-ref-prev prev))
             (return-from inode-commit
               (failed-ref-prev prev))
             (return-from inode-commit
-              (inode-commit inode (inode-ref inode)))))
+              (inode-commit inode (inode-ref inode))))))
         (t
-          (if (and (not (ctrie-readonly-p *ctrie*))
-                (eql (inode-gen (ABORTABLE-READ *ctrie*))
-                  (inode-gen inode)))
-            (if (cas-ref-prev ref prev (constantly nil))  ;; (cas (ref-prev ref) prev nil)
+    (if     (printv  (and (not (ctrie-readonly-p *ctrie*))
+                       (equal (printv (string (inode-gen (ABORTABLE-READ *ctrie*))))
+                        (printv (string (inode-gen inode))))))
+            (if     (printv  (cas-ref-prev ref prev (constantly nil)) ) ;; (cas (ref-prev ref) prev nil)
               (return-from inode-commit ref)
               (return-from inode-commit
                 (inode-commit inode ref)))
-            (progn (cas-ref-prev ref prev    ;; (cas (ref-prev ref) prev
+            (printv      (progn (cas-ref-prev ref prev    ;; (cas (ref-prev ref) prev
                      (lambda ()
                        (make-failed-ref
                        :value (ref-value prev)
                        :stamp (ref-stamp prev)
                        :prev  (ref-prev  prev))))
               (return-from inode-commit
-                (inode-commit inode (inode-ref inode))))))))))
+                (inode-commit inode (inode-ref inode)))))))))))
 
 
 
@@ -1203,7 +1215,49 @@
       (setf (cnode-bitmap it) bitmap))
     (make-instance 'persistent-cnode :bitmap bitmap :arcs (mm:make-marray (logcount bitmap)))))
 
+(defgeneric arc-aref (place index))
 
+(defmethod arc-aref ((cnode transient-cnode) index)
+  (svref (cnode-arcs cnode) index))
+
+(defmethod arc-aref ((cnode persistent-cnode) index)
+  (mm:marray-ref (cnode-arcs cnode) index))
+
+(defmethod arc-aref ((vector vector) index)
+  (svref vector index))
+
+(defmethod arc-aref ((marray mm:marray) index)
+  (mm:marray-ref marray index))
+
+
+(defgeneric (setf arc-aref) (value place index))
+
+(defmethod (setf arc-aref) (value (cnode transient-cnode) index)
+  (setf (svref (cnode-arcs cnode) index) value))
+
+(defmethod (setf arc-aref) (value (vector vector) index)
+  (setf (svref vector index) value))
+
+(defmethod (setf arc-aref) (value (marray mm:marray) index)
+  (setf (mm:marray-ref marray index) value))
+
+(defmethod (setf arc-aref) (value (cnode persistent-cnode) index)
+  (setf (mm:marray-ref (cnode-arcs cnode) index) value))
+
+
+(defgeneric arcs-len (place))
+
+(defmethod arcs-len ((cnode transient-cnode))
+  (length (cnode-arcs cnode)))
+
+(defmethod arcs-len ((cnode persistent-cnode))
+  (mm:marray-length (cnode-arcs cnode)))
+
+(defmethod arcs-len ((vector vector))
+  (length vector))
+
+(defmethod arcs-len ((marray mm:marray))
+  (mm:marray-length marray ))
 
 
 #+()
@@ -1261,11 +1315,14 @@
   (let* ((new-bitmap (logior flag (cnode-bitmap cnode)))
           (new-cnode  (make-cnode new-bitmap)))
     (prog1 new-cnode
-      (map-into (cnode-arcs new-cnode) #'identity (cnode-arcs cnode))
-      (setf (svref (cnode-arcs new-cnode) position) new-arc)
-      (unless (> position (length (cnode-arcs cnode)))
-        (replace (cnode-arcs new-cnode) (cnode-arcs cnode)
-          :start1 (+ position 1) :start2 position)))))
+      (loop for i from 0 to (1- (arcs-len cnode))
+        do (setf (arc-aref new-cnode i) (arc-aref cnode i)))
+      (setf (arc-aref new-cnode position) new-arc)
+      (unless (> position (arcs-len cnode))
+        (loop
+          for new-index from (+ position 1) to (1- (arcs-len new-cnode))
+          for old-index from position
+          do (setf (arc-aref new-cnode new-index) (arc-aref cnode old-index)))))))
 
 
 (defun cnode-updated (cnode position replacement-arc)
@@ -1278,8 +1335,9 @@
   of other nodes within the storage vector will occur"
   (let ((new-cnode (make-cnode (cnode-bitmap cnode))))
     (prog1 new-cnode
-      (replace (cnode-arcs new-cnode) (cnode-arcs cnode))
-      (setf (svref (cnode-arcs new-cnode) position) replacement-arc))))
+      (loop for i from 0 to (1- (arcs-len cnode))
+        do (setf (arc-aref new-cnode i) (arc-aref cnode i)))
+      (setf (arc-aref new-cnode position) replacement-arc))))
 
 
 (defun cnode-truncated (cnode flag pos)
@@ -1296,11 +1354,11 @@
           (new-cnode (make-cnode new-bitmap)))
     (prog1 new-cnode
       (loop with src-index = 0
-        for dest-index from 0
-        for dest across (cnode-arcs new-cnode)
+        for dest-index from 0 to (1- (arcs-len new-cnode))
+        for dest = (arc-aref new-cnode dest-index) 
         when  (= src-index pos) do (incf src-index)
-        do (setf (svref (cnode-arcs new-cnode) dest-index)
-             (svref (cnode-arcs cnode) (post-incf src-index)))))))
+        do (setf (arc-aref new-cnode dest-index)
+             (arc-aref cnode (post-incf src-index)))))))
 
 
 (defun map-cnode (fn cnode)
@@ -1314,7 +1372,9 @@
   (check-type fn function)
   (check-type cnode cnode)
   (aprog1 (make-cnode (cnode-bitmap cnode))
-    (map-into (cnode-arcs it) fn (cnode-arcs cnode))))
+    (loop for i from 0 to (1- (arcs-len cnode))
+      do (setf (arc-aref it i) (funcall fn (arc-aref cnode i))))))
+
 
 
 (defgeneric refresh (place gen)
@@ -1324,13 +1384,32 @@
   specializations are defined on a casewise basis."))
 
 
-(defmethod refresh ((cnode cnode) gen)
+(defmethod refresh ((cnode transient-cnode) gen)
+  "Return a new cnode structure identical to CNODE, but with any
+    arcs that are INODES refreshed to generational descriptor GEN"
+  (map-cnode (lambda (arc) (refresh arc gen)) cnode))
+
+(defmethod refresh ((cnode persistent-cnode) gen)
   "Return a new cnode structure identical to CNODE, but with any
     arcs that are INODES refreshed to generational descriptor GEN"
   (map-cnode (lambda (arc) (refresh arc gen)) cnode))
 
 
-(defmethod refresh ((inode inode) gen)
+(defmethod refresh ((inode transient-inode) gen)
+  "Generate a replacement for inode that continues to reference the
+    same MAIN-NODE as before, but otherwise contains the new generational
+    descriptor GEN, and a new REF substructure initialized
+    with freshly generated metadata, unconditionally discarding the old.
+    Note that the refresh of an inode is not transitive to the nodes contained
+    in the portion of the CTRIE that it references.  I.e., the process does
+    not eagerly descend and propagate until needed, eliminating the
+    overhead incurred by full traversals which, in many situations, turn out
+    to be not even necessary."    
+  (multiple-value-bind (val stamp) (inode-read inode)
+    (declare (ignore stamp))
+    (make-inode val gen (ctstamp))))
+
+(defmethod refresh ((inode persistent-inode) gen)
   "Generate a replacement for inode that continues to reference the
     same MAIN-NODE as before, but otherwise contains the new generational
     descriptor GEN, and a new REF substructure initialized
@@ -1345,11 +1424,18 @@
     (make-inode val gen (ctstamp))))
 
 
-(defmethod refresh ((snode snode) gen)
+(defmethod refresh ((snode transient-snode) gen)
   "An SNODE represents a LEAF storage cell and does not require
     any coordination with generational descriptors, and so is simply
     returned as-is. "
   snode)
+
+(defmethod refresh ((snode persistent-snode) gen)
+  "An SNODE represents a LEAF storage cell and does not require
+    any coordination with generational descriptors, and so is simply
+    returned as-is. "
+  snode)
+
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1370,7 +1456,7 @@
   completing the process."
   (let1 arcs (cnode-arcs cnode)
     (if (and (plusp level) (eql 1 (logcount (cnode-bitmap cnode))))
-      (atypecase (svref arcs 0)
+      (atypecase (arc-aref arcs 0)
         (snode (entomb it))
         (t     cnode))
       cnode)))
@@ -1416,7 +1502,7 @@
   (check-type target-inode inode)
   (check-type level        fixnum)
   (let1 target-gen (inode-gen target-inode)
-    (if (not (eq target-gen (inode-gen (root-node-access *ctrie*))))
+    (if (not (equal (string target-gen) (string (inode-gen (root-node-access *ctrie*)))))
       (throw :restart target-gen)
       (loop while
         (let ((parent-ref  (inode-read parent-inode))
@@ -1424,10 +1510,10 @@
           (when (cnode-p parent-ref)
             (let* ((bmp   (cnode-bitmap parent-ref))
                     (flag (flag key level t))
-                    (pos  (flag-arc-position flag bmp)))
+                    (pos  (flag-arc-position flag bmp))) 
               (when (and (flag-present-p flag bmp)
                       (tnode-p target-ref)
-                      (eq target-inode (svref (cnode-arcs parent-ref) pos)))
+                      (eq target-inode (arc-aref (cnode-arcs parent-ref) pos)))
                 (let1 new-cnode (cnode-updated parent-ref pos (resurrect target-inode))
                   (not (inode-mutate parent-inode parent-ref
                          (cnode-contracted new-cnode level))))))))))))
@@ -1468,9 +1554,13 @@
   (:documentation "Return the KEY contained in a node that may be
   either an SNODE or entombed SNODE, regardless of which kind it
   happens to be")
-  (:method ((snode snode))
+  (:method ((snode transient-snode))
     (snode-key snode))
-  (:method ((tnode tnode))
+  (:method ((snode persistent-snode))
+    (snode-key snode))
+  (:method ((tnode transient-tnode))
+    (leaf-node-key (tnode-cell tnode)))
+  (:method ((tnode persistent-tnode))
     (leaf-node-key (tnode-cell tnode))))
 
 
@@ -1478,9 +1568,13 @@
   (:documentation "Return the VALUE contained in a node that may be
   either an SNODE or entombed SNODE, regardless of which kind it
   happens to be")
-  (:method ((snode snode))
+  (:method ((snode transient-snode))
     (snode-value snode))
-  (:method ((tnode tnode))
+  (:method ((snode persistent-snode))
+    (snode-value snode))
+  (:method ((tnode transient-tnode))
+    (leaf-node-value (tnode-cell tnode)))
+  (:method ((tnode persistent-tnode))
     (leaf-node-value (tnode-cell tnode))))
 
 
@@ -1534,7 +1628,7 @@
 ;;   (:method ((ctrie ctrie) old new)
 ;;     (cas (ctrie-root ctrie) old new)))
 
-
+#+()
 (defstruct (rdcss-descriptor
              (:copier nil))
   "An RDCSS-DESCRIPTOR object represents a 'plan' for a proposed RDCSS
@@ -1560,6 +1654,92 @@
   (committed nil))
 
 
+(defclass transient-rdcss-descriptor ()
+  ((ov
+     :initform nil
+     :accessor rdcss-descriptor-ov
+     :initarg :ov)
+    (ovmain
+      :initform nil
+      :accessor rdcss-descriptor-ovmain
+      :initarg :ovmain)      
+    (nv
+      :initform nil
+      :accessor rdcss-descriptor-nv
+      :initarg :nv)
+    (committed
+      :initform nil
+      :accessor rdcss-descriptor-committed
+      :initarg :committed)))
+
+(mm:defmmclass persistent-rdcss-descriptor ()
+  ((ov
+     :initform nil
+     :accessor rdcss-descriptor-ov
+     :initarg :ov
+     :persistent t)
+    (ovmain
+      :initform nil
+      :accessor rdcss-descriptor-ovmain
+      :initarg :ovmain
+      :persistent t)      
+    (nv
+      :initform nil
+      :accessor rdcss-descriptor-nv
+      :initarg :nv
+      :persistent t)
+    (committed
+      :initform nil
+      :accessor rdcss-descriptor-committed
+      :initarg :committed
+      :persistent t)))
+
+(deftype rdcss-descriptor ()
+  '(or transient-rdcss-descriptor persistent-rdcss-descriptor))
+
+(defun rdcss-descriptor-p (thing)
+  (typep thing 'rdcss-descriptor))
+
+(define-pool transient-rdcss-descriptor (0)
+  (make-instance 'transient-rdcss-descriptor))
+
+(define-pool persistent-rdcss-descriptor (0)
+  (make-instance 'persistent-rdcss-descriptor))
+
+
+(define-layered-function make-rdcss-descriptor (&key ov ovmain nv committed &allow-other-keys)) 
+
+(define-layered-method   make-rdcss-descriptor :in t (&key ov ovmain nv committed persistent)
+  (if persistent
+    (with-active-layers (persistent)
+      (make-rdcss-descriptor :ov ov :ovmain ovmain :nv nv :committed committed))
+    (with-active-layers (transient)
+      (make-rdcss-descriptor :ov ov :ovmain ovmain :nv nv :committed committed))))
+
+(define-layered-method   make-rdcss-descriptor :in transient  (&key ov ovmain nv committed)
+  (if (ctrie-pooling-enabled-p)
+    (aprog1 (allocate 'transient-rdcss-descriptor)
+      (setf 
+        (rdcss-descriptor-ov        it) ov
+        (rdcss-descriptor-ovmain    it) ovmain
+        (rdcss-descriptor-nv        it) nv
+        (rdcss-descriptor-committed it) committed))
+    (funcall #'make-instance 'transient-rdcss-descriptor
+      :ov ov :ovmain ovmain :nv nv :committed committed)))
+
+(define-layered-method   make-rdcss-descriptor :in persistent (&key ov ovmain nv committed)
+  (if (ctrie-pooling-enabled-p)
+    (aprog1 (allocate 'persistent-rdcss-descriptor)
+      (setf 
+        (rdcss-descriptor-ov        it) ov
+        (rdcss-descriptor-ovmain    it) ovmain
+        (rdcss-descriptor-nv        it) nv
+        (rdcss-descriptor-committed it) committed))
+    (funcall #'make-instance 'persistent-rdcss-descriptor
+      :ov ov :ovmain ovmain :nv nv :committed committed)))
+
+
+
 (defun root-node-access (ctrie &optional abort)
   "ROOT-NODE-ACCESS extends `FIND-CTRIE-ROOT`,
   implementing the _RDCSS ROOT NODE PROTOCOL_ for access to root inode of
@@ -1579,9 +1759,16 @@
       node
       (root-node-commit ctrie abort))))
 
-  ;; (atypecase (find-ctrie-root ctrie)
-  ;;   (inode it)
-  ;;   (t (root-node-commit ctrie abort))))
+
+(defun cas-ctrie-root (ctrie old new)
+  (typecase ctrie
+    (persistent-ctrie (with-active-layers (persistent)
+            (printv        (eql (cas-word-sap (printv (mm::mm-object-pointer ctrie))
+                   (printv        (mm:mptr old)) (printv (mm:mptr new)))
+             (printv         (mm:mptr old))))))
+    (transient-ctrie            (with-active-layers (transient)
+         (printv           (eq (cas (slot-value ctrie 'root) old new)
+                      old))))))
 
 
 (defun root-node-replace (ctrie ov ovmain nv)
@@ -1614,31 +1801,34 @@
   (when (ctrie-readonly-p ctrie)
     (ctrie-modification-failed "This CTRIE is READ-ONLY"
       :op 'root-node-replace :place (list :ov ov :nv nv)))
-  (let1 desc (make-rdcss-descriptor :ov ov :ovmain ovmain :nv nv)
-    (if (cas (ctrie-root ctrie) ov desc)
-      (prog2 (root-node-commit ctrie nil)
+  (let1 desc (printv  (make-rdcss-descriptor :ov ov :ovmain ovmain :nv nv))
+   (printv (if (cas-ctrie-root ctrie ov desc)
+      (prog2 (printv (root-node-commit ctrie nil))
         (rdcss-descriptor-committed desc))
-      nil)))
+      nil))))
 
 
 (defun root-node-commit (ctrie &optional abort)
   "rdcss api to complete a root-node transaction"
   (atypecase (ctrie-root ctrie)
-    (inode it)
+    (inode (printv it))
     (rdcss-descriptor (if abort
-                        (if (cas (ctrie-root ctrie) it (rdcss-descriptor-ov it))
+                    (printv    (if (printv (cas-ctrie-root ctrie it (rdcss-descriptor-ov it)))
                           (rdcss-descriptor-ov it)
-                          (root-node-commit ctrie abort))
-                        (let1 oldmain (inode-read (rdcss-descriptor-ov it))
-                          (if (eq oldmain (rdcss-descriptor-ovmain it))
-                            (if (cas (ctrie-root ctrie) it (rdcss-descriptor-nv it))
+                          (root-node-commit ctrie abort)))
+                (printv        (let1 oldmain (inode-read (rdcss-descriptor-ov it))
+                                 (if (printv  (funcall (if (persistent-p ctrie) #'mm:meq #'eq);;(eq
+
+                                               (printv oldmain) (printv (rdcss-descriptor-ovmain it))))
+                           (printv  (if (cas-ctrie-root ctrie it (rdcss-descriptor-nv it))
                               (prog1 (rdcss-descriptor-nv it)
                                 (setf (rdcss-descriptor-committed it) t))
-                              (root-node-commit ctrie abort))
-                            (if (cas (ctrie-root ctrie) it (rdcss-descriptor-ov it))
+                              (root-node-commit ctrie abort)))
+                         (printv   (if (cas-ctrie-root ctrie it (rdcss-descriptor-ov it))
                               (rdcss-descriptor-ov it)
-                              (root-node-commit ctrie abort))))))))
-  
+                              (root-node-commit ctrie abort))))))))))
+
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Feature impl. using RDCSS root-node protocol
@@ -1653,15 +1843,18 @@
   considerable performance benefits in some circumstances, as the arcs
   will not require `REFRESH` and should be the preferred mode when
   updates (writability) of the clone are not required"
-  (loop until
-    (let* ((root (root-node-access ctrie))
-            (main (inode-read root)))
-      (when (root-node-replace ctrie root main
-              (make-inode main (gensym "ctrie")))
-        (return-from ctrie-snapshot
-          (if read-only
-            (make-ctrie :readonly-p t :root root)
-            (make-ctrie :root (make-inode main (gensym "ctrie")))))))))
+  (with-ctrie ctrie
+    (loop until
+      (let* ((root (root-node-access ctrie))
+              (main (inode-read root)))
+        (when (root-node-replace ctrie root main
+                (make-inode main (gensym "ctrie")))
+          (return-from ctrie-snapshot
+            (if read-only
+              (make-ctrie :readonly-p t :root root
+                :persistent (persistent-p ctrie))
+              (make-ctrie :root (make-inode main (gensym "ctrie"))
+                :persistent (persistent-p ctrie)))))))))
 
 
 (defun ctrie-fork (ctrie)
@@ -1674,12 +1867,13 @@
 (defun ctrie-clear (ctrie)
   "Atomically clear all entries stored in CTRIE, returning it to a condition
   which returns `T` when tested with predicate `CTRIE-EMPTY-P`"
-  (loop until
-    (let* ((root (root-node-access ctrie))
-            (main (inode-read root)))
-      (when (root-node-replace ctrie root main
-              (make-inode (make-cnode) (gensym "ctrie")))
-        (return-from ctrie-clear ctrie)))))
+  (with-ctrie ctrie
+    (loop until
+      (let* ((root (root-node-access ctrie))
+              (main (inode-read root)))
+        (when (root-node-replace ctrie root main
+                (make-inode (make-cnode) (gensym "ctrie")))
+          (return-from ctrie-clear ctrie))))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1687,8 +1881,6 @@
 ;; descriptions of the ctrie which change the protocol to eliminate this
 ;; possibility by starting with a fully initialized level 0 cnode
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-'hashtable
 
 #+()
 (defun cas-ctrie-root (ctrie new-value)
@@ -1976,7 +2168,7 @@
   order to indicate our success.  Otherwise we THROW to :RESTART"
   
   ;;;;;;;;;;;;;;;;;;;;;;;;
-  ;; 0.  INODE (start)  ;;   
+   ;; 0.  INODE (start)  ;;   
   ;;;;;;;;;;;;;;;;;;;;;;;;
 
   (atypecase (inode-read inode)
@@ -2014,14 +2206,14 @@
                    (return-from %insert value)
                    (throw :restart cnode)))
                
-               (let ((present (svref (cnode-arcs cnode) pos)))    
+               (let ((present (arc-aref (cnode-arcs cnode) pos)))    
                  (etypecase present
 
                    ;;;;;;;;;;;;;;;;;;;;;;;;
                    ;; 6.  CNODE -> INODE ;;
                    ;;;;;;;;;;;;;;;;;;;;;;;;
                    
-                   (INODE (if (eq startgen (inode-gen present))
+                   (INODE (if (equal (string startgen) (string (inode-gen present)))
                             (return-from %insert
                               (%insert present key value (+ level 5) inode startgen))
                             (if (inode-mutate inode it (refresh it startgen))
@@ -2066,9 +2258,9 @@
                                 ;; 11.  SNODE-> SNODE / new INODE->CNODE (ctrie growth) ;;
                                 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-                                (setf (svref (cnode-arcs new-cnode) (flag-arc-position
-                                                                      new-flag-other
-                                                                      new-bitmap))
+                                (setf (arc-aref (cnode-arcs new-cnode) (flag-arc-position
+                                                                         new-flag-other
+                                                                         new-bitmap))
                                   present)
                                 
                                 (%insert new-inode key value (+ level 5) inode startgen)
@@ -2134,13 +2326,13 @@
                      (pos  (flag-arc-position flag bmp)))
                (if (not (flag-present-p flag bmp))
                  (throw :notfound cnode)
-                 (let ((found (svref (cnode-arcs cnode) pos)))
+                 (let ((found (arc-aref (cnode-arcs cnode) pos)))
                    (typecase found
                      ((or snode tnode)
                        (if (ctequal key (leaf-node-key found))
                          (return-from %lookup (values (leaf-node-value found) t))
                          (throw :notfound found)))
-                     (inode (if (eq startgen (inode-gen found))
+                     (inode (if (equal (string startgen) (string (inode-gen found)))
                               (return-from %lookup (%lookup found key (+ level 5) inode startgen))
                               (if (inode-mutate inode node (refresh node startgen))
                                 (%lookup inode key level parent startgen)
@@ -2196,11 +2388,11 @@
                    (pos  (flag-arc-position flag bmp)))
              (if (not (flag-present-p flag bmp))
                (values key :notfound)
-               (let1 found (svref (cnode-arcs it) pos)
+               (let1 found (arc-aref (cnode-arcs it) pos)
                  (multiple-value-bind (result-value result-kind)
                    (typecase found
                      (inode
-                       (if (eq startgen (inode-gen found))
+                       (if (equal (string startgen) (string (inode-gen found)))
                          (return-from %remove (%remove found key (+ level 5) inode startgen))
                          (if (inode-mutate inode it (refresh it startgen))
                            (%remove inode key level parent startgen)
@@ -2377,26 +2569,40 @@
 (defmethod map-node ((node null) fn)
   (values))
 
-(defmethod map-node ((node inode) fn)
+(defmethod map-node ((node transient-inode) fn)
   (map-node (inode-read node) fn))
 
+(defmethod map-node ((node persistent-inode) fn)
+  (map-node (inode-read node) fn))
 
-(defmethod map-node ((node snode) fn)
+(defmethod map-node ((node transient-snode) fn)
   (funcall fn (snode-key node) (snode-value node)))
 
+(defmethod map-node ((node persistent-snode) fn)
+  (funcall fn (snode-key node) (snode-value node)))
 
-(defmethod map-node ((node tnode) fn)
+(defmethod map-node ((node transient-tnode) fn)
   (map-node (tnode-cell node) fn))
 
+(defmethod map-node ((node persistent-tnode) fn)
+  (map-node (tnode-cell node) fn))
 
-(defmethod map-node ((node lnode) fn)
+(defmethod map-node ((node transient-lnode) fn)
   (map-node (lnode-elt node) fn)
   (map-node (lnode-next node) fn))
 
+(defmethod map-node ((node persistent-lnode) fn)
+  (map-node (lnode-elt node) fn)
+  (map-node (lnode-next node) fn))
 
-(defmethod map-node ((node cnode) fn)
+(defmethod map-node ((node transient-cnode) fn)
   (loop for arc across (cnode-arcs node)
     do (map-node arc fn)))
+
+(defmethod map-node ((node persistent-cnode) fn)
+  (iter
+    (for arc :in-marray (cnode-arcs node))
+    (map-node arc fn)))
 
 
 (defun ctrie-map-keys (ctrie fn &key atomic)
@@ -2547,24 +2753,25 @@
       :atomic atomic)))
 
 
-(defun ctrie-from-alist (alist &key ctrie)
+(defun ctrie-from-alist (alist &key ctrie persistent)
   "Return a CTRIE containing all (key . value) pairs found in ALIST.
   If CTRIE is specified, it will be used as the destination ctrie.
   Otherwise, a new ctrie will be created. Atomicity is not guaranteed"
-  (with-ctrie (or ctrie (make-ctrie))
+  (with-ctrie (or ctrie (make-ctrie :persistent persistent))
     (prog1 *ctrie*
       (mapc (lambda (pair)
               (ctrie-put *ctrie* (car pair) (cdr pair)))
         alist))))
 
-(defun ctrie-from-hashtable (hash-table &key ctrie)
+(defun ctrie-from-hashtable (hash-table &key ctrie persistent)
   "Return a CTRIE containing all (key . value) pairs found in HASH-TABLE.
   If CTRIE is specified, it will be used as the destination ctrie.
   Otherwise, a new ctrie will be created with test identical to that
   of HASH-TABLE. The hash-function will NOT be preserved, as that
   information does not appear to be recoverable from a hash-table once
   created"
-  (with-ctrie (or ctrie (make-ctrie :test (hash-table-test hash-table)))
+  (with-ctrie (or ctrie (make-ctrie :test (hash-table-test hash-table)
+                          :persistent persistent))
       (prog1 *ctrie* (maphash (lambda (k v) (ctrie-put *ctrie* k v))
                        hash-table))))
 
@@ -2590,7 +2797,7 @@
 
 
 #+cl-store
-(defmethod  ctrie-save ((ctrie ctrie) (pathname pathname) &key)
+(defmethod  ctrie-save ((ctrie transient-ctrie) (pathname pathname) &key)
   "Save a representation of CTRIE to PATHNAME such that an
   identical ctrie may be restored at a later time using `CTRIE-LOAD` on
   that PATHNAME.  CTRIE-SAVE guarantees consistency under all circumstances
@@ -2600,6 +2807,17 @@
       (cl-store:store (ctrie-snapshot *ctrie*) pathname))))
 
 #+cl-store
+(defmethod  ctrie-save ((ctrie persistent-ctrie) (pathname pathname) &key)
+  "Save a representation of CTRIE to PATHNAME such that an
+  identical ctrie may be restored at a later time using `CTRIE-LOAD` on
+  that PATHNAME.  CTRIE-SAVE guarantees consistency under all circumstances
+  using an atomic, point-in-time snapshot of CTRIE."
+  (with-ctrie ctrie
+    (with-ctrie (ctrie-from-hashtable (ctrie-to-hashtable *ctrie*))
+      (prog1 pathname
+        (cl-store:store (ctrie-snapshot *ctrie*) pathname)))))
+    
+#+cl-store
 (defmethod  ctrie-save ((ctrie-lambda function) (pathname pathname) &key)
   "Save a representation of CTRIE-LAMBDA to PATHNAME such that a ctrie
   identical to `(ctrie-lambda-ctrie CTRIE-LAMBDA)` may be restored at
@@ -2607,8 +2825,12 @@
   guarantees consistency under all circumstances using an atomic,
   point-in-time snapshot of CTRIE-LAMBDA."
   (with-ctrie ctrie-lambda
-    (prog1 pathname
-      (cl-store:store (ctrie-snapshot *ctrie*) pathname))))
+    (if (persistent-p *ctrie*)
+      (with-ctrie (ctrie-from-hashtable (ctrie-to-hashtable *ctrie*))
+        (prog1 pathname
+          (cl-store:store (ctrie-snapshot *ctrie*) pathname)))       
+      (prog1 pathname
+        (cl-store:store (ctrie-snapshot *ctrie*) pathname)))))
 
 
 (defgeneric ctrie-load (place &key &allow-other-keys)
@@ -2632,7 +2854,17 @@
 
 
 #+cl-store 
-(defmethod  ctrie-export ((ctrie ctrie) (pathname pathname) &key)
+(defmethod  ctrie-export ((ctrie transient-ctrie) (pathname pathname) &key)
+  "Save all (key . value) pairs found in CTRIE to PATHNAME,
+  such that they may be restored later using `CTRIE-IMPORT` on that
+  PATHNAME.  Properties of CTRIE (other than the entries contained)
+  are NOT preserved.  Atomicity is not guaranteed"
+  (with-ctrie ctrie
+    (prog1 pathname
+      (cl-store:store (ctrie-to-alist *ctrie*) pathname))))
+
+#+cl-store 
+(defmethod  ctrie-export ((ctrie persistent-ctrie) (pathname pathname) &key)
   "Save all (key . value) pairs found in CTRIE to PATHNAME,
   such that they may be restored later using `CTRIE-IMPORT` on that
   PATHNAME.  Properties of CTRIE (other than the entries contained)
@@ -2659,11 +2891,12 @@
 
 
 #+cl-store
-(defmethod  ctrie-import ((pathname pathname) &key ctrie)
+(defmethod  ctrie-import ((pathname pathname) &key ctrie persistent)
   "Restore all (key . value) pairs saved to PATHNAME into
   either the specified CTRIE if provided, or one newly created with
   default properties."
-  (ctrie-from-alist (cl-store:restore pathname) :ctrie ctrie))
+  (ctrie-from-alist (cl-store:restore pathname) :ctrie ctrie :persistent persistent))
+
 
 
 

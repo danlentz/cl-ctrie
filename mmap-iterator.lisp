@@ -1,7 +1,7 @@
 ;;;;; -*- mode: common-lisp;   common-lisp-style: modern;    coding: utf-8; -*-
 ;;;;;
 
-(in-package :manardb)
+(in-package :mm)
 
 
 (defmacro doclass ((var class-specifier &key fresh-instances reverse) &body body)

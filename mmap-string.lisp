@@ -1,7 +1,7 @@
 ;;;;; -*- mode: common-lisp;   common-lisp-style: modern;    coding: utf-8; -*-
 ;;;;;
 
-(in-package :manardb)
+(in-package :mm)
 
 (defvar *mm-fixed-string-uncropper* 'mm-fixed-string-uncropper)
 
