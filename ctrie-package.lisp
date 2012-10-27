@@ -52,8 +52,11 @@
     :ctrie-lambda-object
     :new-ctrie
     :define-ctrie
+    :ctrie-gc
+    :ctrie-persistent-store
     :ctrie-enable-pooling
     :ctrie-disable-pooling
+    :ctrie-pool-status
     :ctrie-pooling-enabled-p
     :ctrie-error
     :ctrie-structural-error
@@ -63,10 +66,20 @@
     :ctrie-not-supported
     :ctrie-invalid-dynamic-context
     :ctrie-generational-mismatch
-    :ctrie-modification-failed
-    :serialize-using
-    :serialize
-    :deserialize))
+    :ctrie-modification-failed))
+
+
+(rename-package
+  "COM.INFORMATIMAGO.COMMON-LISP.HEAP.MEMORY"
+  "COM.INFORMATIMAGO.COMMON-LISP.HEAP.MEMORY"
+  '(:mem))
+
+
+(rename-package
+  "COM.INFORMATIMAGO.COMMON-LISP.HEAP.HEAP"
+  "COM.INFORMATIMAGO.COMMON-LISP.HEAP.HEAP"
+  '(:HEAP))
+
 
 
 

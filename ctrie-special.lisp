@@ -15,6 +15,8 @@
   binding, which is properly established by wrapping the operation in
   an appropriate WITH-CTRIE form.")
 
+(defvar       *ctrie-index*   nil)
+
 (defvar       *hash-code*     nil
   "Special variable used to store the hash-code that corresponds to the
   current operation.  Used as a means of improving efficiency by eliminating
@@ -50,7 +52,9 @@
   "Debugging flag, not used in production, to enable generation of
   additional diagnostic and reporting information.")
 
-(defparameter *timestamps-enabled* nil)
+(defparameter *timestamps-enabled* t)
+
+(defparameter *timestamp-factory* 'osicat:get-monotonic-time)
 
 (defparameter *pool-enabled*    t)
 

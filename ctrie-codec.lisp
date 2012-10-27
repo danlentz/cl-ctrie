@@ -34,7 +34,6 @@
 ;; Interface to various encoding/decoding backends
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-
 (defun serialize-dwim (thing &rest args)
   (apply #'hu.dwim.serializer:serialize thing args))
 
@@ -61,38 +60,32 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Backend Registry
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-#+()
-(defmacro aconsf (place key value &environment env)
-  "CONS is to PUSH as ACONS is to ACONSF; it pushes (cons KEY VALUE) to the PLACE."
-  (multiple-value-bind (temps vals stores set-value get-value)
-      (get-setf-expansion place env)
-    (unless (null (cdr stores))
-      (error "ACONSF can't store to this form: ~:_~S" place))
-    (alexandria:once-only (key value)
-      `(let* (,@(mapcar 'list temps vals)
-              (,(car stores)
-               (acons ,key ,value ,get-value)))
-         ,set-value
-         ,value))))
 
 (let ((count 0)
-       (serializers (make-hash-table))
+       (serializers   (make-hash-table))
        (deserializers (make-hash-table))
-       (sentinels   nil))   
+       (sentinels     nil))
+  
   (defun register-serializer (keyword serialize-fn deserialize-fn &optional (id count))
     (incf count)
     (setf (gethash keyword serializers) serialize-fn)
     (setf (gethash id deserializers)    deserialize-fn)
     (aconsf sentinels keyword id))
+
   (defun get-serializer (key)
     (gethash key serializers))
+  
   (defun get-deserializer (int)
     (gethash int deserializers))
+
   (defun get-keyword-for-id (int)
     (alexandria:rassoc-value sentinels int))
+
   (defun get-id-for-keyword (key)
     (alexandria:assoc-value sentinels key)))
 
+
+;; (register-serializer :userial  #'serialize          #'unserialize)
 (register-serializer :dwim     #'serialize-dwim     #'deserialize-dwim)
 (register-serializer :rucksack #'serialize-rucksack #'deserialize-rucksack)
 (register-serializer :clstore  #'serialize-clstore  #'deserialize-clstore)
@@ -108,47 +101,64 @@
 ;; Uniform API
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defgeneric serialize (thing)
-  (:method (thing)
+(defgeneric serialize (thing &key &allow-other-keys)
+  (:method (thing &key)
     (serialize-using :dwim thing))
-  (:method ((thing condition))
+  (:method ((thing condition) &key)
     (serialize-using :clstore thing))
-  (:method ((thing package))
+  (:method ((thing package)   &key)
     (serialize-using :clstore thing)))
   
-(defgeneric deserialize (thing)
-  (:method ((thing vector))
+(defgeneric deserialize (thing &key &allow-other-keys)
+  (:method ((thing vector) &key)
     (let* ((prelim (deserialize-dwim thing)))
       (funcall (get-deserializer (car prelim)) (cdr prelim)))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Misc Utility
+;; USERIAL IMPLENENTATION of CODECs suporting CL-CTRIE
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; (define-serializer (:gensym sym)
+;;   (serialize :string (symbol-name sym)))
 
-(with-output-to-string (s)
-  (defun set-hu-serializer-debug-logger (&optional (new-value s))
-    (prog1 new-value
-      (warn "manually setting serializer debug log; New value is ~A"
-        (setf hu.dwim.serializer::*DEBUG-LOG-ENABLED* new-value))))
-  (defun get-hu-serializer-debug-stream ()
-    s)
-  (defun get-hu-serializer-logs ()
-    (prog1 (get-output-stream-string s)
-      (with-output-to-string (new-s)
-        (setf s new-s)
-        (set-hu-serializer-debug-logger new-s)))))
+;; (serialize :gensym (gensym))
+
+;; #+()
+;; (define-serializer (:typed-ref mmptr)
+;;   :symbol (mmptr-type   mmptr)
+;;   :uint32 (mmptr-offset mmptr)
+;;   :uint16 (mmptr-count  mmptr))
+
+;; (define-serializer (:transient-inode inode)
+;;   (serialize-slots* inode
+;;     :symbol  gen
+;;     :transient-ref ref))
+
+;; (define-serializer (:transient-ctrie ctrie)
+;;   (serialize-slots* ctrie
+;;     :transient-inode root
+;;     :boolean readonly-p
+;;     :symbol test
+;;     :symbol hash
+;;     :symbol stamp))
   
+;; (define-serializer (:mmap-address page/offset)
+;;   (serialize* :uint32 (car page/offset) :uint16 (cdr page/offset)))
+
+;; (serialize :mmap-address (cons #xfffff97 #x5223))
+
+
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Test
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defun test-serialization-roundtrip (value &key (test-fn #'equalp) (key-fn #'identity))
-  (let ((restored-value (deserialize (serialize value)))) 
-    (assert (funcall test-fn (funcall key-fn value) (funcall key-fn restored-value)))
-    (values value restored-value)))
+;; (defun test-serialization-roundtrip (value &key (test-fn #'equalp) (key-fn #'identity))
+;;   (let ((restored-value (deserialize (serialize value)))) 
+;;     (assert (funcall test-fn (funcall key-fn value) (funcall key-fn restored-value)))
+;;     (values value restored-value)))
 
 
 ;;;

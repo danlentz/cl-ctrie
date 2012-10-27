@@ -427,9 +427,10 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Atomic Update (sbcl src copied over until i update to a more recent release)
+;; Atomics
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; Atomic Update (sbcl src copied over until i update to a more recent release)
 ;; TODO: unused?
 
 (defmacro atomic-update (place update-fn &rest arguments &environment env) 
@@ -450,6 +451,7 @@
        (loop for ,new = (funcall ,update-fn ,@arguments ,old)
              until (eq ,old (setf ,old ,cas-form))
              finally (return ,new)))))
+
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

@@ -4,25 +4,22 @@
 (in-package :cl-ctrie)
 
 
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Layered Allocation Context
+;; Layered Interface Contexts
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (clear-layer-caches)
-  (deflayer allocation)
-  (deflayer transient  (allocation))
-  (deflayer persistent (allocation)
-    ((dir :initarg :dir  :accessor dir ;;:special t
-       :initform (apply #'mm:ensure-manardb (ensure-list *default-mmap-dir*))))))
 
+(deflayer interface)
 
-(defun persistent-dir ()
-  (if (find 'persistent (active-layers ) :key #'layer-name)
-    (dir (find-layer 'persistent))
-    (with-active-layers (persistent)
-      (dir (find-layer 'persistent)))))
+(deflayer unordered-map (interface))
+
+(deflayer ordered-map   (interface)
+  ((comparitor
+     :special t
+     :initarg :comparitor
+     :initform "ord:compare"
+     :accessor comparitor)))
+
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -71,11 +68,11 @@
   (constantly nil))
 
 (defun new-transient-root ()
-  (with-active-layers (transient)
+  (with-active-layers (allocation transient)
     (make-inode (make-cnode) (gensym "ctrie"))))
 
 (defun new-persistent-root ()
-  (with-active-layers (persistent)
+  (with-active-layers (allocation persistent)
     (make-inode (make-cnode) (gensym "ctrie"))))
 
 
@@ -100,10 +97,16 @@
       :accessor ctrie-hash
       :initarg :hash)
     (stamp
-      :initform 'nix
+      :initform *timestamp-factory*
       :type symbol
       :accessor ctrie-stamp
-      :initarg :stamp)))
+      :initarg :stamp)
+    (context
+      :initarg    :context
+      :accessor   ctrie-context))
+  (:default-initargs :context (list 'allocation 'transient 'unordered-map)))
+
+;; (with-active-layers (allocation transient unordered-map) (current-layer-context))))
 
 
 (mm:defmmclass persistent-ctrie ()
@@ -112,6 +115,12 @@
      :accessor ctrie-root
      :initarg :root
      :persistent t)
+    (name
+      :initform (byte-vector-to-hex-string (create-unique-id-byte-vector))
+      :accessor ctrie-name
+      :initarg :name
+      :type string
+      :persistent t)    
     (readonly-p
       :initform nil
       :type boolean
@@ -131,11 +140,56 @@
       :initarg :hash
       :persistent t)
     (stamp
-      :initform 'nix
+      :initform *timestamp-factory*
       :type symbol
       :accessor ctrie-stamp
       :initarg :stamp
-      :persistent t)))
+      :persistent t)
+    (context
+      :initarg    :context
+      :accessor   ctrie-context
+      :persistent t)
+    (env
+      :initarg    :env
+      :accessor   ctrie-env
+      :initform   nil
+      :persistent nil))
+  (:default-initargs :context (list 'allocation 'persistent 'unordered-map)))
+
+;; (:default-initargs :context
+;; (with-active-layers (allocation persistent unordered-map)
+;; (current-layer-context))))
+
+
+
+(mm:defmmclass ctrie-index (persistent-ctrie)
+  ()
+  (:default-initargs :name "index" :hash 'sb-ext::psxhash :test 'equalp))
+
+
+(defun ctrie-index ()
+  (or *ctrie-index*
+    (setf *ctrie-index* (first (mm:retrieve-all-instances 'ctrie-index)))
+    (setf *ctrie-index* (make-instance 'ctrie-index))))
+
+(defun find-ctrie (name)
+  (ctrie-get (ctrie-index) name))
+
+(defun (setf find-ctrie) (value name)
+  (with-active-layers (persistent)
+    (aprog1 value
+      (etypecase it
+        (null              (ctrie-drop (ctrie-index) name))
+        (persistent-ctrie  (ctrie-put  (ctrie-index) name value))
+        (transient-ctrie
+          (warn "persisting serialized transient instance as ~A" name)
+          (ctrie-put (ctrie-index) name (maybe-box value)))))))
+
+(defmethod initialize-instance :after ((self persistent-ctrie) &key)
+  (unless (typep self 'ctrie-index)
+    (setf (find-ctrie (ctrie-name self)) self)))
+
+
 
 (deftype ctrie ()
   '(or transient-ctrie persistent-ctrie))
@@ -143,23 +197,30 @@
 (defun ctrie-p (thing)
   (typep thing 'ctrie))
 
-(defun make-ctrie (&rest args &key persistent root (readonly-p nil) (test 'equal) (hash 'sxhash)
-                    (stamp 'nix) #+()(if *timestamps-enabled* 'local-time:now (constantly nil))
-                     &allow-other-keys)
-  "CREATE a new CTRIE instance. This is the entry-point constructor 
-  intended for use by the end-user."
-  (declare (ignorable readonly-p test hash root stamp))
-  (let ((arglist  (remove-from-plist args :persistent)))
-    (if persistent
-      (with-active-layers (persistent)        
-        (apply #'make-instance 'persistent-ctrie arglist))
-      (with-active-layers (transient)
-        (apply #'make-instance 'transient-ctrie arglist)))))
 
 (defun persistent-p (thing)
   (typecase thing
     (mm:mm-object t)
     (t            nil)))
+
+
+(defun make-ctrie (&rest args &key name persistent ordered (readonly-p nil)
+                    (test 'equal) (hash 'sxhash) (stamp *timestamp-factory*) &allow-other-keys)
+  "CREATE a new CTRIE instance. This is the entry-point constructor 
+  intended for use by the end-user."
+  (declare (ignorable name readonly-p test hash stamp))
+  (funcall-with-layer-context (if ordered
+                                (with-active-layers (ordered-map)
+                                  (current-layer-context))
+                                (with-inactive-layers (ordered-map)
+                                  (current-layer-context))) 
+    (lambda ()
+      (let ((arglist  (remove-from-plist args :ordered :persistent)))
+        (if persistent
+          (with-active-layers (persistent)        
+            (apply #'make-instance 'persistent-ctrie arglist))
+          (with-active-layers (transient)
+            (apply #'make-instance 'transient-ctrie arglist)))))))
 
 
 (defmacro/once with-ctrie (&once ctrie &body body)
@@ -177,10 +238,11 @@
                      (funcall ,ctrie #'identity)
                      ,ctrie)))
      (typecase *ctrie*
-       (mm:mm-object (with-active-layers (persistent)
-                       ,@body))
-       (t            (with-active-layers (transient)
-                       ,@body)))))
+       (mm:mm-object   (with-active-layers (persistent)
+                         ,@body))
+       (t              (with-active-layers (transient)
+                         ,@body)))))
+
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -203,7 +265,7 @@
   (when *timestamps-enabled*
     (if *ctrie*
       (funcall (ctrie-stamp *ctrie*))
-      (local-time:now))))
+      (funcall *timestamp-factory*))))
 
 
 (defun flag (key level &optional use-cached-p)
@@ -267,6 +329,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; INODE
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 #+()
 (defstruct (ref
              (:copier nil))
@@ -348,18 +411,19 @@
   (if (ctrie-pooling-enabled-p)
     (aprog1 (allocate 'transient-ref)
       (setf
-        (ref-stamp it) stamp
-        (ref-value it) value
-        (ref-prev  it) prev))
+        (slot-value it 'stamp) stamp
+        (slot-value it 'value) value
+        (slot-value it 'prev)  prev))
     (funcall #'make-instance 'transient-ref :stamp stamp :value value :prev prev)))
+
 
 (define-layered-method   make-ref :in persistent (&key stamp value prev)
   (if (ctrie-pooling-enabled-p)
     (aprog1 (allocate 'persistent-ref)
       (setf
-        (ref-stamp it) stamp
-        (ref-value it) value
-        (ref-prev  it) prev))  
+        (slot-value it 'stamp) stamp
+        (slot-value it 'value) value
+        (slot-value it 'prev)  prev))
     (funcall #'make-instance 'persistent-ref :stamp stamp :value value :prev prev)))
 
   
@@ -371,6 +435,7 @@
   prior inode state following a failed GCAS.  Any inode access that
   detects a `FAILED-REF` will immediately invoke a commit to restore the
   inode to the state recorded in `FAILED-REF-PREV`")
+
 
 (defclass transient-failed-ref (transient-ref)
   ())
@@ -392,6 +457,14 @@
 
 (defun failed-ref-p (thing)
   (typep thing 'failed-ref))
+
+
+(define-pool transient-failed-ref (0)
+  (make-instance 'transient-failed-ref :stamp nil :value nil :prev nil))
+
+(define-pool persistent-failed-ref (0)
+  (make-instance 'persistent-failed-ref :stamp nil :value nil :prev nil))
+
 
 (define-layered-function make-failed-ref (&key stamp value prev &allow-other-keys))
 
@@ -574,20 +647,19 @@
        (typecase ,obj
          (transient-inode
            (with-active-layers (transient)
-             (printv (ref-value ref) ,expected)
-             (and (printv  (eql (ref-value ref) ,expected))
-               (eq  (sb-ext:compare-and-swap (slot-value ,obj 'ref) (printv ref)
-                      (printv  (make-ref :value ,new :stamp ,new-stamp :prev ,prev)))
+             (and   (eql (ref-value ref) ,expected)
+               (eq  (sb-ext:compare-and-swap (slot-value ,obj 'ref)  ref
+                      (make-ref :value ,new :stamp ,new-stamp :prev ,prev))
                  ref))))
          (persistent-inode
            (with-active-layers (persistent)
              (let ((ref-ptr (mm:mptr ref)))
-               (printv (mm:mptr (ref-value ref)) (mm:mptr ,expected))
-               (and (printv  (eql (mm:mptr (ref-value ref)) (mm:mptr ,expected)))
-                 (eq (cas-word-sap (mm::mm-object-pointer ,obj) ref-ptr
-                       (mm:mptr
-                         (make-ref :value ,new :stamp ,new-stamp :prev ,prev)))
+               (and
+                 (eql (mm:mptr (ref-value ref)) (mm:mptr ,expected))
+                 (eql (cas-word-sap (mm::mm-object-pointer ,obj) ref-ptr
+                        (mm:mptr (make-ref :value ,new :stamp ,new-stamp :prev ,prev)))
                    ref-ptr)))))))))
+
 
 #+()
 (define-test check-simple-gcas-cas ()
@@ -656,9 +728,9 @@
                         (let ((prev (ref-prev ,ref)))
                           (eq (cas (slot-value ,inode 'ref) ,ref (failed-ref-prev prev)) ,ref))))
      (persistent-inode (with-active-layers (persistent)
-                         (let ((prev (ref-prev ,ref))) ;;(ref-mptr (mm:mptr ,ref)))
+                         (let ((prev (ref-prev ,ref))) 
                            (eql (cas-word-sap (mm::mm-object-pointer ,inode) (mm:mptr ,ref)
-                                  (mm:mptr (failed-ref-prev prev))) (mm:mptr ,ref))))))) ;; ref-mptr))))))
+                                  (mm:mptr (failed-ref-prev prev))) (mm:mptr ,ref))))))) 
 
 (defmacro cas-ref-prev (ref prev new-generator)
   `(typecase ,ref
@@ -833,16 +905,16 @@
   (if (ctrie-pooling-enabled-p)
     (aprog1 (allocate 'transient-snode)
       (setf
-        (snode-key   it) key
-        (snode-value it) value))
+        (%snode-key   it) key
+        (%snode-value it) value))
     (funcall #'make-instance 'transient-snode :key key :value value)))
 
 (define-layered-method snode :in persistent (key value &key)
   (if (ctrie-pooling-enabled-p)
     (aprog1 (allocate 'persistent-snode)
       (setf
-        (snode-key   it) (maybe-box key)
-        (snode-value it) (maybe-box value)))
+        (%snode-key   it) (maybe-box key)
+        (%snode-value it) (maybe-box value)))
     (funcall #'make-instance 'persistent-snode :key (maybe-box key) :value (maybe-box value))))
 
 
@@ -1186,10 +1258,11 @@
   (typep thing 'cnode))
 
 (define-pool transient-cnode (32)
-  (make-instance 'transient-cnode :arcs (make-array (or bucket 0)))) 
+  (make-instance 'transient-cnode :bitmap 0 :arcs (make-array (or bucket 0)))) 
 
 (define-pool persistent-cnode (32)
-  (make-instance 'persistent-cnode :arcs (mm:make-marray (or bucket 0))))
+  (make-instance 'persistent-cnode :bitmap 0 :arcs (mm:make-marray (or bucket 0))))
+
 
 
 (define-layered-function make-cnode (&optional bitmap persistent)) 
@@ -1208,12 +1281,15 @@
       (setf (cnode-bitmap it) bitmap))
     (make-instance 'transient-cnode :bitmap bitmap :arcs (make-array (logcount bitmap)))))
 
+
 (define-layered-method   make-cnode :in persistent (&optional (bitmap 0) persistent)
   (declare (ignore persistent))
   (if (ctrie-pooling-enabled-p)
     (aprog1 (allocate 'persistent-cnode (logcount bitmap))
       (setf (cnode-bitmap it) bitmap))
     (make-instance 'persistent-cnode :bitmap bitmap :arcs (mm:make-marray (logcount bitmap)))))
+
+
 
 (defgeneric arc-aref (place index))
 
@@ -1977,6 +2053,25 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Support for extended atomic variations (eg put-if-absent, remove-if-not, etc)
+;;
+;; Default lambdas that provide standard put/drop behaviour
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defparameter *applicable-when-found*     (lambda (old new)
+                                            (declare (ignore old new))
+                                            t))
+
+
+(defparameter *applicable-when-not-found* (lambda (new)
+                                            (declare (ignore new))
+                                              t))
+
+(defparameter *compute-updated-value*     (lambda (old new)
+                                            (declare (ignore old))
+                                            new))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; PUT/INSERT
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
   
@@ -2168,7 +2263,7 @@
   order to indicate our success.  Otherwise we THROW to :RESTART"
   
   ;;;;;;;;;;;;;;;;;;;;;;;;
-   ;; 0.  INODE (start)  ;;   
+  ;; 0.  INODE (start)  ;;   
   ;;;;;;;;;;;;;;;;;;;;;;;;
 
   (atypecase (inode-read inode)
@@ -2183,9 +2278,19 @@
     ;; 4.  INODE -> LNODE ;;
     ;;;;;;;;;;;;;;;;;;;;;;;;
 
-    (LNODE (unless (inode-mutate inode it
-                     (lnode-inserted it key value #'ctequal))
-             (throw :restart it)))
+    (LNODE
+      (multiple-value-bind (val found) (lnode-search it key #'ctequal)
+        (printv "LNODE" val found it key
+          (if found
+            (unless (funcall *applicable-when-found* val value)
+              (throw :does-not-apply val))
+            (unless (funcall *applicable-when-not-found* value)
+              (throw :does-not-apply value)))         
+          (unless (inode-mutate inode it
+                    (lnode-inserted it key
+                      (funcall *compute-updated-value* val value)
+                      #'ctequal))
+            (throw :restart it)))))
 
     ;;;;;;;;;;;;;;;;;;;;;;;;
     ;; 5.  INODE -> CNODE ;;
@@ -2281,6 +2386,7 @@
       (loop  with d = 0 and p = nil and result
         for  root =  (root-node-access *ctrie*)
         when (catch-case (%insert root key value d p (inode-gen root))
+               (:does-not-apply (prog1 t (setf result nil)))
                (:restart (prog1 nil
                            (when *debug*
                              (format *TRACE-OUTPUT* "~8A  timeout insert (~A . ~A)~%"

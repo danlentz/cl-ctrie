@@ -3,6 +3,7 @@
 
 (in-package :cl-user)
 
+
 (asdf:defsystem :cl-ctrie
   :serial t
   :description      "CL-CTrie: a lock-free, concurrent, key/value index supporting
@@ -68,15 +69,15 @@
                      this is not necessarily a high priority for the initial development
                      cycle."
   
-  :weakly-depends-on (:cl-store :donuts :cldoc :cl-ppcre :drakma :uuid)
+  :weakly-depends-on (:donuts :cldoc :cl-ppcre :uuid)
   :depends-on        (:closer-mop :contextl :alexandria :lisp-unit :local-time :unicly
-                       :flexi-streams :osicat :hu.dwim.serializer :cl-store :rucksack
-                       :iterate :cl-irregsexp)
+				  :com.informatimago.common-lisp.heap                       
+				  :flexi-streams :osicat :hu.dwim.serializer :cl-store :rucksack
+				  :userial :iterate :cl-irregsexp)
   
   :components ((:static-file  "cl-ctrie.asd")
                 (:static-file "readme.md")
-                (:file "common-io")
-                (:file "common-pointer")
+                (:file "common-ord")
                 (:file "mmap-package")
                 (:file "mmap-utils")   
                 (:file "mmap-struct")  
@@ -84,8 +85,7 @@
                 (:file "mmap-mtagmap") 
                 (:file "mmap-class")   
                 (:file "mmap-types")   
-                (:file "mmap-iterator")
-                ;;(:file "mmap-array")   
+                (:file "mmap-iterator")     
                 (:file "mmap-box")
                 (:file "mmap-storage")
                 (:file "mmap-string") 
@@ -97,6 +97,7 @@
                 (:file "ctrie-cas")
                 (:file "ctrie-util")
                 (:file "ctrie-codec")
+                (:file "ctrie-store")
                 (:file "ctrie-pool")
                 (:file "ctrie")
                 (:file "ctrie-lambda")
@@ -113,6 +114,8 @@
   (let ((*package* (find-package :cl-ctrie)))
     (funcall (intern (symbol-name :generate-alternative-package) (find-package :cl-ctrie)))))
 
+(defmethod asdf:perform :before ((o asdf:load-op) (c (eql (asdf:find-system :cl-ctrie))))
+  (unless (find-package :_) (make-package :_)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; DOCUMENTATION
@@ -127,6 +130,9 @@
 (defmethod asdf:operation-done-p ((o asdf::doc-op) (c (eql (asdf:find-system :cl-ctrie))))
   nil)
 
+#+cldoc
+(defmethod asdf:operation-done-p ((o cldoc::print-op) (c (eql (asdf:find-system :cl-ctrie))))
+  nil)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; TESTING
