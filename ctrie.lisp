@@ -2061,19 +2061,26 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Support for extended atomic variations (eg put-if-absent, remove-if-not, etc)
-;;
-;; Default lambdas that provide standard put/drop behaviour
+;; Support for extended atomic variations (eg put-if, drop-if-not, etc)
+;; Default lambdas provide standard put/drop behaviour
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defparameter *applicable-when-found*     (lambda (old new)
+(defparameter *applicable-when-found-p*     (lambda (old new)
                                             (declare (ignore old new))
-                                            t))
+                                            t)
+  "Dynamically scoped function binding which is used to determine
+  whether a ctrie operation will occur in the circumstance that the
+  key of the requested action is found in the subject ctrie.  This
+  must be a dyadic function calculated from arguments which specify
+  the previous value associated with the given key and the new value
+  that was provided, respectively. In the default case, this will always
+  return T, which results in standard put/drop behaviour.  This may be
+  extended to provide more extensive atomic ctrie operational
+  semantics, such as PUT-IF, DROP-IF-NOT, etc.")
 
-
-(defparameter *applicable-when-not-found* (lambda (new)
+(defparameter *applicable-when-not-found-p* (lambda (new)
                                             (declare (ignore new))
-                                              t))
+                                            t))
 
 (defparameter *compute-updated-value*     (lambda (old new)
                                             (declare (ignore old))
@@ -2290,9 +2297,9 @@
       (multiple-value-bind (val found) (lnode-search it key #'ctequal)
         (printv "LNODE" val found it key
           (if found
-            (unless (funcall *applicable-when-found* val value)
+            (unless (funcall *applicable-when-found-p* val value)
               (throw :does-not-apply val))
-            (unless (funcall *applicable-when-not-found* value)
+            (unless (funcall *applicable-when-not-found-p* value)
               (throw :does-not-apply value)))         
           (unless (inode-mutate inode it
                     (lnode-inserted it key
@@ -2314,7 +2321,7 @@
              ;;;;;;;;;;;;;;;;;;;;;;;;
              
              (if (not (flag-present-p flag bmp))
-               (if (funcall *applicable-when-not-found* value)
+               (if (funcall *applicable-when-not-found-p* value)
                  (let ((new-cnode (cnode-extended cnode flag pos (snode key value))))
                    (if (inode-mutate inode cnode new-cnode)
                      (return-from %insert value)
@@ -2340,14 +2347,14 @@
                    ;;;;;;;;;;;;;;;;;;;;;;;;
                    
                    (SNODE (if (ctequal key (snode-key present))
-                            (if (funcall *applicable-when-found* (snode-value present) value)
+                            (if (funcall *applicable-when-found-p* (snode-value present) value)
                               (let ((new-cnode (cnode-updated cnode pos
                                                  (snode key
                                                    (funcall *compute-updated-value*
                                                      (snode-value present) value)))))
 
                             ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-                              ;; 9.  SNODE -> SNODE / REPLACE (updated range value) ;;
+                                ;; 9.  SNODE -> SNODE / REPLACE (updated range value) ;;
                             ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
                                 (if (inode-mutate inode cnode new-cnode)
@@ -2355,41 +2362,42 @@
                                   (throw :restart present)))
                               (throw :does-not-apply value))
                             
-                            (if (>= level 30)
-                              (if (funcall *applicable-when-not-found* value)
+                            (if (funcall *applicable-when-not-found-p* value)
+                              (if (>= level 30)
                                 (let* ((new-snode (snode key value))
                                         (lnode-chain (enlist new-snode present))
                                         (new-inode (make-inode lnode-chain startgen))
                                         (new-cnode (cnode-updated cnode pos new-inode)))
 
                                 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-                                ;; 10.  SNODE -> SNODE / new INODE->LNODE (hash collision) ;;
+                                  ;; 10.  SNODE -> SNODE / new INODE->LNODE (hash collision) ;;
                                 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
                                   (if (inode-mutate inode cnode new-cnode)
                                     (return-from %insert value)
                                     (throw :restart lnode-chain)))
-                                (throw :does-not-apply value))
-                              
-                              (let* ((new-flag-other (flag (snode-key present) (+ level 5)))
-                                      (new-bitmap (logior new-flag-other))
-                                      (new-cnode (make-cnode new-bitmap))
-                                      (new-inode (make-inode new-cnode startgen)))
+                                
+                                (let* ((new-flag-other (flag (snode-key present) (+ level 5)))
+                                        (new-bitmap (logior new-flag-other))
+                                        (new-cnode (make-cnode new-bitmap))
+                                        (new-inode (make-inode new-cnode startgen)))
 
                                 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-                                ;; 11.  SNODE-> SNODE / new INODE->CNODE (ctrie growth) ;;
+                                  ;; 11.  SNODE-> SNODE / new INODE->CNODE (ctrie growth) ;;
                                 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-                                (setf (arc-aref (cnode-arcs new-cnode) (flag-arc-position
-                                                                         new-flag-other
-                                                                         new-bitmap))
-                                  present)
-                                
-                                (%insert new-inode key value (+ level 5) inode startgen)
-                                
-                                (if (inode-mutate inode cnode (cnode-updated cnode pos new-inode))
-                                  (return-from %insert value)
-                                  (throw :restart present)))))))))))))
+                                  (setf (arc-aref (cnode-arcs new-cnode) (flag-arc-position
+                                                                           new-flag-other
+                                                                           new-bitmap))
+                                    present)
+                                  
+                                  (%insert new-inode key value (+ level 5) inode startgen)
+                                  
+                                  (if (inode-mutate inode cnode
+                                        (cnode-updated cnode pos new-inode))
+                                    (return-from %insert value)
+                                    (throw :restart present))))
+                              (throw :does-not-apply value)))))))))))
 
 
 (defun ctrie-put (ctrie key value)
@@ -2416,27 +2424,41 @@
                              (format *TRACE-OUTPUT* "~8S  done .~%~S~%" it *ctrie*)))))
         return (values result ctrie)))))
 
+
 (defun ctrie-put-if (ctrie key value predicate)
-  (let ((*applicable-when-found* (lambda (old new) (declare (ignore new))
+  (let ((*applicable-when-found-p* (lambda (old new) (declare (ignore new))
                                    (funcall predicate old))))
     (ctrie-put ctrie key value)))
 
 (defun ctrie-put-if-not (ctrie key value predicate)
-  (let ((*applicable-when-found* (lambda (old new) (declare (ignore new))
+  (let ((*applicable-when-found-p* (lambda (old new) (declare (ignore new))
                                    (not (funcall predicate old)))))
     (ctrie-put ctrie key value)))
 
 (defun ctrie-put-ensure (ctrie key value)
-  (let ((*applicable-when-found* (lambda (old new) (declare (ignore new old)) nil)))
+  (let ((*applicable-when-found-p* (lambda (old new) (declare (ignore new old)) nil)))
     (ctrie-put ctrie key value)))
 
 (defun ctrie-put-replace (ctrie key value)
-  (let ((*applicable-when-not-found* (lambda (new) (declare (ignore new)) nil)))
+  (let ((*applicable-when-not-found-p* (lambda (new) (declare (ignore new)) nil)))
     (ctrie-put ctrie key value)))
-  
+
+(defun ctrie-put-replace-if (ctrie key value predicate)
+  (let ((*applicable-when-not-found-p* (lambda (new) (declare (ignore new)) nil))
+         (*applicable-when-found-p*    (lambda (old new) (declare (ignore new))
+                                         (funcall predicate old))))
+    (ctrie-put ctrie key value)))
+
 (defun ctrie-put-update (ctrie key value fn)
-  (let ((*applicable-when-not-found* (lambda (new) (declare (ignore new)) nil))
+  (let ((*applicable-when-not-found-p* (lambda (new) (declare (ignore new)) nil))
          (*compute-updated-value* (lambda (old new) (funcall fn old new))))
+    (ctrie-put ctrie key value)))
+
+(defun ctrie-put-update-if (ctrie key value fn predicate)
+  (let ((*applicable-when-not-found-p* (lambda (new) (declare (ignore new)) nil))
+         (*applicable-when-found-p*    (lambda (old new) (declare (ignore new))
+                                         (funcall predicate old)))
+         (*compute-updated-value*      (lambda (old new) (funcall fn old new))))
     (ctrie-put ctrie key value)))
 
 

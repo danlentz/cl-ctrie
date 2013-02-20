@@ -24,7 +24,9 @@
     :ctrie-put-if-not
     :ctrie-put-ensure
     :ctrie-put-replace
+    :ctrie-put-replace-if
     :ctrie-put-update
+    :ctrie-put-update-if
     :ctrie-get
     :ctrie-drop
     :ctrie-map
