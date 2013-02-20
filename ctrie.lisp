@@ -2314,7 +2314,7 @@
              ;;;;;;;;;;;;;;;;;;;;;;;;
              
              (if (not (flag-present-p flag bmp))
-               (if (funcall *applicable-when-not-found* nil value)
+               (if (funcall *applicable-when-not-found* value)
                  (let ((new-cnode (cnode-extended cnode flag pos (snode key value))))
                    (if (inode-mutate inode cnode new-cnode)
                      (return-from %insert value)
@@ -2356,7 +2356,7 @@
                               (throw :does-not-apply value))
                             
                             (if (>= level 30)
-                              (if (funcall *applicable-when-not-found* nil value)
+                              (if (funcall *applicable-when-not-found* value)
                                 (let* ((new-snode (snode key value))
                                         (lnode-chain (enlist new-snode present))
                                         (new-inode (make-inode lnode-chain startgen))
@@ -2431,11 +2431,11 @@
     (ctrie-put ctrie key value)))
 
 (defun ctrie-put-replace (ctrie key value)
-  (let ((*applicable-when-not-found* (lambda (old new) (declare (ignore new old)) nil)))
+  (let ((*applicable-when-not-found* (lambda (new) (declare (ignore new)) nil)))
     (ctrie-put ctrie key value)))
   
 (defun ctrie-put-update (ctrie key value fn)
-  (let ((*applicable-when-not-found* (lambda (old new) (declare (ignore new old)) nil))
+  (let ((*applicable-when-not-found* (lambda (new) (declare (ignore new)) nil))
          (*compute-updated-value* (lambda (old new) (funcall fn old new))))
     (ctrie-put ctrie key value)))
 
