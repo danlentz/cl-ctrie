@@ -448,7 +448,7 @@
 
 (defvar *figlet-program* "/usr/local/bin/figlet")
 
-
+#+sbcl
 (defun figlet (message &key output (executable *figlet-program*)
                 (font :small) (justification :left) (width 80) (smush t) (right-to-left nil))
   (check-type width integer)
@@ -501,19 +501,19 @@
 ;; Vivisection
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-#+donuts
+#+()
 (defgeneric make-diagram (thing context &key &allow-other-keys)
   (:documentation "Define a specific digram generation procedure specialized
  on the class of THING and optionally for a specific context, represented
  by an abitrary symbol naming that context."))
 
 
-#+donuts
+#+()
 (defmethod make-diagram (thing context &key)
   "By default, attempt to generate a NODE representing THING."
   (donuts::<> thing))
 
-#+donuts
+#+()
 (defun diagram (thing &optional (context *context*))
   "Generate a DONUTS diagram for THING, optionally specialized for
   a specific CONTEXT. See {defgeneric cl-ctrie::make-diagram}."
@@ -521,7 +521,7 @@
     (make-diagram thing context)))
 
 
-#+donuts
+#+()
 (defmacro define-diagram (type (&optional context) &body body)
   "Define a diagrammatic representation of TYPE, optionally specialized
   for a specific CONTEXT. See {defgeneric cl-ctrie::make-diagram}."

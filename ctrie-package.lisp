@@ -53,10 +53,15 @@
     :new-ctrie
     :define-ctrie
     :ctrie-gc
+    :ctrie-index
+    :all-ctries
+    :find-ctrie
+    :ctrie-name
     :ctrie-persistent-store
     :ctrie-enable-pooling
     :ctrie-disable-pooling
     :ctrie-pool-status
+    :ctrie-ps
     :ctrie-pooling-enabled-p
     :ctrie-error
     :ctrie-structural-error
@@ -69,16 +74,16 @@
     :ctrie-modification-failed))
 
 
-(rename-package
-  "COM.INFORMATIMAGO.COMMON-LISP.HEAP.MEMORY"
-  "COM.INFORMATIMAGO.COMMON-LISP.HEAP.MEMORY"
-  '(:mem))
+;; (rename-package
+;;   "COM.INFORMATIMAGO.COMMON-LISP.HEAP.MEMORY"
+;;   "COM.INFORMATIMAGO.COMMON-LISP.HEAP.MEMORY"
+;;   '(:mem))
 
 
-(rename-package
-  "COM.INFORMATIMAGO.COMMON-LISP.HEAP.HEAP"
-  "COM.INFORMATIMAGO.COMMON-LISP.HEAP.HEAP"
-  '(:HEAP))
+;; (rename-package
+;;   "COM.INFORMATIMAGO.COMMON-LISP.HEAP.HEAP"
+;;   "COM.INFORMATIMAGO.COMMON-LISP.HEAP.HEAP"
+;;   '(:HEAP))
 
 
 

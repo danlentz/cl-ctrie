@@ -63,8 +63,8 @@
   (declare (ignore args))
   (case type
     (strings (io:read-stream-to-string-list stream))
-    (string  (io:read-stream-to-string  stream))
-    (t       (cl-store:restore       stream))))
+    (string  (io:read-stream-to-string      stream))
+    (t       (cl-store:restore              stream))))
 
 
 (defmethod deref ((url ql-http:url) &optional (type 'vector) &rest args)

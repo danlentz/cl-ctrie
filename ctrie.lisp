@@ -189,7 +189,8 @@
   (unless (typep self 'ctrie-index)
     (setf (find-ctrie (ctrie-name self)) self)))
 
-
+(defun all-ctries ()
+  (ctrie-keys (ctrie-index)))
 
 (deftype ctrie ()
   '(or transient-ctrie persistent-ctrie))

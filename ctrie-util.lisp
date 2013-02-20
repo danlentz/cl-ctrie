@@ -12,9 +12,10 @@
   '(:get :put :drop :make :new :do :keys :values :size :test :hash :readonly-p
      :map :map-keys :map-values :clear :pprint :error :to-alist :to-hashtable
      :from-hashtable :from-alist :empty-p :save :load :export :import :snapshot :fork
-     :lambda :lambda-ctrie :lambda-class :lambda-object :lambda-spawn :define
-     :max-depth :min-depth :enable-pooling :disable-pooling :pooling-enabled-p)
-  "defines the symbols exported by the alternative packaging style experiment")
+     :lambda :lambda-ctrie :lambda-class :lambda-object :lambda-spawn :define 
+     :max-depth :min-depth :enable-pooling :disable-pooling :pooling-enabled-p
+     :pool-status :ps :index :all :find :name)
+  "defines the symbols exported by the 'alternative' symbol naming styled package")
 
 
 (defun internal-symbols (package &optional (return-type 'list))
@@ -56,22 +57,26 @@
     (delete-package :ctrie)
     (make-package :ctrie :use nil)
     (mapc (lambda (sym) (export (intern (string sym) :ctrie) :ctrie))
-      *alternative-package-exports*)      
+      *alternative-package-exports*)
     (loop for alt in (sort (external-symbols :ctrie) #'string<)
       for sym = (symbolicate "CTRIE-" alt)
       for xsym = (symbolicate alt "-CTRIE")
+      for xsympl = (symbolicate alt "-CTRIES")
       do (format t "~&~23S -> " alt)
       when #3=(find-class sym nil) do (format t "C: ~A " (setf (find-class alt) #3#))
       do (if #1=(macro-function sym)
            (format t "M: ~A " (setf (macro-function alt) #1#))
            (if #2=(macro-function xsym)
              (format t "M: ~A " (setf (macro-function alt) #2#))
-             (if (fboundp xsym)
-               (format t "F: ~A " (setf (fdefinition alt) (fdefinition xsym)))
-               (when (fboundp sym)
-                 (format t "F: ~A " (setf (fdefinition alt) (fdefinition sym))))))))
-    (terpri)
-    (values)))
+             (if (fboundp xsympl)
+               (format t "F: ~A " (setf (fdefinition alt) (fdefinition xsympl)))
+               (if (fboundp xsym)
+                 (format t "F: ~A " (setf (fdefinition alt) (fdefinition xsym)))
+                 (when (fboundp sym)
+                   (format t "F: ~A " (setf (fdefinition alt) (fdefinition sym))))))))
+;;      (setf (fdefinition 'ctrie:all) (fdefinition 'cl-ctrie:all-ctries))
+      (terpri)
+      (values))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
