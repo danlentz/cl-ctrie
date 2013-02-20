@@ -5,7 +5,7 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Layered Interface Contexts
+;; Layered Interface Contexts (Not Yet Implemented)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
@@ -177,19 +177,26 @@
 
 (defun (setf find-ctrie) (value name)
   (with-active-layers (persistent)
-    (aprog1 value
-      (etypecase it
+    (prog1 value
+      (etypecase value
         (null              (ctrie-drop (ctrie-index) name))
         (persistent-ctrie  (ctrie-put  (ctrie-index) name value))
-        (transient-ctrie
-          (warn "persisting serialized transient instance as ~A" name)
-          (ctrie-put (ctrie-index) name (maybe-box value)))))))
+        (transient-ctrie   (ctrie-put  (ctrie-index) name
+                             (aprog1 (ctrie-from-hashtable
+                                       (ctrie-to-hashtable value :atomic t) :persistent t)
+                               (setf (ctrie-name it) name))))))))
+
+;;          (warn "persisting serialized transient instance as ~A" name)
+;;          (ctrie-put (ctrie-index) name (maybe-box value)))))))
 
 (defmethod initialize-instance :after ((self persistent-ctrie) &key)
   (unless (typep self 'ctrie-index)
     (setf (find-ctrie (ctrie-name self)) self)))
 
 (defun all-ctries ()
+  (ctrie-values (ctrie-index)))
+
+(defun ctrie-names ()
   (ctrie-keys (ctrie-index)))
 
 (deftype ctrie ()
@@ -2307,10 +2314,12 @@
              ;;;;;;;;;;;;;;;;;;;;;;;;
              
              (if (not (flag-present-p flag bmp))
-               (let ((new-cnode (cnode-extended cnode flag pos (snode key value))))
-                 (if (inode-mutate inode cnode new-cnode)
-                   (return-from %insert value)
-                   (throw :restart cnode)))
+               (if (funcall *applicable-when-not-found* nil value)
+                 (let ((new-cnode (cnode-extended cnode flag pos (snode key value))))
+                   (if (inode-mutate inode cnode new-cnode)
+                     (return-from %insert value)
+                     (throw :restart cnode)))
+                 (throw :does-not-apply value))
                
                (let ((present (arc-aref (cnode-arcs cnode) pos)))    
                  (etypecase present
@@ -2331,29 +2340,36 @@
                    ;;;;;;;;;;;;;;;;;;;;;;;;
                    
                    (SNODE (if (ctequal key (snode-key present))
-                            (let ((new-cnode (cnode-updated cnode pos (snode key value))))
+                            (if (funcall *applicable-when-found* (snode-value present) value)
+                              (let ((new-cnode (cnode-updated cnode pos
+                                                 (snode key
+                                                   (funcall *compute-updated-value*
+                                                     (snode-value present) value)))))
 
                             ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
                               ;; 9.  SNODE -> SNODE / REPLACE (updated range value) ;;
                             ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-                              (if (inode-mutate inode cnode new-cnode)
-                                (return-from %insert value)
-                                (throw :restart present)))                          
+                                (if (inode-mutate inode cnode new-cnode)
+                                  (return-from %insert value)
+                                  (throw :restart present)))
+                              (throw :does-not-apply value))
                             
                             (if (>= level 30)
-                              (let* ((new-snode (snode key value))
-                                      (lnode-chain (enlist new-snode present))
-                                      (new-inode (make-inode lnode-chain startgen))
-                                      (new-cnode (cnode-updated cnode pos new-inode)))
+                              (if (funcall *applicable-when-not-found* nil value)
+                                (let* ((new-snode (snode key value))
+                                        (lnode-chain (enlist new-snode present))
+                                        (new-inode (make-inode lnode-chain startgen))
+                                        (new-cnode (cnode-updated cnode pos new-inode)))
 
                                 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
                                 ;; 10.  SNODE -> SNODE / new INODE->LNODE (hash collision) ;;
                                 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-                                (if (inode-mutate inode cnode new-cnode)
-                                  (return-from %insert value)
-                                  (throw :restart lnode-chain)))
+                                  (if (inode-mutate inode cnode new-cnode)
+                                    (return-from %insert value)
+                                    (throw :restart lnode-chain)))
+                                (throw :does-not-apply value))
                               
                               (let* ((new-flag-other (flag (snode-key present) (+ level 5)))
                                       (new-bitmap (logior new-flag-other))
@@ -2387,7 +2403,10 @@
       (loop  with d = 0 and p = nil and result
         for  root =  (root-node-access *ctrie*)
         when (catch-case (%insert root key value d p (inode-gen root))
-               (:does-not-apply (prog1 t (setf result nil)))
+               (:does-not-apply (prog1 t
+                                  (format *TRACE-OUTPUT* "~8A  does not apply (~A . ~A)~%"
+                                    it key value)
+                                  (setf result nil)))
                (:restart (prog1 nil
                            (when *debug*
                              (format *TRACE-OUTPUT* "~8A  timeout insert (~A . ~A)~%"
@@ -2395,8 +2414,30 @@
                (t        (prog1 (setf result it)
                            (when *debug*
                              (format *TRACE-OUTPUT* "~8S  done .~%~S~%" it *ctrie*)))))
-        return result))))
+        return (values result ctrie)))))
 
+(defun ctrie-put-if (ctrie key value predicate)
+  (let ((*applicable-when-found* (lambda (old new) (declare (ignore new))
+                                   (funcall predicate old))))
+    (ctrie-put ctrie key value)))
+
+(defun ctrie-put-if-not (ctrie key value predicate)
+  (let ((*applicable-when-found* (lambda (old new) (declare (ignore new))
+                                   (not (funcall predicate old)))))
+    (ctrie-put ctrie key value)))
+
+(defun ctrie-put-ensure (ctrie key value)
+  (let ((*applicable-when-found* (lambda (old new) (declare (ignore new old)) nil)))
+    (ctrie-put ctrie key value)))
+
+(defun ctrie-put-replace (ctrie key value)
+  (let ((*applicable-when-not-found* (lambda (old new) (declare (ignore new old)) nil)))
+    (ctrie-put ctrie key value)))
+  
+(defun ctrie-put-update (ctrie key value fn)
+  (let ((*applicable-when-not-found* (lambda (old new) (declare (ignore new old)) nil))
+         (*compute-updated-value* (lambda (old new) (funcall fn old new))))
+    (ctrie-put ctrie key value)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

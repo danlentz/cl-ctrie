@@ -20,6 +20,11 @@
     :ctrie-hash
     :ctrie-do
     :ctrie-put
+    :ctrie-put-if
+    :ctrie-put-if-not
+    :ctrie-put-ensure
+    :ctrie-put-replace
+    :ctrie-put-update
     :ctrie-get
     :ctrie-drop
     :ctrie-map
@@ -55,6 +60,7 @@
     :ctrie-gc
     :ctrie-index
     :all-ctries
+    :ctrie-names
     :find-ctrie
     :ctrie-name
     :ctrie-persistent-store

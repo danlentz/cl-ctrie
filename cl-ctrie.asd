@@ -69,11 +69,10 @@
                      this is not necessarily a high priority for the initial development
                      cycle."
   
-  :weakly-depends-on (:donuts :cldoc :cl-ppcre :uuid)
+  :weakly-depends-on (:cldoc)
   :depends-on        (:closer-mop :contextl :alexandria :lisp-unit :local-time :unicly
-				  :com.informatimago.common-lisp.heap                       
-				  :flexi-streams :osicat :hu.dwim.serializer :cl-store :rucksack
-				  :userial :iterate :cl-irregsexp)
+                       :cl-ppcre :uuid :flexi-streams :osicat  :userial :iterate :cl-irregsexp
+                       :hu.dwim.serializer :cl-store :rucksack)
   
   :components ((:static-file  "cl-ctrie.asd")
                 (:static-file "readme.md")

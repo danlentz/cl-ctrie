@@ -9,12 +9,13 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defparameter *alternative-package-exports*
-  '(:get :put :drop :make :new :do :keys :values :size :test :hash :readonly-p
+  '(:get :put :put-if :put-if-not :put-ensure :put-replace :put-update
+     :drop :make :new :do :keys :values :size :test :hash :readonly-p
      :map :map-keys :map-values :clear :pprint :error :to-alist :to-hashtable
      :from-hashtable :from-alist :empty-p :save :load :export :import :snapshot :fork
      :lambda :lambda-ctrie :lambda-class :lambda-object :lambda-spawn :define 
      :max-depth :min-depth :enable-pooling :disable-pooling :pooling-enabled-p
-     :pool-status :ps :index :all :find :name)
+     :pool-status :ps :index :all :names :find :name)
   "defines the symbols exported by the 'alternative' symbol naming styled package")
 
 
