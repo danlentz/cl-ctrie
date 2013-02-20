@@ -1,8 +1,9 @@
 doc/other
 tmp
-
+attic
+.DS_Store
 in/common-tty.lisp
-
+test.log
 out/ctrie-doc.lisp
 
 out/ctrie-test.lisp
