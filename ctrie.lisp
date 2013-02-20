@@ -2102,6 +2102,20 @@
   properly document the process -- not to encourage anyone to fiddle
   with it...
 
+  > 0.  The specific behavior of a given call to %insert is controlled
+  by dynamically scoped functional bindings to the special variables
+  `*APPLICABLE-WHEN-FOUND-P*` `*APPLICABLE-WHEN-NOT-FOUND-P*` and
+  `*COMPUTE-UPDATED-VALUE*` which, in various configurations provide
+  the ability to encode extended functionality while retaining the
+  atomicity of the operation. In the default case, these variables are
+  lambda-bound so as to provide normal put/drop type behaviour that would
+  be expected.  Additional atomic operations such as `CTRIE-PUT-IF`,
+  `CTRIE-PUT-IF-NOT`, `CTRIE-PUT-ENSURE`, `CTRIE-PUT-UPDATE`,
+  `CTRIE-PUT-REPLACE`, `CTRIE-PUT-UPDATE-IF`, and
+  `CTRIE-PUT-REPLACE-IF` etc. are all implemented by means of
+  customizing these special variables with alternative functional
+  bindings.
+
   > 1.  A given call to %insert carries with it no guarantee that it will
   actually succeed.  Further, there is no guarantee it will do anything
   at all -- including ever returning to the caller having invoked it.
@@ -2297,15 +2311,18 @@
       (multiple-value-bind (val found) (lnode-search it key #'ctequal)
         (printv "LNODE" val found it key
           (if found
-            (unless (funcall *applicable-when-found-p* val value)
-              (throw :does-not-apply val))
-            (unless (funcall *applicable-when-not-found-p* value)
-              (throw :does-not-apply value)))         
-          (unless (inode-mutate inode it
-                    (lnode-inserted it key
-                      (funcall *compute-updated-value* val value)
-                      #'ctequal))
-            (throw :restart it)))))
+            (let1 newvalue (funcall *compute-updated-value* val value)
+              (if (funcall *applicable-when-found-p* val value)
+                (unless (ctequal val newvalue)
+                  (unless (inode-mutate inode it
+                            (lnode-inserted (lnode-removed it key #'ctequal)
+                              key newvalue #'ctequal))
+                    (throw :restart it)))
+                (throw :does-not-apply newvalue)))
+            (if (funcall *applicable-when-not-found-p* value)
+              (unless (inode-mutate inode it (lnode-inserted it key value #'ctequal))
+                (throw :restart it))
+              (throw :does-not-apply value))))))
 
     ;;;;;;;;;;;;;;;;;;;;;;;;
     ;; 5.  INODE -> CNODE ;;
@@ -2347,20 +2364,19 @@
                    ;;;;;;;;;;;;;;;;;;;;;;;;
                    
                    (SNODE (if (ctequal key (snode-key present))
-                            (if (funcall *applicable-when-found-p* (snode-value present) value)
-                              (let ((new-cnode (cnode-updated cnode pos
-                                                 (snode key
-                                                   (funcall *compute-updated-value*
-                                                     (snode-value present) value)))))
+                            (let1 new-value (funcall *compute-updated-value*
+                                              (snode-value present) value)
+                              (if (funcall *applicable-when-found-p* (snode-value present) value)
+                                (let1 new-cnode (cnode-updated cnode pos (snode key new-value))
 
                             ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
                                 ;; 9.  SNODE -> SNODE / REPLACE (updated range value) ;;
                             ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-                                (if (inode-mutate inode cnode new-cnode)
-                                  (return-from %insert value)
-                                  (throw :restart present)))
-                              (throw :does-not-apply value))
+                                  (if (inode-mutate inode cnode new-cnode)
+                                    (return-from %insert new-value)
+                                    (throw :restart present)))
+                                (throw :does-not-apply value)))
                             
                             (if (funcall *applicable-when-not-found-p* value)
                               (if (>= level 30)
@@ -2403,7 +2419,7 @@
 (defun ctrie-put (ctrie key value)
   "Insert a new entry into CTRIE mapping KEY to VALUE.  If an entry
   with key equal to KEY aleady exists in CTRIE, according to the
-  equality predicate defined by `CTRIE-TEST` then the priorbmapping
+  equality predicate defined by `CTRIE-TEST` then the prior mapping
   will be replaced by VALUE. Returns `VALUE` representing the
   mapping in the resulting CTRIE"
   (with-ctrie ctrie
@@ -2412,18 +2428,26 @@
         for  root =  (root-node-access *ctrie*)
         when (catch-case (%insert root key value d p (inode-gen root))
                (:does-not-apply (prog1 t
-                                  (format *TRACE-OUTPUT* "~8A  does not apply (~A . ~A)~%"
-                                    it key value)
+                                  (when *debug*
+                                    (format *TRACE-OUTPUT* "~8A  does not apply (~A . ~A)~%"
+                                      it key value))
                                   (setf result nil)))
-               (:restart (prog1 nil
-                           (when *debug*
-                             (format *TRACE-OUTPUT* "~8A  timeout insert (~A . ~A)~%"
-                               it key value))))
-               (t        (prog1 (setf result it)
-                           (when *debug*
-                             (format *TRACE-OUTPUT* "~8S  done .~%~S~%" it *ctrie*)))))
+               (:restart        (prog1 nil
+                                  (when *debug*
+                                    (format *TRACE-OUTPUT* "~8A  timeout insert (~A . ~A)~%"
+                                      it key value))))
+               (t               (prog1 (setf result it)
+                                  (when *debug*
+                                    (format *TRACE-OUTPUT* "~8S  done .~%~S~%" it *ctrie*)))))
         return (values result ctrie)))))
 
+;; TODO: I'm a little troubled by the order of arguments in the
+;; lambda-lists of the following few functions, as it seems a little
+;; awkward and unnatural and possibly not convenently curried and so
+;; forth.  But, as implemented, this way provides the most consistent
+;; approach to design of the api shared collectively by the ctrie
+;; library.  Maybe there is some approach to this that could achieve
+;; both goals?
 
 (defun ctrie-put-if (ctrie key value predicate)
   (let ((*applicable-when-found-p* (lambda (old new) (declare (ignore new))
@@ -2436,14 +2460,31 @@
     (ctrie-put ctrie key value)))
 
 (defun ctrie-put-ensure (ctrie key value)
+  "Insert a new entry into CTRIE mapping KEY to VALUE if and only if
+  there is no entry with key equal to KEY aleady present in CTRIE,
+  according to the equality predicate defined by `CTRIE-TEST`. Returns
+  the value inserted in such a case, otherwise returns NIL.  As a
+  second value, returns the CTRIE it was invoked on"
   (let ((*applicable-when-found-p* (lambda (old new) (declare (ignore new old)) nil)))
     (ctrie-put ctrie key value)))
 
 (defun ctrie-put-replace (ctrie key value)
+  "Replace the VALUE mapped to KEY in CTRIE if and only if there is an
+  entry with key equal to KEY present in CTRIE, according to the
+  equality predicate defined by `CTRIE-TEST`. Returns the replacement
+  value in such a case, otherwise returns NIL.  As a second value,
+  returns the CTRIE it was invoked on"
   (let ((*applicable-when-not-found-p* (lambda (new) (declare (ignore new)) nil)))
     (ctrie-put ctrie key value)))
 
 (defun ctrie-put-replace-if (ctrie key value predicate)
+  "Replace the VALUE mapped to KEY in CTRIE if and only if there is an
+  entry with key equal to KEY present in CTRIE, according to the
+  equality predicate defined by `CTRIE-TEST`, and application of
+  PREDICATE to that currently associated VALUE evaluates to
+  true. Returns the replacement value when successful, otherwise
+  returns NIL.  As a second value, returns the CTRIE it was invoked
+  on"
   (let ((*applicable-when-not-found-p* (lambda (new) (declare (ignore new)) nil))
          (*applicable-when-found-p*    (lambda (old new) (declare (ignore new))
                                          (funcall predicate old))))
@@ -2569,15 +2610,18 @@
                            (throw :restart startgen))))
                      ((or snode tnode)
                        (if (ctequal key (leaf-node-key found))
-                         (let1 new-cnode (cnode-truncated it flag pos)
-                           (if (inode-mutate inode it (cnode-contracted new-cnode level))
-                             (values (leaf-node-value found) t)
-                             (values nil :restart)))
+                         (if (funcall *applicable-when-found-p* (leaf-node-value found) nil)
+                           (let1 new-cnode (cnode-truncated it flag pos)
+                             (if (inode-mutate inode it (cnode-contracted new-cnode level))
+                               (values (leaf-node-key found) t)
+                               (values nil :restart)))
+                           (values (leaf-node-value found) :does-not-apply))
                          (values nil :notfound))))
                    (case result-kind
+                     (:does-not-apply  (values result-value :does-not-apply))
                      (:restart  (values result-value :restart))
                      (:notfound (values nil nil))
-                     (t         (multiple-value-prog1 (values result-value t)                       
+                     (t         (multiple-value-prog1 (values result-value t)                      
                                   (when (tnode-p (inode-read inode))
                                     (clean-parent parent inode key (- level 5)))))))))))))
 
@@ -2591,10 +2635,24 @@
            (*hash-code* (cthash key)))
       (multiple-value-bind (val kind) (%remove r key 0 nil (inode-gen r))
         (case kind
-          (:restart  (return-from ctrie-drop (ctrie-drop *ctrie* key)))
-          (:notfound (values val nil))
-          (t         (values val t)))))))
+          (:does-not-apply (multiple-value-prog1 (values nil nil)
+                             (when *debug*
+                               (format *TRACE-OUTPUT* " does not apply (~A . ~A)~%"
+                                  key val))))
+          (:restart       (return-from ctrie-drop (ctrie-drop *ctrie* key)))
+          (:notfound      (values val nil))
+          (t              (values val t)))))))
 
+
+(defun ctrie-drop-if (ctrie key predicate)
+  (let ((*applicable-when-found-p* (lambda (old new) (declare (ignore new))
+                                   (funcall predicate old))))
+    (ctrie-drop ctrie key)))
+
+(defun ctrie-drop-if-not (ctrie key predicate)
+  (let ((*applicable-when-found-p* (lambda (old new) (declare (ignore new))
+                                   (not (funcall predicate old)))))
+    (ctrie-drop ctrie key)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

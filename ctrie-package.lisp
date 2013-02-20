@@ -29,6 +29,8 @@
     :ctrie-put-update-if
     :ctrie-get
     :ctrie-drop
+    :ctrie-drop-if
+    :ctrie-drop-if-not    
     :ctrie-map
     :ctrie-map-keys
     :ctrie-map-values

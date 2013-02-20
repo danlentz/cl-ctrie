@@ -10,7 +10,8 @@
 
 (defparameter *alternative-package-exports*
   '(:get :put :put-if :put-if-not :put-ensure :put-replace :put-replace-if
-     :put-update :put-update-if :drop :make :new :do :keys :values :size :test :hash 
+     :put-update :put-update-if :drop :drop-if :drop-if-not :make :new
+     :do :keys :values :size :test :hash 
      :readonly-p :map :map-keys :map-values :clear :pprint :error :to-alist :to-hashtable
      :from-hashtable :from-alist :empty-p :save :load :export :import :snapshot :fork
      :lambda :lambda-ctrie :lambda-class :lambda-object :lambda-spawn :define 
