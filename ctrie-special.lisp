@@ -16,6 +16,8 @@
   an appropriate WITH-CTRIE form.")
 
 (defvar       *ctrie-index*   nil)
+(defvar       *ctrie-seqs*    nil)
+
 
 (defvar       *hash-code*     nil
   "Special variable used to store the hash-code that corresponds to the

@@ -11,12 +11,12 @@
 (defparameter *alternative-package-exports*
   '(:get :put :put-if :put-if-not :put-ensure :put-replace :put-replace-if
      :put-update :put-update-if :drop :drop-if :drop-if-not :make :new
-     :do :keys :values :size :test :hash 
+     :do :keys :values :size :test :hash :next-id
      :readonly-p :map :map-keys :map-values :clear :pprint :error :to-alist :to-hashtable
      :from-hashtable :from-alist :empty-p :save :load :export :import :snapshot :fork
      :lambda :lambda-ctrie :lambda-class :lambda-object :lambda-spawn :define 
      :max-depth :min-depth :enable-pooling :disable-pooling :pooling-enabled-p
-     :pool-status :ps :index :all :names :find :name)
+     :pool-status :index :all :names :find :name)
   "defines the symbols exported by the 'alternative' symbol naming styled package")
 
 
@@ -249,6 +249,28 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; 'Unique Value' Utilities
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; from :hu.dwim.util
+
+(defun fully-qualified-symbol-name (symbol &optional separator)
+  (flet ((string+ (&rest args) (apply #'concatenate 'string args)))
+    (let* ((symbol-name (symbol-name symbol))
+            (package (symbol-package symbol))
+            (keyword-package (load-time-value (find-package :keyword))))
+      (if package
+        (string+
+          (unless (eq package keyword-package) (package-name package))
+          (or separator (if (or (eq package keyword-package)
+                              (eq (nth-value 1 (find-symbol symbol-name package)) :external))
+                          ":" "::"))
+          symbol-name)
+        (string+ "#:" symbol-name)))))
+
+
+;; (fully-qualified-symbol-name :xyz)   ":XYZ"
+;; (fully-qualified-symbol-name 'xyz)   "CL-CTRIE::XYZ"
+;; (fully-qualified-symbol-name 'list)  "COMMON-LISP:LIST"
+;; (fully-qualified-symbol-name 'ctrie) "CL-CTRIE:CTRIE"
 
 (defun gensym-list (length)
   "generate a list of LENGTH uninterned symbols"

@@ -67,6 +67,7 @@
     :ctrie-names
     :find-ctrie
     :ctrie-name
+    :ctrie-next-id
     :ctrie-persistent-store
     :ctrie-enable-pooling
     :ctrie-disable-pooling

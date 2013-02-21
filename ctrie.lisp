@@ -160,7 +160,28 @@
 ;; (with-active-layers (allocation persistent unordered-map)
 ;; (current-layer-context))))
 
+(defmethod print-object ((ctrie persistent-ctrie) stream)
+  (print-unreadable-object (ctrie stream :type nil)
+    (format stream "~A:~8,'-X ~34A [~8,'.D keys] (~A,~A,~A,~A)"
+      "CTRIE"  (mm:lisp-object-to-mptr ctrie)
+      (concatenate 'string "\"" (string-upcase (ctrie-name ctrie)) "\"")
+      (ctrie-size ctrie) "mmap"
+      (if (ctrie-readonly-p ctrie) "ro" "rw")
+      (string-downcase  (princ-to-string (ctrie-test ctrie)))
+      (string-downcase  (princ-to-string (ctrie-hash ctrie))))))
 
+
+(deftype ctrie ()
+  '(or transient-ctrie persistent-ctrie))
+
+(defun ctrie-p (thing)
+  (typep thing 'ctrie))
+
+
+(defun persistent-p (thing)
+  (typecase thing
+    (mm:mm-object t)
+    (t            nil)))
 
 (mm:defmmclass ctrie-index (persistent-ctrie)
   ()
@@ -169,8 +190,15 @@
 
 (defun ctrie-index ()
   (or *ctrie-index*
-    (setf *ctrie-index* (first (mm:retrieve-all-instances 'ctrie-index)))
-    (setf *ctrie-index* (make-instance 'ctrie-index))))
+    (setf *ctrie-index* (find "index" (mm:retrieve-all-instances 'ctrie-index)
+                          :key #'ctrie-name))
+    (setf *ctrie-index* (make-instance 'ctrie-index :name "index"))))
+
+(defun ctrie-seqs ()
+  (or *ctrie-seqs*
+    (setf *ctrie-seqs* (find "sequences" (mm:retrieve-all-instances 'ctrie-index)
+                         :key #'ctrie-name))
+    (setf *ctrie-seqs* (make-instance 'ctrie-index :name "sequences"))))
 
 (defun find-ctrie (name)
   (ctrie-get (ctrie-index) name))
@@ -199,17 +227,21 @@
 (defun ctrie-names ()
   (ctrie-keys (ctrie-index)))
 
-(deftype ctrie ()
-  '(or transient-ctrie persistent-ctrie))
+(defun ctrie-seq-names ()
+  (ctrie-keys (ctrie-seqs)))
 
-(defun ctrie-p (thing)
-  (typep thing 'ctrie))
+(defgeneric ctrie-next-id (sequence-designator))
 
+(defmethod  ctrie-next-id ((string string))
+  (or (ctrie-put-update-if (ctrie-seqs) "s0" 1 '+ 'numberp)
+    (ctrie-put-ensure (ctrie-seqs) string 0)))
 
-(defun persistent-p (thing)
-  (typecase thing
-    (mm:mm-object t)
-    (t            nil)))
+(defmethod  ctrie-next-id ((ctrie persistent-ctrie))
+  (ctrie-next-id (ctrie-name ctrie)))
+
+(defmethod  ctrie-next-id ((symbol symbol))
+  (ctrie-next-id (fully-qualified-symbol-name symbol)))
+
 
 
 (defun make-ctrie (&rest args &key name persistent ordered (readonly-p nil)
@@ -803,8 +835,12 @@
 ;; Serial Boxes
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(mm:defmmclass serial-box (mm:marray)
-  ())
+(mm:defmmclass serial-box ()
+  ((contents
+     :initarg :contents
+     :accessor serial-box-contents
+     :persistent t
+     :initform nil)))
 
 (define-layered-function maybe-box (thing))
 
@@ -812,10 +848,31 @@
   thing)
 
 (define-layered-method maybe-box :in persistent ((thing t))
-  (let ((bytes   (hu.dwim.serializer:serialize thing)))
-    (mm:make-marray (length bytes)
-      :initial-contents (coerce bytes 'list)
-      :marray-class 'serial-box)))
+  (if (ctrie-pooling-enabled-p)
+    (let ((byte-vector (hu.dwim.serializer:serialize thing))
+           (result (sb-concurrency:make-mailbox)))
+      (request-dynamic-action!
+        (lambda (thing)
+          (sb-concurrency:send-message result
+            (make-instance 'serial-box :contents (mm:lisp-object-to-mptr byte-vector))))
+        thing)
+      (return-from maybe-box (sb-concurrency:receive-message result)))
+    (let ((byte-vector (hu.dwim.serializer:serialize thing)))
+      (make-instance 'serial-box :contents (mm:lisp-object-to-mptr byte-vector)))))
+
+(define-layered-method maybe-box :in persistent ((thing string))
+  (if (ctrie-pooling-enabled-p)
+    (let ((result (sb-concurrency:make-mailbox)))
+      (request-dynamic-action!
+        (lambda (thing)
+          (sb-concurrency:send-message result
+            (mm:make-mm-fixed-string (+ 3 (length thing)) :value (first thing))))
+        thing)
+      (return-from maybe-box
+        (sb-concurrency:receive-message result)))
+    (return-from maybe-box
+      (mm:make-mm-fixed-string (+ 3 (length thing)) :value thing))))
+ 
 
 (define-layered-method maybe-box :in persistent ((thing mm:mm-object))
   thing)
@@ -829,23 +886,23 @@
 (define-layered-method maybe-box :in persistent ((thing null))
   thing)
 
-(define-layered-method maybe-box :in persistent ((thing string))
-  (mm:make-mm-fixed-string (length thing) :value thing))
-
 
 (define-layered-function maybe-unbox (thing))
 
 (define-layered-method maybe-unbox :in t (thing)
   thing)
 
-(define-layered-method maybe-unbox :in t ((bytes serial-box))
-  (hu.dwim.serializer:deserialize (coerce (mm:marray-to-list bytes) 'vector)))
+(define-layered-method maybe-unbox :in t ((box serial-box))
+  (hu.dwim.serializer:deserialize (mm:mptr-to-lisp-object (serial-box-contents box))))
 
-(define-layered-method maybe-unbox :in persistent ((bytes serial-box))
-  (hu.dwim.serializer:deserialize (coerce (mm:marray-to-list bytes) 'vector)))
+(define-layered-method maybe-unbox :in persistent ((box serial-box))
+  (hu.dwim.serializer:deserialize (mm:mptr-to-lisp-object (serial-box-contents box))))
 
 (define-layered-method maybe-unbox :in persistent ((thing t))
   thing)
+
+(define-layered-method maybe-unbox :in t ((thing mm::mm-fixed-string))
+  (mm:mm-fixed-string-value thing))
 
 (define-layered-method maybe-unbox :in persistent ((thing mm::mm-fixed-string))
   (mm:mm-fixed-string-value thing))
