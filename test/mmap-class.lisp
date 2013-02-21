@@ -2,9 +2,9 @@
 ;;;;;
 
 
-(in-package :manardb-test)
+(in-package :cl-ctrie-test)
 
-(in-suite manardb-test)
+(in-suite ctrie/mm/class)
 
 
 (deftest test-simple-defclass ()
@@ -21,13 +21,13 @@
 
 (deftest test-create-two-slot-class ()
   (eval 
-    `(manardb:defmmclass two-slot ()
+    `(mm:defmmclass two-slot ()
        ((basic-slot
           :initarg :basic-slot
           :initform (error "Please provide a value for the basic slot"))
          (marray
            :initarg :marray
-           :initform (manardb:make-marray 1000 :initial-element nil))))))
+           :initform (mm:make-marray 1000 :initial-element nil))))))
 
 
 (deftest test-nil-slots-are-not-created ()

@@ -70,9 +70,9 @@
                      cycle."
   
   :weakly-depends-on (:cldoc)
-  :depends-on        (:closer-mop :contextl :alexandria :lisp-unit :local-time :unicly
-                       :cl-ppcre :uuid :flexi-streams :osicat  :userial :iterate :cl-irregsexp
-                       :hu.dwim.serializer :cl-store :rucksack)
+  :depends-on        (:closer-mop :contextl :alexandria ;:local-time :unicly :userial
+                       :cl-ppcre :uuid :flexi-streams :osicat  :iterate :cl-irregsexp
+                       :hu.dwim.stefil :hu.dwim.serializer :cl-store :rucksack)
   
   :components ((:static-file  "cl-ctrie.asd")
                 (:static-file "readme.md")
@@ -154,8 +154,19 @@
 
 (asdf:defsystem :cl-ctrie-test
   :serial t
-  :depends-on (:cl-ctrie :lparallel)
-  :components ((:test-file "ctrie-test")))
+  :depends-on (:cl-ctrie :hu.dwim.stefil :lparallel)
+  :components ((:module :test :serial t
+                 :components ((:file "suite")
+                               (:test-file "common-ord")
+                               (:test-file "common-io")
+                               (:test-file "common-pointer")
+                               (:test-file "mmap-class")
+                               (:test-file "mmap-box")
+                               (:test-file "mmap-symbol")
+                               (:test-file "mmap-mptr")
+                               (:test-file "mmap-tree")
+                               (:test-file "mmap-gc")
+                               ))))
 
 
 (defmethod asdf:perform ((o asdf:test-op) (c (eql (asdf:find-system :cl-ctrie))))
