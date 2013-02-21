@@ -151,7 +151,7 @@
 (defmethod  slots-to-compare-using-class ((class standard-class) object)
   "comparible slots may be cutomized by class, with the default being all slots"
   (mapcar #'c2mop:slot-definition-name 
-    (c2mop:class-slots object)))
+    (c2mop:class-slots (class-of object))))
 
 
 (defgeneric slots-to-compare (object)
@@ -160,7 +160,8 @@
 
 (defmethod  slots-to-compare ((object standard-object))
   "comparible slots of a standard-object are defined by specialization on it class"
-  (slots-to-compare-using-class (class-of object) object))
+  (slots-to-compare-using-class (class-of (class-of object)) object))
+
 
 
 (defmethod ord:compare ((a standard-object) (b standard-object))
@@ -179,28 +180,27 @@
        with ord:compare.
    -- when all preceding steps complete without ordinal determination, the objects are
        considered equal"
-  (if (not (eq (class-of a) (class-of b)))
-    (writing-readably 
-      (ord:compare
-        (format nil "~S" (class-name (class-of a)))
-        (format nil "~S" (class-name (class-of b)))))
-    (let ((slots (slots-to-compare a)))
-      (when (null slots)
-        (return-from compare
-          (writing-readably 
-            (ord:compare (format nil "~S" a) (format nil "~S" b)))))
-      (loop
-        :for x :in slots
-        :do (cond
-              ((and (not (slot-boundp a x)) (not (slot-boundp b x)))  nil)            
-              ((not (slot-boundp a x)) (return-from compare   1))
-              ((not (slot-boundp b x)) (return-from compare  -1))
-              (t
-                (let ((c (ord:compare (slot-value a x) (slot-value b x))))
-                  (unless (zerop c)
-                    (return-from compare c))))))
-      0)))
-    
+      (if (not (eq (class-of a) (class-of b)))
+      (writing-readably 
+        (compare 
+          (format nil "~S" (class-name (class-of a)))
+          (format nil "~S" (class-name (class-of b)))))
+      (let ((slots (slots-to-compare a)))
+        (when (null slots)
+          (return-from compare
+            (writing-readably 
+              (compare (format nil "~S" a) (format nil "~S" b)))))
+        (loop
+          :for x :in slots
+          :do (cond
+                ((and (not (slot-boundp a x)) (not (slot-boundp b x)))  nil)            
+                ((not (slot-boundp a x)) (return-from compare   1))
+                ((not (slot-boundp b x)) (return-from compare  -1))
+                (t
+                  (let ((c (compare (slot-value a x) (slot-value b x))))
+                    (unless (zerop c)
+                      (return-from compare c))))))
+        0)))
 
         
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

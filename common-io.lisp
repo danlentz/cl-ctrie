@@ -266,21 +266,6 @@
                        ,@body)
        (ignore-errors (delete-file ,pathname-var)))))
 
-(assert (equal "hi" (with-temporary-file (x)
-                      (format x "hi")
-                      (force-output x)
-                      (read-file-to-string -filename-))))
-
-(assert (equal "hi" (with-temporary-file (x fn)
-                      (format x "hi")
-                      (force-output x)
-                      (read-file-to-string fn))))
-
-(assert (equal "hi" (with-temporary-file ()
-                      (format -file- "hi")
-                      (force-output -file-)
-                      (read-file-to-string -filename-))))
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Basic Regular Expression Utilities
