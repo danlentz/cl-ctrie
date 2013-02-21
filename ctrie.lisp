@@ -242,9 +242,10 @@
   expect that the special variable `*CTRIE*` will be bound to the root
   container of subject CTRIE.  See also the documentation for
   `*CTRIE*`"
-  `(let* ((*ctrie* (if (typep ,ctrie 'function)
-                     (funcall ,ctrie #'identity)
-                     ,ctrie)))
+  `(let* ((*ctrie* (typecase ,ctrie
+                     (string   (find-ctrie ,ctrie))
+                     (function (funcall ,ctrie #'identity))
+                     (t        ,ctrie))))
      (typecase *ctrie*
        (mm:mm-object   (with-active-layers (persistent)
                          ,@body))
