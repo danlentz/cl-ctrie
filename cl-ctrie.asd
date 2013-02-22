@@ -170,16 +170,16 @@
 
 
 (defmethod asdf:perform ((o asdf:test-op) (c (eql (asdf:find-system :cl-ctrie))))
-  (when (find-package :cl-ctrie-test)
-    (funcall (intern (symbol-name :end-kernels) (find-package :cl-ctrie-test)))
-    (delete-package :cl-ctrie-test))
+  ;; (when (find-package :cl-ctrie-test)
+  ;;   (funcall (intern (symbol-name :end-kernels) (find-package :cl-ctrie-test)))
+  ;;   (delete-package :cl-ctrie-test))
   (asdf:load-system :cl-ctrie-test)
   (with-open-file (log-stream (asdf:system-relative-pathname c "test" :type "log")
                     :direction :output :if-does-not-exist :create :if-exists :supersede)
     (let ((*standard-output*  (make-broadcast-stream *standard-output* log-stream))
-           (*trace-output*    (make-broadcast-stream *trace-output* log-stream))
-           (*error-output*    (make-broadcast-stream *error-output* log-stream)))      
-      (funcall (intern (symbol-name :run-ctrie-tests) (find-package :cl-ctrie-test))))))
+           (*trace-output*    (make-broadcast-stream *trace-output*    log-stream))
+           (*error-output*    (make-broadcast-stream *error-output*    log-stream)))      
+      (funcall (intern (symbol-name :run-all-tests) (find-package :cl-ctrie-test))))))
 
 
 (defmethod asdf:perform ((o asdf:test-op) (c (eql (asdf:find-system :cl-ctrie-test))))

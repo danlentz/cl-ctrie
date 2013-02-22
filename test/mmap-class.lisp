@@ -1,13 +1,12 @@
 ;;;;; -*- mode: common-lisp;   common-lisp-style: modern;    coding: utf-8; -*-
 ;;;;;
 
-
 (in-package :cl-ctrie-test)
 
-(in-suite ctrie/mm/class)
+(defsuite* (cl-ctrie/mmap/class :in cl-ctrie/mmap))
 
 
-(deftest test-simple-defclass ()
+(deftest check-defclass/simple ()
   (eval `(defclass test-empty-class ()
 	   ()
 	   (:metaclass mm-metaclass)))
@@ -19,7 +18,7 @@
 	   (:metaclass mm-metaclass))))
 
 
-(deftest test-create-two-slot-class ()
+(deftest check-create-class/two-slots ()
   (eval 
     `(mm:defmmclass two-slot ()
        ((basic-slot
@@ -30,15 +29,15 @@
            :initform (mm:make-marray 1000 :initial-element nil))))))
 
 
-(deftest test-nil-slots-are-not-created ()
-  (test-create-two-slot-class)
+(deftest check-make-instance/nil-slots-not-created ()
+  (check-create-class/two-slots)
   (let ((m (make-instance 'two-slot :basic-slot nil)))
     (is (not (slot-value m 'basic-slot)))
     m))
 
 
-(deftest test-create-instance-of-two-slot (&optional (vals (list nil 0 :keyword "string")))
-  (test-create-two-slot-class)
+(deftest check-make-instance/two-slots (&optional (vals (list nil 0 :keyword "string")))
+  (check-create-class/two-slots)
   (loop for val in vals do
     (let ((m (make-instance 'two-slot :basic-slot val :marray val)))
       (is (equalp val (slot-value m 'marray)))

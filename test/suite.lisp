@@ -126,10 +126,11 @@
 
 
 
-(defsuite* (cl-ctrie/ctrie/smoke     :in cl-ctrie/ctrie))
-(defsuite* (cl-ctrie/mmap/class      :in cl-ctrie/mmap))
-(defsuite* (cl-ctrie/mmap/box        :in cl-ctrie/mmap))
-(defsuite* (cl-ctrie/mmap/symbol     :in cl-ctrie/mmap))
-(defsuite* (cl-ctrie/mmap/mptr       :in cl-ctrie/mmap))
-(defsuite* (cl-ctrie/mmap/tree       :in cl-ctrie/mmap))
-(defsuite* (cl-ctrie/mmap/gc         :in cl-ctrie/mmap))
+
+;; (defsuite* (cl-ctrie/ctrie/smoke     :in cl-ctrie/ctrie))
+
+
+
+
+
+

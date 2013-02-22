@@ -1,18 +1,17 @@
 ;;;;; -*- mode: common-lisp;   common-lisp-style: modern;    coding: utf-8; -*-
 ;;;;;
 
+(in-package :cl-ctrie-test)
 
-(in-package :manardb-test)
+(defsuite* (cl-ctrie/mmap/mptr :in cl-ctrie/mmap))
 
-(stefil:in-suite manardb-test)
-
-(stefil:deftest make-mptr-all ()
-  (loop for mtag below +mtags+
-	do (loop 
-		 repeat 1000
-		 for mindex = (random (ash 1 +mindex-bits+))
-		 for mptr = (make-mptr mtag mindex)
-		 do 
-		 (stefil:is (= (mptr-index mptr) mindex))
-		 (stefil:is (= (mptr-tag mptr) mtag)))))
+(deftest check-make-mptr/all ()
+  (loop for mtag below mm::+mtags+
+    do (loop 
+         repeat 1000
+         for mindex = (random (ash 1 mm::+mindex-bits+))
+         for mptr = (mm::make-mptr mtag mindex)
+         do 
+         (is (= (mm::mptr-index mptr) mindex))
+         (is (= (mm::mptr-tag mptr)   mtag)))))
 

@@ -85,15 +85,26 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; MM-SYMBOL
+;;
+;; Symbol handling has been revised so as to handle uninterned symbols, which
+;; previously caused painful bugs and led to eventual crash. Specifically,
+;; uninterned symbols can be stored persistently, will retain identity through
+;; a round-trip to/from persistent storage, and will be comsidered to be uniquely
+;; represented based on #'symbol-name.  That is, gensyms with the same name will
+;; always resolve to the same mm-symbol.  This prevents the undesirable alternative
+;; problems caused by the default gensym semantics which results in the same gensym
+;; persisted again and again each time it is encountered when identity had not
+;; been preserved.  For all intents and purposes, this rendered uninterned symbols
+;; entirely unusable and quite toxic to the operation of the system.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defvar *gensyms* (make-hash-table  :synchronized t))
+(defpackage :|| (:use))
+
+(defvar *stored-symbols* nil)
 
 (defmacro prop-for-mm-symbol (sym)
   `(get ,sym 'mm-symbol))
 
-
-(defvar *stored-symbols* nil)
 
 (with-constant-tag-for-class (tag mm-symbol)
   (check-class-slot-layout mm-symbol)
@@ -103,46 +114,46 @@
     (declare (type symbol object))
     (let* ((pkg (symbol-package object)) 
             (mptr (ptr (make-instance 'mm-symbol
-                         :package (if pkg (package-name pkg) nil)
+                         :package (if pkg (package-name pkg) "")
                          :symbol  (symbol-name object)))))
       (assert (not (zerop mptr)))
-      (if pkg
-        (progn
-          (push object *stored-symbols*)
-          (setf (prop-for-mm-symbol object) mptr))
-        (progn
-          (push object *stored-symbols*)
-          (setf (gethash (symbol-name object) *gensyms*) mptr)
-          (setf (gethash mptr *gensyms*) object)
-          ))
-      mptr))
-
+      (prog1 mptr
+        (if pkg
+          (progn
+            (push object *stored-symbols*)
+            (setf (prop-for-mm-symbol object) mptr))
+          (let ((altsym (intern (symbol-name object) :||)))
+            (setf (prop-for-mm-symbol altsym) mptr)
+            (setf (get altsym :uninterned) object)
+            (pushnew altsym *stored-symbols* :test #'eq))))))
+   
   (defun box-symbol (object)
     (declare (type symbol object))
     (cond
-      ((not object) (make-mptr tag 0))
-      (t            (or
-                      (prop-for-mm-symbol object)
-                      (gethash (symbol-name object) *gensyms*)
-                      (box-symbol-miss object)))))
+      ((not object)                  (make-mptr tag 0))
+      ((not (symbol-package object)) (or
+                                       (prop-for-mm-symbol (intern (symbol-name object) :||))
+                                       (box-symbol-miss object)))
+      (t                             (or
+                                       (prop-for-mm-symbol object)
+                                       (box-symbol-miss object)))))
   
   (defun unbox-symbol (index)
     (unless (zerop index)
       (with-pointer-slots (package-name symbol-name) ((mpointer tag index) mm-symbol)
         (let ((package-name (mptr-to-lisp-object package-name))
                (symbol-name (mptr-to-lisp-object symbol-name)))
-          (let ((sym (if package-name
-                       (intern symbol-name (find-package package-name))
-                       (or (gethash (gethash symbol-name *gensyms*) *gensyms*) (make-symbol symbol-name)))))
-            (unless (or (prop-for-mm-symbol sym) (gethash symbol-name *gensyms*))
-              (push sym *stored-symbols*)
-              (if package-name
-                (setf (prop-for-mm-symbol sym) (make-mptr tag index))
-                (setf (gethash (setf (gethash (symbol-name sym) *gensyms*) (make-mptr tag index)) *gensyms*) sym)))
-            sym))))))
-
-
-
+          (let ((sym (intern symbol-name (find-package package-name))))
+            (pushnew sym *stored-symbols* :test #'eq)
+            (setf (prop-for-mm-symbol sym) (make-mptr tag index))
+            (if (equal package-name "")
+              (or (get sym :uninterned)
+                (setf (get sym :uninterned) (make-symbol symbol-name)))
+              sym)))))))
+  
+           
+  
+  
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; MM-ARRAY & MM-STRING
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

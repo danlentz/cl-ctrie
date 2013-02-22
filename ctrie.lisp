@@ -8,7 +8,6 @@
 ;; Layered Interface Contexts (Not Yet Implemented)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-
 (deflayer interface)
 
 (deflayer unordered-map (interface))
@@ -19,7 +18,6 @@
      :initarg :comparitor
      :initform "ord:compare"
      :accessor comparitor)))
-
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -67,13 +65,20 @@
 (defun nix ()
   (constantly nil))
 
+(defun make-generational-descriptor ()
+  (osicat:get-monotonic-time))
+
+(defun gen-eq (a b)
+  (eql a b))
+
+
 (defun new-transient-root ()
   (with-active-layers (allocation transient)
-    (make-inode (make-cnode) (gensym "ctrie"))))
+    (make-inode (make-cnode) (make-generational-descriptor))))
 
 (defun new-persistent-root ()
   (with-active-layers (allocation persistent)
-    (make-inode (make-cnode) (gensym "ctrie"))))
+    (make-inode (make-cnode) (make-generational-descriptor))))
 
 
 (defclass transient-ctrie ()
@@ -170,7 +175,6 @@
       (string-downcase  (princ-to-string (ctrie-test ctrie)))
       (string-downcase  (princ-to-string (ctrie-hash ctrie))))))
 
-
 (deftype ctrie ()
   '(or transient-ctrie persistent-ctrie))
 
@@ -182,6 +186,11 @@
   (typecase thing
     (mm:mm-object t)
     (t            nil)))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Special CTRIES
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (mm:defmmclass ctrie-index (persistent-ctrie)
   ()
@@ -233,7 +242,7 @@
 (defgeneric ctrie-next-id (sequence-designator))
 
 (defmethod  ctrie-next-id ((string string))
-  (or (ctrie-put-update-if (ctrie-seqs) "s0" 1 '+ 'numberp)
+  (or (ctrie-put-update-if (ctrie-seqs) string 1 '+ 'numberp)
     (ctrie-put-ensure (ctrie-seqs) string 0)))
 
 (defmethod  ctrie-next-id ((ctrie persistent-ctrie))
@@ -243,6 +252,10 @@
   (ctrie-next-id (fully-qualified-symbol-name symbol)))
 
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; CTRIE Creation and Instance Handling
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defun make-ctrie (&rest args &key name persistent ordered (readonly-p nil)
                     (test 'equal) (hash 'sxhash) (stamp *timestamp-factory*) &allow-other-keys)
@@ -615,10 +628,10 @@
   (if (ctrie-pooling-enabled-p)
     (aprog1 (allocate 'transient-inode)
       (setf
-        (inode-gen it) (or gen (gensym "ctrie"))
+        (inode-gen it) (or gen (make-generational-descriptor))
         (inode-ref it) (make-ref :value link-to :stamp (or stamp (ctstamp)) :prev prev)))
     (funcall #'make-instance 'transient-inode
-      :gen (or gen (gensym "ctrie"))
+      :gen (or gen (make-generational-descriptor))
       :ref (make-ref :value link-to :stamp (or stamp (ctstamp)) :prev prev))))
 
 
@@ -627,10 +640,10 @@
   (if (ctrie-pooling-enabled-p)
     (aprog1 (allocate 'persistent-inode)
       (setf
-        (inode-gen it) (or gen (gensym "ctrie"))
+        (inode-gen it) (or gen (make-generational-descriptor))
         (inode-ref it) (make-ref :value link-to :stamp (or stamp (ctstamp)) :prev prev)))
     (funcall #'make-instance 'persistent-inode
-      :gen (or gen (gensym "ctrie"))
+      :gen (or gen (make-generational-descriptor))
       :ref (make-ref :value link-to :stamp (or stamp (ctstamp)) :prev prev))))
 
 
@@ -814,8 +827,8 @@
               (inode-commit inode (inode-ref inode))))))
         (t
     (if     (printv  (and (not (ctrie-readonly-p *ctrie*))
-                       (equal (printv (string (inode-gen (ABORTABLE-READ *ctrie*))))
-                        (printv (string (inode-gen inode))))))
+                       (gen-eq (printv  (inode-gen (ABORTABLE-READ *ctrie*)))
+                        (printv (inode-gen inode)))))
             (if     (printv  (cas-ref-prev ref prev (constantly nil)) ) ;; (cas (ref-prev ref) prev nil)
               (return-from inode-commit ref)
               (return-from inode-commit
@@ -860,6 +873,7 @@
     (let ((byte-vector (hu.dwim.serializer:serialize thing)))
       (make-instance 'serial-box :contents (mm:lisp-object-to-mptr byte-vector)))))
 
+#+()
 (define-layered-method maybe-box :in persistent ((thing string))
   (if (ctrie-pooling-enabled-p)
     (let ((result (sb-concurrency:make-mailbox)))
@@ -877,13 +891,24 @@
 (define-layered-method maybe-box :in persistent ((thing mm:mm-object))
   thing)
 
-(define-layered-method maybe-box :in persistent ((thing fixnum))
+(define-layered-method maybe-box :in persistent ((thing number))
   thing)
 
 (define-layered-method maybe-box :in persistent ((thing symbol))
   thing)
 
 (define-layered-method maybe-box :in persistent ((thing null))
+  thing)
+
+#+()
+(define-layered-method maybe-box :in persistent ((thing cons))
+  thing)
+
+#+()
+(define-layered-method maybe-box :in persistent ((thing array))
+  thing)
+
+(define-layered-method maybe-box :in persistent ((thing string))
   thing)
 
 
@@ -1644,7 +1669,7 @@
   (check-type target-inode inode)
   (check-type level        fixnum)
   (let1 target-gen (inode-gen target-inode)
-    (if (not (equal (string target-gen) (string (inode-gen (root-node-access *ctrie*)))))
+    (if (not (gen-eq target-gen (inode-gen (root-node-access *ctrie*))))
       (throw :restart target-gen)
       (loop while
         (let ((parent-ref  (inode-read parent-inode))
@@ -1990,12 +2015,12 @@
       (let* ((root (root-node-access ctrie))
               (main (inode-read root)))
         (when (root-node-replace ctrie root main
-                (make-inode main (gensym "ctrie")))
+                (make-inode main (make-generational-descriptor)))
           (return-from ctrie-snapshot
             (if read-only
               (make-ctrie :readonly-p t :root root
                 :persistent (persistent-p ctrie))
-              (make-ctrie :root (make-inode main (gensym "ctrie"))
+              (make-ctrie :root (make-inode main (make-generational-descriptor))
                 :persistent (persistent-p ctrie)))))))))
 
 
@@ -2014,7 +2039,7 @@
       (let* ((root (root-node-access ctrie))
               (main (inode-read root)))
         (when (root-node-replace ctrie root main
-                (make-inode (make-cnode) (gensym "ctrie")))
+                (make-inode (make-cnode) (make-generational-descriptor)))
           (return-from ctrie-clear ctrie))))))
 
 
@@ -2410,7 +2435,7 @@
                    ;; 6.  CNODE -> INODE ;;
                    ;;;;;;;;;;;;;;;;;;;;;;;;
                    
-                   (INODE (if (equal (string startgen) (string (inode-gen present)))
+                   (INODE (if (gen-eq startgen (inode-gen present))
                             (return-from %insert
                               (%insert present key value (+ level 5) inode startgen))
                             (if (inode-mutate inode it (refresh it startgen))
@@ -2601,7 +2626,7 @@
                        (if (ctequal key (leaf-node-key found))
                          (return-from %lookup (values (leaf-node-value found) t))
                          (throw :notfound found)))
-                     (inode (if (equal (string startgen) (string (inode-gen found)))
+                     (inode (if (gen-eq startgen (inode-gen found))
                               (return-from %lookup (%lookup found key (+ level 5) inode startgen))
                               (if (inode-mutate inode node (refresh node startgen))
                                 (%lookup inode key level parent startgen)
@@ -2661,7 +2686,7 @@
                  (multiple-value-bind (result-value result-kind)
                    (typecase found
                      (inode
-                       (if (equal (string startgen) (string (inode-gen found)))
+                       (if (gen-eq startgen (inode-gen found))
                          (return-from %remove (%remove found key (+ level 5) inode startgen))
                          (if (inode-mutate inode it (refresh it startgen))
                            (%remove inode key level parent startgen)
