@@ -1,0 +1,57 @@
+% The Minsky-Fenichel-Yochelson-Cheney-Arnborg [26,18,11,1] Garbage Collector.
+pointer B;				% Bottom; points to bottom of free area.
+pointer S;				% Scan; points to first untraced cell.
+pointer T;				% Top; points to top of tospace.
+					% Assertions: S<=B<=T and T-B is even.
+pointer procedure CONS(x,y) :		% Allocate the list cell (x.y) 
+  begin
+    if B = T				% If there is no more free space,
+      then				%    collect all the garbage.
+        begin				% This block is the "garbage collector".
+          flip();			% Interchange semispaces.
+          for i=1 to NR			% Update all user registers.
+            do R[i]:=move(R[i]);
+          x:=move(x); y:=move(y);	% Update our arguments.
+          while S<B			% Trace all accessible cells.
+            do begin
+                 S[0]:=move(S[0]);	% Update the car and cdr.
+                 S[1]:=move(S[1]);
+                 S:=S+2			% Point to next untraced cell.
+               end
+         end;
+    if B>=T then error;			% Memory is full.
+    B[0]:=x; B[1]:=y;			% Create new cell at bottom of free area.
+    B & (B:=B+2)			% Return the current value of B 
+  end;					%   after stepping it to next cell.
+
+pointer procedure CAR(x) : x[0];	% A cell consists of 2 words:
+
+pointer procedure CDR(x) : x[1];	%   car is 1st; cdr is 2nd.
+
+procedure RPLACA(x,y) : x[0]:=y;	% car(x) := y 
+
+procedure RPLACD(x,y) : x[1]:=y;	% cdr(x) := y 
+
+boolean procedure EQ(x,y) : x=y;	% Are x,y the same object?
+
+boolean procedure ATOM(x) :		% Is x an atom?
+  not tospace(x);
+
+pointer procedure MOVE(p) :		% Move p if not yet moved; return new address.
+  if not fromspace(p)			% We only need to move old ones.
+    then p				% This happens a lot.
+    else begin
+           if not tospace(p[0])		% We must move p.
+             then p[0]:=copy(p);	% Copy it into the bottom of free area.
+           p[0]				% Leave and return forwarding address.
+         end;
+
+pointer procedure COPY(p) :		% Create a copy of a cell.
+  begin					% Allocate space at bottom of free area.
+    if B>=T then error;			% Memory full?
+    B[0]:=p[0]; B[1]:=p[1];		% Each cell requires 2 words.
+    B & (B:=B+2)			% Return the current value of B
+  end;					%   after moving it to next cell.
+
+%  TOSPACE, FROMSPACE test whether a pointer is in that semispace.
+

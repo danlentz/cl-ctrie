@@ -245,6 +245,7 @@
     (setf *pool-worker*
       (sb-thread:make-thread
         (lambda ()
+          ;; (ctrie-gc)
           (fill-all-pools)
           (pool-work-loop)
           (destroy-pool-list)

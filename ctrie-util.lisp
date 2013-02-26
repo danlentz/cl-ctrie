@@ -19,6 +19,34 @@
      :pool-status :index :all :names :find :name)
   "defines the symbols exported by the 'alternative' symbol naming styled package")
 
+;; from :hu.dwim.util
+
+(defun fully-qualified-symbol-name (symbol &optional separator)
+  (flet ((string+ (&rest args) (apply #'concatenate 'string args)))
+    (let* ((symbol-name (symbol-name symbol))
+            (package (symbol-package symbol))
+            (keyword-package (load-time-value (find-package :keyword))))
+      (if package
+        (string+
+          (unless (eq package keyword-package) (package-name package))
+          (or separator (if (or (eq package keyword-package)
+                              (eq (nth-value 1 (find-symbol symbol-name package)) :external))
+                          ":" "::"))
+          symbol-name)
+        (string+ "#:" symbol-name)))))
+
+
+(defun gensym-list (length)
+  "generate a list of LENGTH uninterned symbols"
+  (loop repeat length collect (gensym)))
+  
+(defmacro gensym-values (num)
+  `(values ,@(loop REPEAT num COLLECT '(gensym))))
+
+(defmacro gensym-let ((&rest symbols) &body body)
+  (let ((n (length symbols)))
+    `(multiple-value-bind ,symbols (gensyms-values ,n)
+       ,@body)))
 
 (defun internal-symbols (package &optional (return-type 'list))
   (let ((acc (make-array 100 :adjustable t :fill-pointer 0))
@@ -250,39 +278,6 @@
 ;; 'Unique Value' Utilities
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; from :hu.dwim.util
-
-(defun fully-qualified-symbol-name (symbol &optional separator)
-  (flet ((string+ (&rest args) (apply #'concatenate 'string args)))
-    (let* ((symbol-name (symbol-name symbol))
-            (package (symbol-package symbol))
-            (keyword-package (load-time-value (find-package :keyword))))
-      (if package
-        (string+
-          (unless (eq package keyword-package) (package-name package))
-          (or separator (if (or (eq package keyword-package)
-                              (eq (nth-value 1 (find-symbol symbol-name package)) :external))
-                          ":" "::"))
-          symbol-name)
-        (string+ "#:" symbol-name)))))
-
-
-;; (fully-qualified-symbol-name :xyz)   ":XYZ"
-;; (fully-qualified-symbol-name 'xyz)   "CL-CTRIE::XYZ"
-;; (fully-qualified-symbol-name 'list)  "COMMON-LISP:LIST"
-;; (fully-qualified-symbol-name 'ctrie) "CL-CTRIE:CTRIE"
-
-(defun gensym-list (length)
-  "generate a list of LENGTH uninterned symbols"
-  (loop repeat length collect (gensym)))
-  
-(defmacro gensym-values (num)
-  `(values ,@(loop REPEAT num COLLECT '(gensym))))
-
-(defmacro gensym-let ((&rest symbols) &body body)
-  (let ((n (length symbols)))
-    `(multiple-value-bind ,symbols (gensyms-values ,n)
-       ,@body)))
 
 (defun random-string (&key (length 16))
   "Returns a random alphabetic string."
@@ -292,6 +287,11 @@
       (setf (aref id x) (code-char (+ 97 (random 26)))))
     id))
 
+(defun random-uuid ()
+  #+:unicly          (unicly:make-v4-uuid)
+  #+:uuid            (uuid:make-v4-uuid)
+  #-(or uuid unicly) (random-string :length 32))
+  
 (defun create-unique-id-byte-vector ()
   "Create a universally unique 16-byte vector using unicly or uuid
   libraries if available, or else fall back to random generation."
@@ -303,6 +303,12 @@
       (loop for i from 0 to 15 do (setf (aref bytes i) (random 255)))
       bytes)))
 
+#+unicly
+(defmethod uuid-to-integer ((uuid unicly:unique-universal-identifier))
+  "Create a universally unique 128-bit integer using unicly when available"
+   (unicly::uuid-bit-vector-to-integer 
+     (unicly:uuid-to-bit-vector uuid)))
+    
 (defun create-null-id-byte-vector ()
   "Generate a 16-byte vector representing the NULL uuid."
   (make-array 16 :element-type '(unsigned-byte 8) :initial-element 0))
@@ -329,18 +335,12 @@
     (assert (equalp bv0 bv1)) 
     (values bv0 bv1)))
 
-;; (test-byte-vector-hex-string-roundrip)
-;;   #(210 216 162 217 188 189 78 162 150 249 163 170 175 143 56 10)
-;;   #(210 216 162 217 188 189 78 162 150 249 163 170 175 143 56 10)
-;;
-;; (test-byte-vector-hex-string-roundrip)
-;;   #(18 84 222 74 74 46 68 53 134 219 105 134 17 177 38 185)
-;;   #(18 84 222 74 74 46 68 53 134 219 105 134 17 177 38 185))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; macrology originating from LMJ's excellent LPARALLEL http://www.lparallel.com
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (eval-when (:load-toplevel :compile-toplevel :execute)
   (defmacro let1 (var value &body body)
     "Make a single `let' binding, heroically saving three columns."
@@ -589,16 +589,7 @@
                      (lambda () ,reader-form))))
       `(values ,writer ,reader))))
 
-#|
-(defparameter *x* '(1 2 3))
-(defparameter *write-x* (get-place (car *x*)))
-(funcall *write-x* 4)
-(print *x*)
-(defun no-really (set-place)
-  (let ((*x* 42))
-   (funcall set-place 7)))
-(no-really *write-x*)
-|#
+
 
 ;;; place utils (from ??)
 (defmacro place-fn (place-form)
@@ -1010,7 +1001,7 @@ For any other use, contact Erik Naggum."
                 (if (listp form)
                   `(,(car form)
                      (let ((v ,(cadr form)))
-                       (printv (list ',(car form) v))
+                       (printv `(,(car form) v))
                        v))
                   form))
             bind-forms)

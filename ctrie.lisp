@@ -66,10 +66,11 @@
   (constantly nil))
 
 (defun make-generational-descriptor ()
-  (osicat:get-monotonic-time))
+  (create-unique-id-byte-vector))
+
 
 (defun gen-eq (a b)
-  (eql a b))
+  (equalp a b))
 
 
 (defun new-transient-root ()
@@ -864,14 +865,13 @@
   (if (ctrie-pooling-enabled-p)
     (let ((byte-vector (hu.dwim.serializer:serialize thing))
            (result (sb-concurrency:make-mailbox)))
-      (request-dynamic-action!
-        (lambda (thing)
-          (sb-concurrency:send-message result
-            (make-instance 'serial-box :contents (mm:lisp-object-to-mptr byte-vector))))
-        thing)
-      (return-from maybe-box (sb-concurrency:receive-message result)))
+      (request-dynamic-action! (lambda (x) (sb-concurrency:send-message result
+                                        (make-instance 'serial-box
+                                          :contents (mm:lisp-object-to-mptr x))))
+        byte-vector)
+      (return-from maybe-box (sb-concurrency:receive-message result))
     (let ((byte-vector (hu.dwim.serializer:serialize thing)))
-      (make-instance 'serial-box :contents (mm:lisp-object-to-mptr byte-vector)))))
+      (make-instance 'serial-box :contents (mm:lisp-object-to-mptr byte-vector))))))
 
 #+()
 (define-layered-method maybe-box :in persistent ((thing string))
@@ -918,10 +918,10 @@
   thing)
 
 (define-layered-method maybe-unbox :in t ((box serial-box))
-  (hu.dwim.serializer:deserialize (mm:mptr-to-lisp-object (serial-box-contents box))))
+  (hu.dwim.serializer:deserialize (first (mm:mptr-to-lisp-object (serial-box-contents box)))))
 
 (define-layered-method maybe-unbox :in persistent ((box serial-box))
-  (hu.dwim.serializer:deserialize (mm:mptr-to-lisp-object (serial-box-contents box))))
+  (hu.dwim.serializer:deserialize (first (mm:mptr-to-lisp-object (first (serial-box-contents box))))))
 
 (define-layered-method maybe-unbox :in persistent ((thing t))
   thing)

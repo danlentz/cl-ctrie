@@ -166,6 +166,7 @@
                                (:test-file "mmap-mptr")
                                (:test-file "mmap-tree")
                                (:test-file "mmap-gc")
+                               (:test-file "ctrie-util")
                                ))))
 
 

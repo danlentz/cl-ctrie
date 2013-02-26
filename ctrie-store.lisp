@@ -24,6 +24,7 @@
     (when (mm::schema)
       (mm:close-all-mmaps))
     (aprog1 (mm:ensure-manardb directory-pathname)
+      ;; (ctrie-gc)
       (mm::check-schema it))))
 
 
@@ -82,7 +83,8 @@
          (message (format nil "Compacting CTRIE-PERSISTENT-STORE: ~A" store)))
     (mm::with-transaction (:message message)
       (funcall #'mm:gc
-        (union additional-roots
-          (mm:retrieve-all-instances 'persistent-ctrie)
-          :test #'mm:meq)))))
+        (list*
+          (first (mm:retrieve-all-instances 'ctrie-index))
+           additional-roots) :verbose t))))
+
 
