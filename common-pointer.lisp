@@ -22,6 +22,35 @@
 (setf (fdefinition '(setf @)) (fdefinition '(setf deref)))
 
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; First class reference objects
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defmacro get-place-accessors (place &environment env)
+  (multiple-value-bind (vars vals store-vars writer-form reader-form)
+      (get-setf-expansion place env)
+    (let ((writer `(let (,@(mapcar #'list vars vals))
+                     (lambda (,@store-vars)
+                       ,writer-form)))
+          (reader `(let (,@(mapcar #'list vars vals))
+                     (lambda () ,reader-form))))
+      `(values ,writer ,reader))))
+
+
+(defmacro ref (place-form)
+  "This creates a closure which can write to and read from 'maps'"
+  (alexandria:with-gensyms (value value-supplied-p)
+    `(sb-int:named-lambda place (&optional (,value nil ,value-supplied-p))
+       (if ,value-supplied-p
+         (setf (,place-form) ,value)
+         (,place-form)))))
+
+
+
+
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; (defmethod deref :before (thing &optional type &rest args)
 ;;   (declare (ignorable thing type args))

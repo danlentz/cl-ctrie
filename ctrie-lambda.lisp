@@ -27,53 +27,6 @@
   (set-dispatch-macro-character  #\# #\` #'|#`-reader|))
 
 
-(defmacro with-macro-character ((ch func) &body body)
-  "Bind the reader macro func to ch and execute the body in this
-  environment.  Restore the original reader-macros when this form is
-  done.
-  ;;;
-  ;;; (with-macro-character (ch func) body)
-  ;;;"
-  (let ((c (gensym))
-        (f (gensym))
-        (o (gensym)))
-    `(let ((,c ,ch)
-           (,f ,func))
-       (let ((,o (get-macro-character ,c)))
-         (set-macro-character ,c ,f)
-         (unwind-protect
-              (progn ,@body)
-           (set-macro-character ,c ,o))))))
-
-
-(defmacro with-macro-characters (pairs &body body)
-  "Bind the reader macro func1 to ch1, and so on, and execute the body
-   in this environment. Restore the original reader-macros when this
-   form is done.
-   ;;;
-   ;;; (with-macro-characters ((ch1 func1) (ch1 func2) ...) body)
-   ;;;"
-  (if (null pairs)
-      `(progn ,@body)
-      `(if (oddp (length ',(car pairs)))
-           (error "with-macro-characters: ~A must be a pair of a
-           character and a reader-macro-function" ',(car pairs))
-           (with-macro-character ,(car pairs)
-             (with-macro-characters ,(cdr pairs)
-               ,@body)))))
-
-
-;; (defun try-it ()
-;;   (with-macro-characters
-;;       ((#\! #'reader-iota-0)
-;;        (#\@ #'reader-iota-1))
-;;     (concatenate 'list
-;;                  '(first)
-;;                  (read-from-string "!10")
-;;                  '(second)
-;;                  (read-from-string "@10"))))
-
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Specialized Binding Form
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -655,14 +608,14 @@
 ;; Unit/Regression Test
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-
+#+()
 (define-test check-fbind
   (fbind (foo (lambda (x) (list 'foo x)))
     (assert-equalp (foo 1)  '(foo 1))
     (assert-equalp (foo :x) '(foo :x))
     (assert-equalp (foo (foo t)) '(foo (foo t))))) 
 
-
+#+()
 (define-test check-alet-fsm
   (flet ((make-test-fsm ()
            (alet ((acc 0))

@@ -1,16 +1,20 @@
 ;;;;; -*- mode: common-lisp;   common-lisp-style: modern;    coding: utf-8; -*-
 ;;;;;
 
-#-sbcl (cl:error "~A not supportred" (cl:lisp-implementation-type))
+#-sbcl (cl:error "~A not supportred" (cl:lisp-implementation-type)
+         (:export
+           #:defun/inline
+           #:let1))
 
 (defpackage :cl-ctrie  
   (:documentation "This is a common-lisp implementation of the CTrie
      unordered map data-structure described in the paper 'Concurrent
      Tries with Efficient Non-Blocking Snapshots, (c) ACM 2-25-2012'
      by Prokopec, Bronson, Bagwell, and Odersky.")
-  (:shadow :once-only)
-  (:use :closer-common-lisp :closer-mop :contextl :alexandria :lisp-unit :iterate)
-  (:shadowing-import-from :lisp-unit :set-equal)
+  (:shadow :once-only :map :set)
+  (:use :closer-common-lisp :closer-mop :contextl :alexandria :iterate
+    :macro)
+  ;; (:shadowing-import-from :lisp-unit :set-equal)
   (:import-from :sb-ext :get-cas-expansion :define-cas-expander :cas
     :compare-and-swap :atomic-incf :atomic-decf :defcas :defglobal)
   (:export
@@ -60,6 +64,7 @@
     :ctrie-lambda-class
     :ctrie-lambda-object
     :new-ctrie
+;;    :def-ctrie
     :define-ctrie
     :ctrie-gc
     :ctrie-index
@@ -83,7 +88,7 @@
     :ctrie-invalid-dynamic-context
     :ctrie-generational-mismatch
     :ctrie-modification-failed))
-
+  
 
 ;; (rename-package
 ;;   "COM.INFORMATIMAGO.COMMON-LISP.HEAP.MEMORY"

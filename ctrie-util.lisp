@@ -5,12 +5,12 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Constructor for experimental alternative package interface
+;; Symbology
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defparameter *alternative-package-exports*
   '(:get :put :put-if :put-if-not :put-ensure :put-replace :put-replace-if
-     :put-update :put-update-if :drop :drop-if :drop-if-not :make :new
+     :put-update :put-update-if :drop :drop-if :drop-if-not :make :new ;; :def
      :do :keys :values :size :test :hash :next-id
      :readonly-p :map :map-keys :map-values :clear :pprint :error :to-alist :to-hashtable
      :from-hashtable :from-alist :empty-p :save :load :export :import :snapshot :fork
@@ -35,6 +35,21 @@
           symbol-name)
         (string+ "#:" symbol-name)))))
 
+(defun find-fully-qualified-symbol (name &key (otherwise nil))
+  "The inverse of FULLY-QUALIFIED-SYMBOL-NAME. Does not INTERN but it
+  does instantiate package-less symbols."
+  (check-type name string)
+  (if (starts-with-subseq "#:" name)
+      (make-symbol (subseq name 2))
+    (hu.dwim.util:find-symbol* name :packages '() :otherwise otherwise)))
+
+(defun if-symbol-exists (package name)
+  "Can be used to conditionalize at read-time like this:
+   #+#.(hu.dwim.util:if-symbol-exists \"PKG\" \"FOO\")(pkg::foo ...)"
+  (if (and (find-package (string package))
+           (find-symbol (string name) (string package)))
+      '(:and)
+      '(:or)))
 
 (defun gensym-list (length)
   "generate a list of LENGTH uninterned symbols"
@@ -336,164 +351,52 @@
     (values bv0 bv1)))
 
 
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; macrology originating from LMJ's excellent LPARALLEL http://www.lparallel.com
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(eval-when (:load-toplevel :compile-toplevel :execute)
-  (defmacro let1 (var value &body body)
-    "Make a single `let' binding, heroically saving three columns."
-    `(let ((,var ,value))
-       ,@body))
-
-  (defmacro defun/inline (name args &body body)
-    "define a function automatically declared to be INLINE"
-    `(progn
-       (declaim (inline ,name))
-       (defun ,name ,args ,@body)))
-
-  (defmacro once-only-1 (var &body body)
-    (let ((tmp (gensym (symbol-name var))))
-      ``(let ((,',tmp ,,var))
-          ,(let ((,var ',tmp))
-             ,@body))))
-
-  (defmacro once-only (vars &body body)
-    (if vars
-      `(once-only-1 ,(car vars)
-         (once-only ,(cdr vars)
-           ,@body))
-      `(progn ,@body)))
-
-  (defun unsplice (form)
-    (if form (list form) nil))
-
-  (defun has-docstring-p (body)
-    (and (stringp (car body)) (cdr body)))
-
-  (defun has-declare-p (body)
-    (and (consp (car body)) (eq (caar body) 'declare)))
-
-  (defmacro with-preamble ((preamble body-var) &body body)
-    "Pop docstring and declarations off `body-var' and assign them to `preamble'."
-    `(let ((,preamble (loop
-                        :while (or (has-docstring-p ,body-var)
-                                 (has-declare-p ,body-var))
-                        :collect (pop ,body-var))))
-       ,@body))
-
-  (defmacro defmacro/once (name params &body body)
-    "Like `defmacro' except that params which are immediately preceded
-   by `&once' are passed to a `once-only' call which surrounds `body'."
-    (labels ((once-keyword-p (obj)
-               (and (symbolp obj) (equalp (symbol-name obj) "&once")))
-              (remove-once-keywords (params)
-                (mapcar (lambda (x) (if (consp x) (remove-once-keywords x) x))
-                  (remove-if #'once-keyword-p params)))
-              (find-once-params (params)
-                (mapcon (lambda (x)
-                          (cond ((consp (first x))
-                                  (find-once-params (first x)))
-                            ((once-keyword-p (first x))
-                              (unless (and (cdr x) (atom (cadr x)))
-                                (error "`&once' without parameter in ~a" name))
-                              (list (second x)))
-                            (t
-                              nil)))
-                  params)))
-      (with-preamble (preamble body)
-        `(defmacro ,name ,(remove-once-keywords params)
-           ,@preamble
-           (once-only ,(find-once-params params)
-             ,@body)))))
-  )
-
-
-
-(defmacro/once build-list (&once n &body body)
-  "Execute `body' `n' times, collecting the results into a list."
-  `(loop :repeat ,n :collect (progn ,@body)))
-
-
-(defmacro/once build-vector (&once n &body body)
-  "Execute `body' `n' times, collecting the results into a vector."
-  (with-gensyms (result index)
-    `(let1 ,result (make-array ,n)
-       (dotimes (,index ,n ,result)
-         (setf (aref ,result ,index) (progn ,@body))))))
-
-
-(defmacro with-thread ((&key bindings name) &body body)
-  `(let1 bt:*default-special-bindings* ,bindings
-     (bt:make-thread (lambda () ,@body)
-       :name ,name)))
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Anaphora
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defmacro anaphoric (op test &body body)
-  "higher-order anaphoric operator creation macro."
-  `(let ((it ,test))
-     (,op it ,@body)))
-
-(defmacro aprog1 (first &body rest)
-  "Binds IT to the first form so that it can be used in the rest of the
-  forms. The whole thing returns IT."
-  `(anaphoric prog1 ,first ,@rest))
-
-(defmacro awhen (test &body body)
-  "Like WHEN, except binds the result of the test to IT (via LET) for the scope
-  of the body."
-  `(anaphoric when ,test ,@body))
-
-(defmacro atypecase (keyform &body cases)
-  "Like TYPECASE, except binds the result of the keyform to IT (via LET) for
-  the scope of the cases."
-  `(anaphoric typecase ,keyform ,@cases))
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Atomics
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;; Atomic Update (sbcl src copied over until i update to a more recent release)
-;; TODO: unused?
-
-(defmacro atomic-update (place update-fn &rest arguments &environment env) 
-  "Updates PLACE atomically to the value returned by calling function
-  designated by UPDATE-FN with ARGUMENTS and the previous value of PLACE.
-  PLACE may be read and UPDATE-FN evaluated and called multiple times before the
-  update succeeds: atomicity in this context means that value of place did not
-  change between the time it was read, and the time it was replaced with the
-  computed value. PLACE can be any place supported by SB-EXT:COMPARE-AND-SWAP.
-  EXAMPLE: Conses T to the head of FOO-LIST:
-  ;;;   (defstruct foo list)
-  ;;;   (defvar *foo* (make-foo))
-  ;;;   (atomic-update (foo-list *foo*) #'cons t)"
-  (multiple-value-bind (vars vals old new cas-form read-form)
-      (get-cas-expansion place env)
-    `(let* (,@(mapcar 'list vars vals)
-            (,old ,read-form))
-       (loop for ,new = (funcall ,update-fn ,@arguments ,old)
-             until (eq ,old (setf ,old ,cas-form))
-             finally (return ,new)))))
-
-
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Assorted
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-(defun reuse-cons (x y x-y)
-  "Return (cons x y), or reuse x-y if it is equal to (cons x y)"
-  (if (and (eql x (car x-y)) (eql y (cdr x-y)))
-      x-y
-    (cons x y)))
+;; (defun reuse-cons (x y x-y)
+;;   "Return (cons x y), or reuse x-y if it is equal to (cons x y)"
+;;   (if (and (eql x (car x-y)) (eql y (cdr x-y)))
+;;       x-y
+;;     (cons x y)))
 
+(defvar *cons-table*  (make-hash-table :test #'equal))
+(defvar *a-cons-cell* (list nil)
+  "holding area for spare cons.")
+
+(defun hcons (x y)                      
+  (setf (car *a-cons-cell*) x (cdr *a-cons-cell*) y)
+  (let ((z (gethash *a-cons-cell* *cons-table*)))
+    (or z
+      (prog1 (setf (gethash *a-cons-cell* *cons-table*) *a-cons-cell*)
+        (setq *a-cons-cell* (list nil))))))
+
+(defun hlist* (first rest)
+  (cond
+    ((atom rest) (hcons first rest))
+    ((null rest) (hcons first nil))
+    (t           (hcons first (hlist* (car rest) (cdr rest))))))
+
+(defun hlist (&rest args)
+  (when args
+    (hlist* (car args) (cdr args))))
+
+(defvar *an-mcons-pair* nil) ;;  (mm:mcons nil nil))
+
+;; (mm:mptr-to-lisp-object  (mm::lisp-object-to-mptr (hcons nil nil)))
+
+;;   defun mcons (x y)
+  
+;; (eq (hlist (iota 17)) (hlist (iota 17)))
+  
+;;   (defun hh (seq)
+;;   (loop for cell on (reverse seq)
+;;     for hlist = (print (hcons (car cell) nil)) then (print (hcons (car cell) hlist))
+;;     collect (print (hcons (car cell) (cdr cell)))))
+
+;; (hlist* :z (list :a :b :c :d))
 
 (define-modify-macro conc1f (obj)
   (lambda (place obj)
@@ -503,7 +406,7 @@
 (defmacro multiple-setf (value &rest places)
   "The multiple-setf macro was written by Mario Castel‚àö¬∞n. It is a
  beautiful form to support multiple places in zerof and nilf."
-  (once-only (value)
+  (alexandria:once-only (value)
     `(setf ,@(loop for place in places
                append `(,place ,value)))))
 
@@ -517,7 +420,7 @@
       (get-setf-expansion place env)
     (unless (null (cdr stores))
       (error "ACONSF can't store to this form: ~:_~S" place))
-    (once-only (key value)
+    (alexandria:once-only (key value)
       `(let* (,@(mapcar 'list temps vals)
               (,(car stores)
                (acons ,key ,value ,get-value)))
@@ -579,38 +482,6 @@
 
 
 
-(defmacro get-place (place &environment env)
-  (multiple-value-bind (vars vals store-vars writer-form reader-form)
-      (get-setf-expansion place env)
-    (let ((writer `(let (,@(mapcar #'list vars vals))
-                     (lambda (,@store-vars)
-                       ,writer-form)))
-          (reader `(let (,@(mapcar #'list vars vals))
-                     (lambda () ,reader-form))))
-      `(values ,writer ,reader))))
-
-
-
-;;; place utils (from ??)
-(defmacro place-fn (place-form)
-  "This creates a closure which can write to and read from the 'place'
-   designated by PLACE-FORM."
-  (with-gensyms (value value-supplied-p)
-    `(sb-int:named-lambda place (&optional (,value nil ,value-supplied-p))
-       (if ,value-supplied-p
-           (setf ,place-form ,value)
-         ,place-form))))
-
-
-(defmacro map-fn (place-form)
-  "This creates a closure which can write to and read from 'maps'"
-  (with-gensyms (key value value-supplied-p)
-    `(sb-int:named-lambda place (,key &optional (,value nil ,value-supplied-p))
-       (if ,value-supplied-p
-         (setf (,place-form ,key) ,value)
-         (,place-form ,key)))))
-
-
 (defmacro post-incf (place &optional (delta 1))
   "place++ ala C"
   `(prog1 ,place (incf ,place ,delta)))
@@ -670,249 +541,6 @@
          (mapappend fun (mapcar 'cdr args)))))
 
 
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; CLOS
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defvar *nuke-existing-packages*   nil)
-(defvar *nuke-existing-classes*    nil)
-(defvar *store-class-superclasses* nil)
-
-(defun fc (class-designator)
-  (typecase class-designator
-    (class    class-designator)  
-    (keyword (fc (string class-designator)))
-    (string  (fc (read-from-string class-designator)))
-    (symbol  (find-class class-designator))
-    (t       (find-class class-designator))))
-
-
-(defun proto (thing)
-  (flet ((get-proto (c)
-           (let ((cc (find-class c)))
-             (c2mop:finalize-inheritance cc)
-             (c2mop:class-prototype cc))))
-    (etypecase thing
-      (class  (get-proto thing))
-      (standard-object (get-proto (class-of thing)))
-      (symbol (get-proto  thing)))))
-
-
-(defun finalize (class-designator)
-  (finalize-inheritance (fc class-designator))
-  (fc class-designator))
-
-
-(defun new (&rest args)
-  (apply #'make-instance args))
-
-
-(defun slot-value-safe (obj slot &optional (unbound-return :unbound))
-  (handler-case (values (slot-value obj slot) t)
-    (unbound-slot (c) (values unbound-return c))))
-
-
-(defun required-arg (name)
-  (error "~S is a required argument" name))
-
-(defgeneric get-slot-details (slot-definition)
-  (declare (optimize speed))
-  (:documentation 
-    "Return a list of slot details which can be used 
-    as an argument to ensure-class")
-  (:method ((slot-definition #+(or ecl abcl (and clisp (not mop))) t 
-              #-(or ecl abcl (and clisp (not mop))) slot-definition))
-    (list :name (slot-definition-name slot-definition)
-      :allocation (slot-definition-allocation slot-definition)
-      :initargs (slot-definition-initargs slot-definition)
-      :readers (slot-definition-readers slot-definition)
-      :type (slot-definition-type slot-definition)
-      :writers (slot-definition-writers slot-definition))))
-
-;; (mapcar #'get-slot-details (sb-mop:class-slots (fc 'cl-user::test-file)))
-;;
-;; ((:NAME ASDF::NAME :ALLOCATION :INSTANCE :INITARGS (:NAME) :READERS NIL
-;;    :TYPE  STRING :WRITERS NIL)
-;;   (:NAME ASDF:VERSION :ALLOCATION :INSTANCE :INITARGS (:VERSION) :READERS NIL
-;;     :TYPE T :WRITERS NIL)
-;;   (:NAME ASDF::DESCRIPTION :ALLOCATION :INSTANCE :INITARGS (:DESCRIPTION)
-;;     :READERS NIL :TYPE T :WRITERS NIL)
-;;   (:NAME ASDF::LONG-DESCRIPTION :ALLOCATION :INSTANCE :INITARGS
-;;     (:LONG-DESCRIPTION) :READERS NIL :TYPE T :WRITERS NIL)
-;;   (:NAME ASDF::LOAD-DEPENDENCIES :ALLOCATION :INSTANCE :INITARGS NIL :READERS
-;;     NIL :TYPE T :WRITERS NIL)
-;;   (:NAME ASDF::IN-ORDER-TO :ALLOCATION :INSTANCE :INITARGS (:IN-ORDER-TO)
-;;     :READERS NIL :TYPE T :WRITERS NIL)
-;;   (:NAME ASDF::DO-FIRST :ALLOCATION :INSTANCE :INITARGS (:DO-FIRST) :READERS NIL
-;;     :TYPE T :WRITERS NIL)
-;;   (:NAME ASDF::INLINE-METHODS :ALLOCATION :INSTANCE :INITARGS NIL :READERS NIL
-;;     :TYPE T :WRITERS NIL)
-;;   (:NAME ASDF::PARENT :ALLOCATION :INSTANCE :INITARGS (:PARENT) :READERS NIL
-;;     :TYPE T :WRITERS NIL)
-;;   (:NAME ASDF::RELATIVE-PATHNAME :ALLOCATION :INSTANCE :INITARGS (:PATHNAME)
-;;     :READERS NIL :TYPE T :WRITERS NIL)
-;;   (:NAME ASDF::ABSOLUTE-PATHNAME :ALLOCATION :INSTANCE :INITARGS NIL :READERS
-;;     NIL :TYPE T :WRITERS NIL)
-;;   (:NAME ASDF::OPERATION-TIMES :ALLOCATION :INSTANCE :INITARGS NIL :READERS NIL
-;;     :TYPE T :WRITERS NIL)
-;;   (:NAME ASDF::AROUND-COMPILE :ALLOCATION :INSTANCE :INITARGS (:AROUND-COMPILE)
-;;     :READERS NIL :TYPE T :WRITERS NIL)
-;;   (:NAME ASDF::%ENCODING :ALLOCATION :INSTANCE :INITARGS (:ENCODING) :READERS
-;;     NIL :TYPE T :WRITERS NIL)
-;;   (:NAME ASDF::PROPERTIES :ALLOCATION :INSTANCE :INITARGS (:PROPERTIES) :READERS
-;;     NIL :TYPE T :WRITERS NIL)
-;;   (:NAME TYPE :ALLOCATION :INSTANCE :INITARGS (:TYPE) :READERS NIL :TYPE T
-;;     :WRITERS NIL))
-
-
-;; Structure definition storing
-(defun get-layout (obj)
-  (slot-value obj 'sb-pcl::wrapper))
-
-(defun get-info (obj)
-  (declare (type sb-kernel:layout obj))
-  (slot-value obj 'sb-int:info))
-
-(defun dd-name (dd)
-  (slot-value dd 'sb-kernel::name))
-
-(defvar *sbcl-struct-inherits*
-  `(,(get-layout (find-class t))
-    ,@(when-let (class (find-class 'sb-kernel:instance nil))
-        (list (get-layout class)))
-    ,(get-layout (find-class 'cl:structure-object))))
-
-(defstruct (struct-def (:conc-name sdef-))
-  (supers (required-arg :supers) :type list)
-  (info (required-arg :info) :type sb-kernel:defstruct-description))
-
-(defun info-or-die (obj)
-  (let ((wrapper (get-layout obj)))
-    (if wrapper
-        (or (get-info wrapper) 
-            (error "No defstruct-definition for ~A." obj))
-        (error "No wrapper for ~A." obj))))
-
-(defun save-able-supers (obj)
-  (set-difference (coerce (slot-value (get-layout obj) 'sb-kernel::inherits)
-                          'list)
-                  *sbcl-struct-inherits*))
-
-(defun get-supers (obj)
-  (loop for x in (save-able-supers obj) 
-     collect (let ((name (dd-name (get-info x))))
-               (if *store-class-superclasses* 
-                   (find-class name)
-                   name))))
-
-
-;; Restoring 
-(defun sbcl-struct-defs (info)
-  (append (sb-kernel::constructor-definitions info)
-          (sb-kernel::class-method-definitions info)))
-
-(defun create-make-foo (dd)
-  (declare (optimize speed))
-  (funcall (compile nil `(lambda () ,@(sbcl-struct-defs dd))))
-  (find-class (dd-name dd)))
-
-
-(defun sb-kernel-defstruct (dd supers source)
-  (declare (ignorable source))
- ;; #+defstruct-has-source-location 
-  (sb-kernel::%defstruct dd supers source))
-
-  ;; #-defstruct-has-source-location
-  ;; (sb-kernel::%defstruct dd supers))
-
-(defun sbcl-define-structure (dd supers)
-  (cond ((or *nuke-existing-classes*  
-             (not (find-class (dd-name dd) nil)))
-         ;; create-struct
-         (sb-kernel-defstruct dd supers nil)
-         ;; compiler stuff
-         (sb-kernel::%compiler-defstruct dd supers) 
-         ;; create make-?
-         (create-make-foo dd))
-        (t (find-class (dd-name dd)))))
-         
-(defun super-layout (super)
-  (etypecase super
-    (symbol (get-layout (find-class super)))
-    (structure-class 
-     (super-layout (dd-name (info-or-die super))))))
-
-(defun super-layouts (supers)
-  (loop for super in supers 
-    collect (super-layout super)))
-
-
-(defgeneric serializable-slots (object)
-  (declare (optimize speed))
-  (:documentation 
-   "Return a list of slot-definitions to serialize. The default
-    is to call serializable-slots-using-class with the object 
-    and the objects class")
-  (:method ((object standard-object))
-   (serializable-slots-using-class object (class-of object)))
-#+(or sbcl cmu openmcl allegro)
-  (:method ((object structure-object))
-   (serializable-slots-using-class object (class-of object)))
-  (:method ((object condition))
-   (serializable-slots-using-class object (class-of object))))
-
-; unfortunately the metaclass of conditions in sbcl and cmu 
-; are not standard-class
-
-(defgeneric serializable-slots-using-class (object class)
-  (declare (optimize speed))
-  (:documentation "Return a list of slot-definitions to serialize.
-   The default calls compute slots with class")
-  (:method ((object t) (class standard-class))
-   (class-slots class))
-#+(or sbcl cmu openmcl allegro) 
-  (:method ((object t) (class structure-class))
-   (class-slots class))
-#+sbcl
-  (:method ((object t) (class sb-pcl::condition-class))
-   (class-slots class))
-#+cmu
-  (:method ((object t) (class pcl::condition-class))
-   (class-slots class)))
-
-
-
-(defvar *object->sexp-visited-objects* nil)
-
-(defun object->sexp (obj &key suppress-types suppress-properties)
-  "Converts arbitrary CLOS objects into s-expressions that can easily be used in tests."
- (if (and (subtypep (type-of obj) 'standard-object)
-        (find obj *object->sexp-visited-objects*))
-    :recursive-reference
-    (let ((*object->sexp-visited-objects* (cons obj *object->sexp-visited-objects*)))
-      (cond ((find (type-of obj) suppress-types) :suppressed)
-        ((subtypep (type-of obj) 'standard-object)
-          (multiple-value-bind (instance slots)
-            (make-load-form-saving-slots obj)
-            (let ((class (cadr (cadadr instance)))
-                   (bound-slots (mapcar #'(lambda (s)
-                                            (list (second (first (last (second s))))
-                                              (object->sexp (second (third s))
-                                                :suppress-types suppress-types
-                                                :suppress-properties suppress-properties)))
-                                  (remove 'slot-makunbound (rest slots) :key #'first))))
-              (list* class
-                (sort (remove-if #'(lambda (slot)
-                                     (find (first slot) suppress-properties))
-                        bound-slots)
-                  #'string< :key (compose #'symbol-name #'first))))))
-        ((null obj) nil)
-        ((listp obj)
-          (mapcar #'(lambda (obj) (object->sexp obj
-                                    :suppress-types suppress-types
-                                    :suppress-properties suppress-properties)) obj))
-        (t obj)))))
 
 
 

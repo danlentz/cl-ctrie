@@ -40,6 +40,21 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; ATOMIC-UPDATE
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  (defun find-symbol* (name package-designator &optional (error t))
+    "Find a symbol in a package of given string'ified NAME;
+unless CL:FIND-SYMBOL, work well with 'modern' case sensitive syntax
+by letting you supply a symbol or keyword for the name;
+also works well when the package is not present.
+If optional ERROR argument is NIL, return NIL instead of an error
+when the symbol is not found."
+    (block nil
+      (let ((package (find-package* package-designator error)))
+        (when package ;; package error handled by find-package* already
+          (multiple-value-bind (symbol status) (find-symbol (string name) package)
+            (cond
+              (status (return (values symbol status)))
+              (error (error "There is no symbol ~S in package ~S" name (package-name package))))))
+        (values nil nil))))
 
 (deftest check-atomic-update/parallel (&key (threads 512) (iterations 512))
   ;; Guaranteed to be (:COUNT . 1000000) -- if you replace

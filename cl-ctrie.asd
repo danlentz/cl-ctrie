@@ -70,15 +70,21 @@
                      cycle."
   
   :weakly-depends-on (:cldoc)
-  :depends-on        (:closer-mop :contextl :alexandria ;:local-time :unicly :userial
+  :depends-on        (:closer-mop :contextl :alexandria :unicly ;:local-time  :userial
                        :cl-ppcre :uuid :flexi-streams :osicat  :iterate :cl-irregsexp
                        :hu.dwim.stefil :hu.dwim.serializer :cl-store :rucksack)
   
   :components ((:static-file  "cl-ctrie.asd")
                 (:static-file "readme.md")
+                (:file "common-readtable")
+                (:file "common-macro")
                 (:file "common-ord")
                 (:file "common-io")
                 (:file "common-pointer")
+                (:file "common-array")
+                (:file "common-instance")
+                (:file "common-vm")
+                (:file "common-atomic")
                 (:file "mmap-package")
                 (:file "mmap-utils")   
                 (:file "mmap-struct")  
@@ -100,9 +106,15 @@
                 (:file "ctrie-codec")
                 (:file "ctrie-store")
                 (:file "ctrie-pool")
+                (:file "ctrie-layers")
                 (:file "ctrie")
                 (:file "ctrie-lambda")
                 #+cldoc (:file "ctrie-doc")
+                (:file "tree-package")
+                (:file "tree-node")
+                (:file "tree-common")
+                (:file "tree-wbalanced")
+                (:file "tree-hbalanced")
                 ))
 
 
@@ -167,6 +179,8 @@
                                (:test-file "mmap-tree")
                                (:test-file "mmap-gc")
                                (:test-file "ctrie-util")
+                               (:test-file "ctrie-layers")
+                               (:test-file "tree-node")
                                ))))
 
 
