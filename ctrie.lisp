@@ -4,21 +4,6 @@
 (in-package :cl-ctrie)
 
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Layered Interface Contexts (Not Yet Implemented)
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(deflayer interface)
-
-(deflayer unordered-map (interface))
-
-(deflayer ordered-map   (interface)
-  ((comparitor
-     :special t
-     :initarg :comparitor
-     :initform "ord:compare"
-     :accessor comparitor)))
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; CTRIE Root Container
@@ -65,13 +50,15 @@
 (defun nix ()
   (constantly nil))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Generational Descriptor Object (required for 'generational cas')
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (defun make-generational-descriptor ()
   (create-unique-id-byte-vector))
 
-
 (defun gen-eq (a b)
   (equalp a b))
-
 
 (defun new-transient-root ()
   (with-active-layers (allocation transient)
@@ -81,12 +68,19 @@
   (with-active-layers (allocation persistent)
     (make-inode (make-cnode) (make-generational-descriptor))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; CTRIE Root Container Classes
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defclass transient-ctrie ()
   ((root
      :initform (new-transient-root)
      :accessor ctrie-root
      :initarg :root)
+    (name
+      :initform (byte-vector-to-hex-string (create-unique-id-byte-vector))
+      :reader ctrie-name
+      :type string)
     (readonly-p
       :initform nil
       :type boolean
@@ -109,10 +103,11 @@
       :initarg :stamp)
     (context
       :initarg    :context
-      :accessor   ctrie-context))
-  (:default-initargs :context (list 'allocation 'transient 'unordered-map)))
-
-;; (with-active-layers (allocation transient unordered-map) (current-layer-context))))
+      :accessor   ctrie-context)
+    (env
+      :initarg    :env
+      :initform   nil))
+  (:default-initargs :context (list 'map 'transient 'unordered)))
 
 
 (mm:defmmclass persistent-ctrie ()
@@ -157,14 +152,28 @@
       :persistent t)
     (env
       :initarg    :env
-      :accessor   ctrie-env
       :initform   nil
       :persistent nil))
-  (:default-initargs :context (list 'allocation 'persistent 'unordered-map)))
+  (:default-initargs :context (list 'map 'persistent 'unordered)))
 
-;; (:default-initargs :context
-;; (with-active-layers (allocation persistent unordered-map)
-;; (current-layer-context))))
+
+(defgeneric ctrie-env (thing &optional default-context)
+  (:method ((thing transient-ctrie) &optional (default-context contextl::*active-context*))
+    (or (slot-value thing 'env)
+      (setf (slot-value thing 'env) (apply #'combined-layer-context default-context
+                                      (ctrie-context thing)))))
+  (:method ((thing persistent-ctrie) &optional (default-context contextl::*active-context*))
+    (or (slot-value thing 'env)
+      (setf (slot-value thing 'env) (apply #'combined-layer-context default-context
+                                      (ctrie-context thing))))))
+
+;; (funcall-with-layer-context (ctrie-env (make-ctrie)) #'active-layers)
+;;
+;;  (#<LAYER UNORDERED {1006A15273}>
+;;   #<LAYER TRANSIENT {1006967EF3}>
+;;   #<LAYER MAP {100E795573}>
+;;   T)
+
 
 (defmethod print-object ((ctrie persistent-ctrie) stream)
   (print-unreadable-object (ctrie stream :type nil)
@@ -193,10 +202,67 @@
 ;; Special CTRIES
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; (defvar *context* nil)
+
+;; (defvar *default-context* nil)
+
+;; (defclass context (uuid:uuid)
+;;   ())
+
+;; (defun compute-default-context (&optional (site-name (or
+;;                                                        (short-site-name)
+;;                                                        (machine-instance))))
+;;   (obj:cloned-object-as 'context
+;;     (uuid:make-v5-uuid uuid:+namespace-url+
+;;       (princ-to-string (make-instance 'puri:uri :host site-name :scheme :http)))))
+
+;; (defun default-context ()
+;;   (or *default-context*
+;;     (setf *default-context* (compute-default-context))))
+
+;; (defun context (&rest path)
+;;   (print path)
+;;   (cond
+;;     ((null (car path))  (or *context* (default-context)))
+;;     (t                  (obj:cloned-object-as 'context
+;;                           (uuid:make-v5-uuid (context (rest path)) (string (car path)))))))
+
+;; ;; (context)
+;; ;; A875B96A-2B00-55D9-90A0-2DC0FD75746F
+;; ;; (default-context)
+;; ;; A875B96A-2B00-55D9-90A0-2DC0FD75746F
+;; ;; (context "one")
+
+
+;; (defclass entity (uuid:uuid)
+;;   ((context :initarg :context :accessor context-of)
+;;     (identifier :initarg :identifier :initarg :id :accessor identifier-of)))
+
+;; ;;(make-instance 'entity :context (uuid:make-v4-uuid))
+
+
+;; (defclass collection (entity)
+;;   ((allocation-layer
+;;      :initarg :allocation
+;;      :initarg :allocation-layer
+;;      :accessor allocation-layer-of)
+;;     (index-class
+;;       :initarg :index-class
+;;       :accessor index-class-of)))
+
+
+;; (defclass special-collection (collection)
+;;   ((package-name :initarg :package-name :accessor package-name-of)
+;;     (symbol-name :initarg :symbol-name :accessor symbol-name-of)))
+
+
+;; (defclass graph (special-collection)
+;;   ((root :initarg :root :accessor root-of)))
+
+
 (mm:defmmclass ctrie-index (persistent-ctrie)
   ()
   (:default-initargs :name "index" :hash 'sb-ext::psxhash :test 'equalp))
-
 
 (defun ctrie-index ()
   (or *ctrie-index*
@@ -211,18 +277,29 @@
     (setf *ctrie-seqs* (make-instance 'ctrie-index :name "sequences"))))
 
 (defun find-ctrie (name)
-  (ctrie-get (ctrie-index) name))
+  (let1 namestring  (typecase name
+                     (string (string-upcase name))
+                     (keyword (symbol-name name))
+                     (symbol (string-upcase (symbol-name name)))
+                     (t  (error "ctries must be named by string or keyword")))
+    (ctrie-get (ctrie-index) namestring)))
 
 (defun (setf find-ctrie) (value name)
-  (with-active-layers (persistent)
-    (prog1 value
-      (etypecase value
-        (null              (ctrie-drop (ctrie-index) name))
-        (persistent-ctrie  (ctrie-put  (ctrie-index) name value))
-        (transient-ctrie   (ctrie-put  (ctrie-index) name
-                             (aprog1 (ctrie-from-hashtable
-                                       (ctrie-to-hashtable value :atomic t) :persistent t)
-                               (setf (ctrie-name it) name))))))))
+  (let1 namestring  (typecase name
+                      (string (string-upcase name))
+                      (keyword (symbol-name name))
+                      (symbol (string-upcase (symbol-name name)))
+                      (t  (error "ctries must be named by string or keyword")))
+    (with-active-layers (persistent)
+      (prog1 value
+        (etypecase value
+          (null              (ctrie-drop (ctrie-index) namestring))
+          (function          (setf (find-ctrie namestring) (funcall value #'identity)))
+          (persistent-ctrie  (ctrie-put  (ctrie-index) namestring value))
+          (transient-ctrie   (ctrie-put  (ctrie-index) namestring
+                               (aprog1 (ctrie-from-hashtable
+                                         (ctrie-to-hashtable value :atomic t) :persistent t)
+                                 (setf (ctrie-name it) namestring)))))))))
 
 ;;          (warn "persisting serialized transient instance as ~A" name)
 ;;          (ctrie-put (ctrie-index) name (maybe-box value)))))))
@@ -253,13 +330,13 @@
   (ctrie-next-id (fully-qualified-symbol-name symbol)))
 
 
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; CTRIE Creation and Instance Handling
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defun make-ctrie (&rest args &key name persistent ordered (readonly-p nil)
-                    (test 'equal) (hash 'sxhash) (stamp *timestamp-factory*) &allow-other-keys)
+                    (test 'equal) (hash 'sxhash) (stamp *timestamp-factory*)
+                    &allow-other-keys)
   "CREATE a new CTRIE instance. This is the entry-point constructor 
   intended for use by the end-user."
   (declare (ignorable name readonly-p test hash stamp))
@@ -276,7 +353,25 @@
           (with-active-layers (transient)
             (apply #'make-instance 'transient-ctrie arglist)))))))
 
+;; no
+#+()
+(defmacro def-ctrie (name &key (test 'equal) (hash 'sxhash) (stamp *timestamp-factory*))
+  (let1 namestring (typecase name
+                     (string (string-upcase name))
+                     (keyword (symbol-name name))
+                     (symbol (string-upcase (symbol-name name)))
+                     (t  (error "ctries must be named by string or keyword")))
+    (with-gensyms (gnamestring)
+      `(let1 ,gnamestring ,namestring
+         (or (find-ctrie ,gnamestring)
+           (make-ctrie :name ,gnamestring :persistent t
+             :test ',test :hash ',hash :stamp ',stamp))))))
 
+;; (ppmx (def-ctrie :xyz))
+;; (ppmx (def-ctrie xyz))
+;; (ppmx (def-ctrie "xyz"))
+
+  
 (defmacro/once with-ctrie (&once ctrie &body body)
   "Configure the dynamic environment with the appropriate condition
   handlers, control fixtures, and instrumentation necessary to execute

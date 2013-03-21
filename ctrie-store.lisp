@@ -23,9 +23,9 @@
       (return-from open-store (truename directory-pathname)))
     (when (mm::schema)
       (mm:close-all-mmaps))
-    (aprog1 (mm:ensure-manardb directory-pathname)
+    (macro:aprog1 (mm:ensure-manardb directory-pathname)
       ;; (ctrie-gc)
-      (mm::check-schema it))))
+      (mm::check-schema macro::it))))
 
 
 (clear-layer-caches)
@@ -45,14 +45,14 @@
 
 
 
-(deflayer allocation)
+;; (deflayer allocation)
 
-(deflayer transient  (allocation))
+;; (deflayer transient  (allocation))
   
-(deflayer persistent (allocation)
-  ((storage-directory-pathname
-     :accessor storage-directory-pathname
-     :initform (apply 'open-store (ensure-list *default-mmap-dir*)))))
+;; (deflayer persistent (allocation)
+;;   ((storage-directory-pathname
+;;      :accessor storage-directory-pathname
+;;      :initform (apply 'open-store (ensure-list *default-mmap-dir*)))))
 
 
 
