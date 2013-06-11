@@ -11,8 +11,17 @@
      unordered map data-structure described in the paper 'Concurrent
      Tries with Efficient Non-Blocking Snapshots, (c) ACM 2-25-2012'
      by Prokopec, Bronson, Bagwell, and Odersky.")
+  #+:package-local-nicknames
+  (:local-nicknames
+    (:mem  :com.informatimago.common-lisp.heap.memory)
+    (:heap :com.informatimago.common-lisp.heap.heap))
+  ;; (:fast :fast-io))
+    ;; (:os :uiop/os)
+    ;; (:fs :uiop/filesystem)
+    ;; (:pkg :uiop/package)
+    ;; (:utl :uiop/utility))
   (:shadow :once-only :map :set)
-  (:use :closer-common-lisp :closer-mop :contextl :alexandria :iterate
+  (:use :closer-common-lisp :closer-mop :contextl :alexandria :iterate 
     :macro)
   ;; (:shadowing-import-from :lisp-unit :set-equal)
   (:import-from :sb-ext :get-cas-expansion :define-cas-expander :cas
@@ -87,21 +96,26 @@
     :ctrie-not-supported
     :ctrie-invalid-dynamic-context
     :ctrie-generational-mismatch
-    :ctrie-modification-failed))
+    :ctrie-modification-failed
+    :ctrie-registry
+    :*vm*
+    :type-of))
+
   
+(unless (find-package :mem)
+  (rename-package
+    "COM.INFORMATIMAGO.COMMON-LISP.HEAP.MEMORY"
+    "COM.INFORMATIMAGO.COMMON-LISP.HEAP.MEMORY"
+    '(:mem)))
 
-;; (rename-package
-;;   "COM.INFORMATIMAGO.COMMON-LISP.HEAP.MEMORY"
-;;   "COM.INFORMATIMAGO.COMMON-LISP.HEAP.MEMORY"
-;;   '(:mem))
+(unless (find-package :heap)
+  (rename-package
+    "COM.INFORMATIMAGO.COMMON-LISP.HEAP.HEAP"
+    "COM.INFORMATIMAGO.COMMON-LISP.HEAP.HEAP"
+    '(:HEAP)))
 
-
-;; (rename-package
-;;   "COM.INFORMATIMAGO.COMMON-LISP.HEAP.HEAP"
-;;   "COM.INFORMATIMAGO.COMMON-LISP.HEAP.HEAP"
-;;   '(:HEAP))
-
-
+(defpackage :ctrie
+  (:use))
 
 
 

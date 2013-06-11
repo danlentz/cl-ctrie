@@ -40,6 +40,7 @@
     :head
     :tail))
 
+
 (in-package :io)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -355,6 +356,8 @@
   (unless (and (integerp lines) (plusp lines))
     (error "lines must be a positive integer, but was specified as ~A" lines))
   (last (read-file-to-string-list pathname) lines))
+
+
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

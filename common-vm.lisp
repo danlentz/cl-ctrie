@@ -48,7 +48,16 @@
   (loop for i below length by sb-vm:n-word-bytes
         do (setf (sb-sys:sap-ref-word to i)
              (sb-sys:sap-ref-word from i))))
-
+#+()
+(defun count-heap-instances (class)
+  (let ((stat (make-object-type-stat :type (class-name class))))
+    (sb-vm::map-allocated-objects (lambda (object type-code size)
+                                    (when (and (= type-code 82)
+                                               (eq (class-of object) class))
+                                      (incf (object-type-stat-count stat))
+                                      (incf (object-type-stat-total-size stat) size)))
+                                  :dynamic)
+    stat))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Introspection

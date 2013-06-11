@@ -8,8 +8,8 @@
     :defun/inline
     :once-only
     :defmacro/once
-    :build-list
-    :build-vector
+    :building-list
+    :building-vector
     :with-thread
     :anaphoric
     :aprog1
@@ -18,7 +18,10 @@
     :atypecase
     :define-lazy-singleton
     :defun-dynamic
-    :flet-dynamic))
+    :flet-dynamic
+    :map-cut
+    :cut
+    :define-synonym))
 
 (in-package :macro)
   
@@ -108,12 +111,24 @@
        (define-symbol-macro ,(intern (format nil "<~A>" name)) (,name)))))
   
 
-(defmacro/once build-list (&once n &body body)
+(defmacro define-synonym (alias orig &optional doc-string)
+  `(progn
+     (setf (documentation ',alias 'function)
+	   ,doc-string)
+     (cl:if (macro-function ',orig)
+            (setf (macro-function ',alias) (macro-function ',orig))
+            (setf (symbol-function ',alias) (symbol-function ',orig)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Generating Sequences
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defmacro/once building-list (&once n &body body)
   "Execute `body' `n' times, collecting the results into a list."
   `(loop :repeat ,n :collect (progn ,@body)))
 
 
-(defmacro/once build-vector (&once n &body body)
+(defmacro/once building-vector (&once n &body body)
   "Execute `body' `n' times, collecting the results into a vector."
   (alexandria:with-gensyms (result index)
     `(let1 ,result (make-array ,n)
@@ -126,6 +141,33 @@
      (bt:make-thread (lambda () ,@body)
        :name ,name)))
 
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; "Cut"
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun map-cut (fn &rest args &aux arg-list)
+  (let* ((body (mapcar (lambda (arg) (case arg
+                                  (<> (let ((sym (gensym)))
+                                        (push sym arg-list)
+                                        sym))
+                                  (otherwise arg))) 
+                 args))
+          (fn-form (nconc (etypecase fn 
+                            (symbol (list fn))
+                            (function `(funcall ,fn)))
+                     body)))
+    `(lambda ,(nreverse arg-list) ,fn-form)))
+         
+(defmacro cut (function-name &rest args-or-<>)
+  `(apply #'map-cut ',function-name (quote ,args-or-<>)))
+  
+  
+;; CL-USER> (#.(cut list 1 2 <> 4 <>) 3 "t")
+;; (1 2 3 4 "t")
+;; CL-USER> (apply #'map-cut '(list 1 2 <> 4 <>))
+;; (LAMBDA (#:G925 #:G926) (LIST 1 2 #:G925 4 #:G926))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Anaphora
@@ -209,3 +251,5 @@
 ;;                                         (flet-dynamic ((foo (x) (* 10 x)))
 ;;                                           (bar 3)))))))
 ;;   :ok)
+
+

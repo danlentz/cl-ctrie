@@ -3,6 +3,11 @@
 
 (in-package :cl-user)
 
+#+()
+(eval-when (:load-toplevel :execute)
+  (asdf:operate 'asdf:load-op :cffi-grovel)
+  (asdf:operate 'asdf:load-op :cffi-objects))
+  
 
 (asdf:defsystem :cl-ctrie
   :serial t
@@ -69,18 +74,23 @@
                      this is not necessarily a high priority for the initial development
                      cycle."
   
-  :weakly-depends-on (:cldoc)
-  :depends-on        (:closer-mop :contextl :alexandria :unicly ;:local-time  :userial
-                       :cl-ppcre :uuid :flexi-streams :osicat  :iterate :cl-irregsexp
-                       :hu.dwim.stefil :hu.dwim.serializer :cl-store :rucksack)
+  ;;  :weakly-depends-on (:cldoc)
+  :depends-on        (:closer-mop :contextl :alexandria :printv :cldoc :unicly :uuid
+                       :com.informatimago.common-lisp.heap :cl-ppcre :osicat
+                       :iterate :cl-irregsexp :hu.dwim.stefil :hu.dwim.serializer
+                       :cl-store)
   
   :components ((:static-file  "cl-ctrie.asd")
                 (:static-file "readme.md")
                 (:file "common-readtable")
                 (:file "common-macro")
+             ;  (:file "common-condition")
                 (:file "common-ord")
                 (:file "common-io")
                 (:file "common-pointer")
+             ;  (:file "common-tty")
+             ;  (:file "common-diff")
+             ;  (:file "common-stream")
                 (:file "common-array")
                 (:file "common-instance")
                 (:file "common-vm")
@@ -97,7 +107,7 @@
                 (:file "mmap-storage")
                 (:file "mmap-string") 
                 (:file "mmap-mcons")        
-                (:file "mmap-gc")           
+                (:file "mmap-gc")                     
                 (:file "ctrie-package")
                 (:file "ctrie-special")
                 (:file "ctrie-conditions")
@@ -105,10 +115,14 @@
                 (:file "ctrie-util")
                 (:file "ctrie-codec")
                 (:file "ctrie-store")
-                (:file "ctrie-pool")
                 (:file "ctrie-layers")
+                (:file "ctrie-protocol")
                 (:file "ctrie")
-                (:file "ctrie-lambda")
+              ;;  (:file "ctrie-lambda")
+                (:file "cvm-package")
+                (:file "cvm-memory")
+                (:file "cvm-host")
+                (:file "cvm-ctrie")
                 #+cldoc (:file "ctrie-doc")
                 (:file "tree-package")
                 (:file "tree-node")
@@ -116,6 +130,7 @@
                 (:file "tree-wbalanced")
                 (:file "tree-hbalanced")
                 ))
+
 
 
 
@@ -205,5 +220,6 @@
 
 (defmethod asdf:operation-done-p ((o asdf:test-op) (c (eql (asdf:find-system :cl-ctrie-test))))
   nil)
+
 
 

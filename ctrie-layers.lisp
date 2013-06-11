@@ -8,46 +8,57 @@
 ;; Layered Context Groups
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defclass grouped-layer (standard-layer-class) ())
+(defclass grouped-layer-class (standard-layer-class) ())
 
 (defgeneric group-root    (layer))
 (defgeneric default-layer (layer))
 
-(define-layered-method adjoin-layer-using-class ((to-add grouped-layer) active-layers)
+(define-layered-method adjoin-layer-using-class ((to-add grouped-layer-class)
+                                                  active-layers)
   (call-next-layered-method to-add
     (remove-layer (group-root (find-layer to-add)) active-layers)))
 
-(define-layered-method remove-layer-using-class ((to-remove grouped-layer) active-layers)
+(define-layered-method remove-layer-using-class ((to-remove grouped-layer-class)
+                                                  active-layers)
   (declare (ignore active-layers))
   (multiple-value-bind (new-layers cacheable-p) (call-next-method)
-    (values
-      (adjoin-layer (default-layer (find-layer to-remove)) new-layers)
+    (values (adjoin-layer (default-layer (find-layer to-remove)) new-layers)
       cacheable-p)))
 
 ;; Allocation Layer Group 
 
-(deflayer allocation ()
+(deflayer allocation-group ()
   ((group-root
-     :initform 'allocation
+     :initform 'allocation-group
      :reader group-root)
     (default-layer
-      :initform 'transient
+      :initform 'fundamental
       :reader default-layer)))
 
-(deflayer transient  (allocation) ()
-  (:metaclass grouped-layer))
+(deflayer fundamental (allocation-group)
+  ()
+  (:metaclass grouped-layer-class))
 
-(deflayer persistent (allocation)
+(deflayer transient  (allocation-group)
+  ()
+  (:metaclass grouped-layer-class))
+
+(deflayer cvm  (allocation-group)
+  ((base :special t :initform 0 :initarg :base :accessor base)) 
+  (:metaclass grouped-layer-class))
+
+(deflayer persistent (allocation-group)
   ((storage-directory-pathname
      :accessor storage-directory-pathname
      :initform (apply 'open-store (ensure-list *default-mmap-dir*))))
-  (:metaclass grouped-layer))
+  (:metaclass grouped-layer-class))
 
-(deflayer persistent/cache (persistent) ()
-  (:metaclass grouped-layer))
+(deflayer persistent/cache (persistent)
+  ()
+  (:metaclass grouped-layer-class))
 
 (deftype allocation-group-layer ()
-  `(member transient persistent persistent/cache))
+  `(member cvm fundamental transient persistent persistent/cache))
 
 (defun valid-allocation-group-layer-p (layer)
   (check-type layer symbol) 
@@ -55,25 +66,25 @@
 
 ;; Dicipline Layer Group
 
-(deflayer dicipline ()
+(deflayer dicipline-group ()
   ((group-root
-     :initform 'dicipline
+     :initform 'dicipline-group
      :reader group-root)
     (default-layer
       :initform 'unordered
       :reader default-layer)))
 
-(deflayer unordered (dicipline) ()
-  (:metaclass grouped-layer))
+(deflayer unordered (dicipline-group) ()
+  (:metaclass grouped-layer-class))
 
-(deflayer ordered   (dicipline) ()
-  (:metaclass grouped-layer))
+(deflayer ordered   (dicipline-group) ()
+  (:metaclass grouped-layer-class))
 
 (deflayer height-balanced (ordered) ()
-  (:metaclass grouped-layer))
+  (:metaclass grouped-layer-class))
 
 (deflayer weight-balanced (ordered) ()
-  (:metaclass grouped-layer))
+  (:metaclass grouped-layer-class))
 
 (deftype dicipline-group-layer ()
   `(member unordered height-balanced weight-balanced))
@@ -84,25 +95,30 @@
   
 ;; Interface Layer Group
 
-(deflayer interface ()
+
+(deflayer interface-group ()
   ((group-root
-     :initform 'interface
+     :initform 'interface-group
      :reader group-root)
     (default-layer
       :initform 'map
       :reader default-layer)))
 
-(deflayer map (interface) ()
-  (:metaclass grouped-layer))
 
-(deflayer set (map) ()
-  (:metaclass grouped-layer))
+(deflayer set (interface-group) ()
+  (:metaclass grouped-layer-class))
 
-(deflayer seq (map) ()
-  (:metaclass grouped-layer))
+(deflayer bag (interface-group) ()
+  (:metaclass grouped-layer-class))
+
+(deflayer map (interface-group) ()
+  (:metaclass grouped-layer-class))
+
+(deflayer seq (interface-group) ()
+  (:metaclass grouped-layer-class))
 
 (deftype interface-group-layer ()
-  `(member map set seq))
+  `(member map set bag seq))
 
 (defun valid-interface-group-layer-p (layer)
   (check-type layer symbol) 
@@ -133,3 +149,20 @@
            (setf result (adjoin-layer layer result))))
     (mapcar #'augment-with layers)
     result))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Ensuring Root and Findiomg Default Context
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+(defclass base-layer ()
+  ((group-root
+     :initform 'interface
+     :reader group-root)
+    (default-layer
+      :initform 'map
+      :reader default-layer)))
+
+;;(deflayer default-context ()
+  

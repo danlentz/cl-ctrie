@@ -40,13 +40,13 @@
 (defun deserialize-dwim (vector &rest args)
   (apply #'hu.dwim.serializer:deserialize vector args))
 
-(defun serialize-rucksack (thing)
-  (flex:with-output-to-sequence (out)
-    (rs::serialize thing (make-instance 'rs::serializer :stream out))))
+;; (defun serialize-rucksack (thing)
+;;   (flex:with-output-to-sequence (out)
+;;     (rs::serialize thing (make-instance 'rs::serializer :stream out))))
 
-(defun deserialize-rucksack (vector)
-  (flex:with-input-from-sequence (in vector)
-    (rs::deserialize (make-instance 'rs::serializer :stream in))))
+;; (defun deserialize-rucksack (vector)
+;;   (flex:with-input-from-sequence (in vector)
+;;     (rs::deserialize (make-instance 'rs::serializer :stream in))))
 
 (defun serialize-clstore (thing)
   (flex:with-output-to-sequence (out)
@@ -87,7 +87,7 @@
 
 ;; (register-serializer :userial  #'serialize          #'unserialize)
 (register-serializer :dwim     #'serialize-dwim     #'deserialize-dwim)
-(register-serializer :rucksack #'serialize-rucksack #'deserialize-rucksack)
+;; (register-serializer :rucksack #'serialize-rucksack #'deserialize-rucksack)
 (register-serializer :clstore  #'serialize-clstore  #'deserialize-clstore)
 
 

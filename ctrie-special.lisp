@@ -15,8 +15,8 @@
   binding, which is properly established by wrapping the operation in
   an appropriate WITH-CTRIE form.")
 
-(defvar       *ctrie-index*   nil)
-(defvar       *ctrie-seqs*    nil)
+(defvar       *ctrie-registry*   nil)
+(defvar       *ctrie-seqs*       nil)
 
 
 (defvar       *hash-code*     nil
@@ -54,9 +54,25 @@
   "Debugging flag, not used in production, to enable generation of
   additional diagnostic and reporting information.")
 
+(defvar *delta* 0)
+
+(defun stamp-adjust-delta (&optional from)
+  (if (zerop *delta*)
+    from
+    (+ *delta* (or from 0))))
+
+(defun funcall-with-delta (d thunk)
+  (let ((*delta* (+ *delta* (or d 0))))
+    (funcall thunk)))
+
+(defmacro with-delta (&optional (d 0) &body body)
+  `(funcall-with-delta ,d (lambda () ,@body)))
+  
 (defparameter *timestamps-enabled* t)
 
-(defparameter *timestamp-factory* 'osicat:get-monotonic-time)
+(defparameter *timestamp-factory* 'stamp-adjust-delta)
+
+;;'osicat:get-monotonic-time
 
 (defparameter *pool-enabled*    t)
 
@@ -69,4 +85,10 @@
 (defvar       *pool-queue*       nil)
 
 (defparameter *default-mmap-dir* nil)
+
+
+(defparameter *root-uri*
+  (if (short-site-name)
+    (puri:uri (short-site-name))
+    (make-instance 'puri:uri :scheme :http :host (machine-instance))))
 

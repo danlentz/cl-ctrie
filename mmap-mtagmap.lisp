@@ -98,15 +98,30 @@
   (assert (not (mtagmap-closed-p mtagmap)))
   (fd-file-length (mtagmap-fd mtagmap)))
 
-
+(defvar *allocation-gate* (sb-concurrency:make-gate :name "allocate" :open t))
+(defvar *truncation-lock* (sb-thread:make-mutex :name "truncate"))
+                            
 (defun check-allocate-okay ()
-  (assert *mmap-may-allocate*))
-
+  (assert *mmap-may-allocate*)
+  (sb-concurrency:wait-on-gate *allocation-gate*))
 
 (defun check-mmap-truncate-okay ()
   (assert (not (zerop (logand osicat-posix:MAP-SHARED *mmap-sharing*))))
   (check-allocate-okay))
 
+(defun begin-disruptive-operation ()
+  (sb-thread:grab-mutex *truncation-lock*)
+  (sb-concurrency:close-gate *allocation-gate*))
+
+(defun end-disruptive-operation ()
+  (sb-concurrency:open-gate *allocation-gate*)
+  (sb-thread:release-mutex *truncation-lock*))
+
+(defmacro with-exclusive-operation (&body body)
+  `(unwind-protect (progn
+                     (begin-disruptive-operation)
+                     ,@body)
+     (end-disruptive-operation)))
 
 (defun mtagmap-default-filename (mtagmap)
   (mm-metaclass-pathname (mtagmap-class mtagmap)))
@@ -145,31 +160,32 @@
 (defun mtagmap-resize (mtagmap new-len)
   (assert (not (mtagmap-closed-p mtagmap)))
   (check-mmap-truncate-okay)
-  (symbol-macrolet ((len (mtagmap-len mtagmap)))
-    (flet ((trunc ()
-	     (osicat-posix:ftruncate (mtagmap-fd mtagmap) new-len))
-            (remap ()
-              #+linux
-              (progn
-                ;; linux supports MREMAP
-                (setf (mtagmap-ptr mtagmap) (osicat-posix:mremap (mtagmap-ptr mtagmap)
-                                              len new-len osicat-posix:MREMAP-MAYMOVE))
-                (setf (mtagmap-len mtagmap) new-len))
-              #-linux
-              (progn
-                ;; others require MUNMAP/MMAP
-                (osicat-posix:munmap (mtagmap-ptr mtagmap) len)
-                (setf (mtagmap-ptr mtagmap) (osicat-posix:mmap (cffi:null-pointer)
-                                              new-len *mmap-protection*
-                                              *mmap-sharing* (mtagmap-fd mtagmap) 0))
-                (setf (mtagmap-len mtagmap) new-len))))
-      (let (done)
-	(unwind-protect (progn
-                          (cond
-                            ((> len new-len) (remap) (trunc))
-                            (t               (trunc) (remap)))
-                          (setf done t))
-	  (unless done (mtagmap-close mtagmap))))))  
+  (with-exclusive-operation 
+    (symbol-macrolet ((len (mtagmap-len mtagmap)))
+      (flet ((trunc ()
+               (osicat-posix:ftruncate (mtagmap-fd mtagmap) new-len))
+              (remap ()
+                #+linux
+                (progn
+                  ;; linux supports MREMAP
+                  (setf (mtagmap-ptr mtagmap) (osicat-posix:mremap (mtagmap-ptr mtagmap)
+                                                len new-len osicat-posix:MREMAP-MAYMOVE))
+                  (setf (mtagmap-len mtagmap) new-len))
+                #-linux
+                (progn
+                  ;; others require MUNMAP/MMAP
+                  (osicat-posix:munmap (mtagmap-ptr mtagmap) len)
+                  (setf (mtagmap-ptr mtagmap) (osicat-posix:mmap (cffi:null-pointer)
+                                                new-len *mmap-protection*
+                                                *mmap-sharing* (mtagmap-fd mtagmap) 0))
+                  (setf (mtagmap-len mtagmap) new-len))))
+        (let (done)
+          (unwind-protect (progn
+                            (cond
+                              ((> len new-len) (remap) (trunc))
+                              (t               (trunc) (remap)))
+                            (setf done t))
+            (unless done (mtagmap-close mtagmap)))))))  
   (mtagmap-check mtagmap))
 
 
@@ -185,18 +201,20 @@
 	    do (setf new-len (* 2 new-len)))
       (mtagmap-resize mtagmap new-len))))
 
+(defvar *big-allocation-lock* (sb-thread:make-mutex :name "big allocation lock"))
 
 (defun mtagmap-alloc (mtagmap bytes)
   (declare (type mindex bytes))
   (check-allocate-okay)
-  (symbol-macrolet ((len (mtagmap-len mtagmap)))
-    (when (zerop len) (mtagmap-open mtagmap))
-    (let ((next (mtagmap-next mtagmap)))
-      (declare (type mindex next))
-      (when (> (the mindex (+ next bytes)) (the mindex len))
-	(mtagmap-extend-alloc mtagmap bytes))
-      (setf (mtagmap-next mtagmap) (the mindex (+ next bytes)))
-      next)))
+  (sb-thread:with-mutex (*big-allocation-lock*)
+    (symbol-macrolet ((len (mtagmap-len mtagmap)))
+      (when (zerop len) (mtagmap-open mtagmap))
+      (let ((next (mtagmap-next mtagmap)))
+        (declare (type mindex next))
+        (when (> (the mindex (+ next bytes)) (the mindex len))
+          (mtagmap-extend-alloc mtagmap bytes))
+        (setf (mtagmap-next mtagmap) (the mindex (+ next bytes)))
+        next))))
 
 
 (defun mtagmap-check-read (mtagmap)

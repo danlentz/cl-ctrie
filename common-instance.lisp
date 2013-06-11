@@ -1,9 +1,11 @@
+;;;;; -*- mode: common-lisp;   common-lisp-style: modern;    coding: utf-8; -*-
+;;;;;
 
 (defpackage :object
   (:nicknames :obj)
   (:use :closer-common-lisp :c2mop :alexandria)
   (:export :proto
-    :fc
+    :find-class*
     :finalized-class
     :new
     :slot-value*
@@ -24,16 +26,21 @@
     :serializable-slots
     :serializable-slots-using-class
     :find-direct-slot-definition-by-initarg
-    :subclasses
-    :superclasses
+    :class-subclasses
+    :class-superclasses
     :class-slot-names
     :clone-instance
     :cloned-object-as
     :cloned-object
     :copy-instance
-    :make-uninitialized-instance))
+    :make-uninitialized-instance
+    :unparse-direct-slot-definition
+    :class-add-slot))
 
 (in-package :object)
+
+(unless (find-package :mop)
+  (rename-package (package-name :c2mop) (package-name :c2mop) '(:mop :c2mop)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; CLOS
@@ -43,14 +50,13 @@
 (defvar *nuke-existing-classes*    nil)
 (defvar *store-class-superclasses* t)
 
-(defun fc (class-designator)
+(defun find-class* (class-designator)
   (typecase class-designator
     (class    class-designator)  
-    (keyword (fc (string class-designator)))
-    (string  (fc (read-from-string class-designator)))
+    (keyword (find-class* (string class-designator)))
+    (string  (find-class* (read-from-string class-designator)))
     (symbol  (find-class class-designator))
     (t       (find-class class-designator))))
-
 
 (defun proto (thing)
   (flet ((get-proto (c)
@@ -62,20 +68,16 @@
       (standard-object (get-proto (class-of thing)))
       (symbol (get-proto  thing)))))
 
-
 (defun finalized-class (class-designator)
-  (finalize-inheritance (fc class-designator))
-  (fc class-designator))
-
+  (finalize-inheritance (find-class* class-designator))
+  (find-class* class-designator))
 
 (defun new (&rest args)
   (apply #'make-instance args))
 
-
 (defun slot-value* (obj slot &optional (unbound-return :unbound))
   (handler-case (values (slot-value obj slot) t)
     (unbound-slot (c) (values unbound-return c))))
-
 
 (defun required-arg (name)
   (error "~S is a required argument" name))
@@ -84,6 +86,25 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; MOP
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun unparse-direct-slot-definition (slotd)
+  "Return a list of slot details which can be used as an argument to ensure-class"
+  (list
+    :name (sb-mop:slot-definition-name slotd)
+    :type (sb-mop:slot-definition-type slotd)
+    :initfunction (sb-mop:slot-definition-initfunction slotd)
+    :allocation (sb-mop:slot-definition-allocation slotd)
+    :initargs (sb-mop:slot-definition-initargs slotd)
+    :readers (sb-mop:slot-definition-readers slotd)
+    :writers (sb-mop:slot-definition-writers slotd)))
+
+
+(defun class-add-slot (class-name slot-name)
+  (sb-mop:ensure-class-using-class
+    (find-class class-name) class-name
+    :direct-slots (cons `(:name ,slot-name)
+                    (mapcar #'unparse-direct-slot-definition
+                      (sb-mop:class-direct-slots (find-class class-name))))))
 
 (defun find-direct-slot-definition-by-initarg (class initarg)
   (loop named outer
@@ -102,8 +123,8 @@
          (mapappend fun (mapcar 'cdr args)))))
 
 
-;;   (let ((result (mapappend #'(lambda (c) (when c (class-direct-subclasses c))) (list (fc class))))) result))
-;;     (unless proper? (push (fc class) result))
+;;   (let ((result (mapappend #'(lambda (c) (when c (class-direct-subclasses c))) (list (find-class* class))))) result))
+;;     (unless proper? (push (find-class* class) result))
 ;;     (remove-duplicates result)))
 
 ;; (subclasses 'standard-object)
@@ -116,19 +137,27 @@
 ;;                     :proper? proper?)
 ;;     (nreverse result)))
 
+(defun class-subclasses (thing &key proper)
+  (labels ((all-subclasses (class)
+             (cons class
+                   (mapcan #'all-subclasses
+                           (c2mop:class-direct-subclasses class)))))
+    (let ((result (all-subclasses (find-class* thing))))
+      (if proper (rest result) result))))
 
-(defun superclasses (thing &key (proper? t))
-  "Returns a list of superclasses of thing. Thing can be a class, object or symbol naming a class.
-  The list of classes returned is 'proper'; it does not include the class itself."
-  (let ((result (class-precedence-list (fc thing))))
-    (if proper? (rest result) result)))
+(defun class-superclasses (thing &key (proper t))
+  "Returns a list of superclasses of thing. Thing can be a class,
+   object or symbol naming a class. The list of classes returned is
+   'proper'; it does not include the class itself."
+  (let ((result (class-precedence-list (find-class* thing))))
+    (if proper (rest result) result)))
 
 
 (defun class-slot-names (thing)
-  (let ((class (fc thing)))
+  (let ((class (find-class* thing)))
     (if class
-      (mapcar 'mop:slot-definition-name
-              (mop:class-slots (finalized-class class)))
+      (mapcar #'c2mop:slot-definition-name
+              (c2mop:class-slots (finalized-class class)))
       (progn
         (warn "class for ~a not found)" thing)
         nil))))
@@ -196,7 +225,7 @@ REINITIALIZE-INSTANCE is called to update the copy with INITARGS.")
 ;; C3C72EC2-A553-4436-9B61-589516002CD4
 
 ;; (cloned-object-as 'cl-ctrie::context (uuid:make-v4-uuid))
-;; 4DCBAA4C-8461-46E5-AA54-BFFCC047D4F8
+;; 4DCBAA4C-8461-46E5-AA54-BFFIND-CLASS*C047D4F8
 
 ;; (class-of (cloned-object-as 'cl-ctrie::context (uuid:make-v4-uuid)))
 ;; #<STANDARD-CLASS CL-CTRIE::CONTEXT>
@@ -238,22 +267,8 @@ REINITIALIZE-INSTANCE is called to update the copy with INITARGS.")
                                     :suppress-properties suppress-properties)) obj))
         (t obj)))))
 
-(defgeneric slot-definition-sexp (slot-definition)
-  (declare (optimize speed))
-  (:documentation 
-    "Return a list of slot details which can be used 
-    as an argument to ensure-class")
-  (:method ((slot-definition #+(or ecl abcl (and clisp (not mop))) t 
-              #-(or ecl abcl (and clisp (not mop))) slot-definition))
-    (list
-      :name (slot-definition-name slot-definition)
-      :allocation (slot-definition-allocation slot-definition)
-      :initargs (slot-definition-initargs slot-definition)
-      :readers (slot-definition-readers slot-definition)
-      :type (slot-definition-type slot-definition)
-      :writers (slot-definition-writers slot-definition))))
 
-;; (mapcar #'get-slot-details (sb-mop:class-slots (fc 'cl-user::test-file)))
+;; (mapcar #'get-slot-details (sb-mop:class-slots (find-class* 'cl-user::test-file)))
 ;;
 ;; ((:NAME ASDF::NAME :ALLOCATION :INSTANCE :INITARGS (:NAME) :READERS NIL
 ;;    :TYPE  STRING :WRITERS NIL)

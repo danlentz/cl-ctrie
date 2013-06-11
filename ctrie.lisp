@@ -3,6 +3,60 @@
 
 (in-package :cl-ctrie)
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Generational Descriptor Object (required for 'generational cas')
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun make-generational-descriptor ()
+  (create-unique-id-byte-vector))
+
+(defun gen-eq (a b)
+  (equalp a b))
+
+(defun new-fundamental-root ()
+  (with-active-layers (fundamental)
+    (make-inode (make-cnode) (make-generational-descriptor))))
+
+(defun new-transient-root ()
+  (with-active-layers (transient)
+    (make-inode (make-cnode) (make-generational-descriptor))))
+
+(defun new-persistent-root ()
+  (with-active-layers (persistent)
+    (make-inode (make-cnode) (make-generational-descriptor))))
+
+(defun constantly-nil ()
+  nil)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Dereferenced Instance Access
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defclass reference ()
+  ((value
+     :accessor reference-value
+     :initarg :value)))
+
+(defclass simple-reference (reference)
+  ((value
+     :accessor contents-of
+     :initarg :contents)))
+
+(defmethod pointer:deref ((thing simple-reference) &optional type &rest args)
+  (declare (ignore type args))
+  (contents-of thing))
+
+(mm:defmmclass persistent-struct (mm:marray)
+  ((contents :initform nil :accessor contents-of :initarg :contents :persistent nil)))
+
+(defun make-persistent-struct (contents &optional (class 'persistent-struct))
+  (mm:make-marray (length contents) :marray-class class
+    :initial-contents (coerce contents 'list)))
+
+(defmethod pointer:deref ((thing persistent-struct) &optional type &rest args)
+  (declare (ignore type args))
+  (or (contents-of thing)
+    (setf (contents-of thing) (cl:map 'vector 'maybe-unbox (mm:marray-to-list thing)))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -15,58 +69,20 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-#+()
-(defstruct (ctrie (:constructor %make-ctrie))
-  "A CTRIE structure is the root container that uniquely identifies a CTRIE
-  instance, and  contains the following perameters which specify the
-  definable aspects of each CTRIE:
-  - `READONLY-P` if not `NIL` prohibits any future modification or
-  cloning of this instance.
-  - `TEST` is a designator for an equality predicate that will be
-  applied to disambiguate and determine the equality of any two
-  keys. It is recommened that this value be a symbol that is fboundp,
-  to retain capability of externalization (save/restore). At present,
-  though, this is not enforced and a function object or lambda
-  expression will also be accepted, albeit without the ability of
-  save/restore.
-  - `HASH` is a designator for a hash function, which may be
-  desirable to customize when one has specific knowledge about the set
-  of keys which will populate the table.  At this time, a 32-bit hash
-  is recommended as this is what has been used for development and
-  testing and has been shown to provide good performance in
-  practice. As with `TEST` it is recommended that `HASH` be specified
-  by a symbol that is fboundp.
-  - `ROOT` is the slot used internally for storage of the root inode
-  structure that maintains the reference to the contents of the ctrie
-  proper.  The ctrie-root must only be accessed using the _RDCSS ROOT
-  NODE PROTOCOL_ defined by the top-level entry-points `ROOT-NODE-ACCESS`
-  and `ROOT-NODE-REPLACE`"
+(defstruct (fundamental-ctrie (:copier nil)) 
+  (root        (new-fundamental-root))
+  (index       0)
+  (name        (byte-vector-to-hex-string (create-unique-id-byte-vector)))
   (readonly-p  nil)
-  (test       'equal  :read-only t)
-  (hash       'sxhash :read-only t)
-  (stamp      (if *timestamps-enabled* #'local-time:now (constantly nil)))
-  (root       (make-inode (make-cnode) (gensym "ctrie"))))
+  (test       'equal)
+  (hash       'sxhash)
+  (stamp       *timestamp-factory*)
+  (context    '(fundamental map unordered))
+  (env        nil))
 
-(defun nix ()
-  (constantly nil))
+(defmethod index-incf ((ctrie fundamental-ctrie) &optional (amount 1))
+  (sb-ext:atomic-update (fundamental-ctrie-index ctrie) #'+ amount))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Generational Descriptor Object (required for 'generational cas')
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defun make-generational-descriptor ()
-  (create-unique-id-byte-vector))
-
-(defun gen-eq (a b)
-  (equalp a b))
-
-(defun new-transient-root ()
-  (with-active-layers (allocation transient)
-    (make-inode (make-cnode) (make-generational-descriptor))))
-
-(defun new-persistent-root ()
-  (with-active-layers (allocation persistent)
-    (make-inode (make-cnode) (make-generational-descriptor))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; CTRIE Root Container Classes
@@ -79,8 +95,14 @@
      :initarg :root)
     (name
       :initform (byte-vector-to-hex-string (create-unique-id-byte-vector))
+      :initarg name
       :reader ctrie-name
       :type string)
+    (index
+      :initform 0
+      :accessor ctrie-index
+      :type integer
+      :initarg :index)
     (readonly-p
       :initform nil
       :type boolean
@@ -107,7 +129,11 @@
     (env
       :initarg    :env
       :initform   nil))
-  (:default-initargs :context (list 'map 'transient 'unordered)))
+  (:default-initargs :context (list 'transient)))
+
+
+(defmethod index-incf ((ctrie transient-ctrie) &optional (amount 1))
+  (sb-ext:atomic-update (slot-value ctrie 'index) #'+ amount))
 
 
 (mm:defmmclass persistent-ctrie ()
@@ -122,6 +148,11 @@
       :initarg :name
       :type string
       :persistent t)    
+    (index
+      :initform 0
+      :accessor ctrie-index
+      :type integer
+      :initarg :index)
     (readonly-p
       :initform nil
       :type boolean
@@ -154,25 +185,57 @@
       :initarg    :env
       :initform   nil
       :persistent nil))
-  (:default-initargs :context (list 'map 'persistent 'unordered)))
+  (:default-initargs :context '(persistent)))
+
+(defmethod index-incf ((ctrie persistent-ctrie) &optional (amount 1))
+  (sb-ext:atomic-update (slot-value ctrie 'index) #'+ amount))
+
+(defmethod ctrie-root ((ctrie fundamental-ctrie))
+  (fundamental-ctrie-root ctrie))
+
+(defmethod ctrie-name ((ctrie fundamental-ctrie))
+  (fundamental-ctrie-name ctrie))
+
+(defmethod ctrie-readonly-p ((ctrie fundamental-ctrie))
+  (fundamental-ctrie-readonly-p ctrie))
+
+(defmethod ctrie-test ((ctrie fundamental-ctrie))
+  (fundamental-ctrie-test ctrie))
+
+(defmethod ctrie-hash ((ctrie fundamental-ctrie))
+  (fundamental-ctrie-hash ctrie))
+
+(defmethod ctrie-stamp ((ctrie fundamental-ctrie))
+  (fundamental-ctrie-stamp ctrie))
+
+(defmethod ctrie-context ((ctrie fundamental-ctrie))
+  (fundamental-ctrie-context ctrie))
 
 
-(defgeneric ctrie-env (thing &optional default-context)
-  (:method ((thing transient-ctrie) &optional (default-context contextl::*active-context*))
-    (or (slot-value thing 'env)
-      (setf (slot-value thing 'env) (apply #'combined-layer-context default-context
-                                      (ctrie-context thing)))))
-  (:method ((thing persistent-ctrie) &optional (default-context contextl::*active-context*))
-    (or (slot-value thing 'env)
-      (setf (slot-value thing 'env) (apply #'combined-layer-context default-context
-                                      (ctrie-context thing))))))
+(defun configuration-context (layers &optional (default-context contextl::*active-context*))
+  (apply #'combined-layer-context default-context layers))
 
-;; (funcall-with-layer-context (ctrie-env (make-ctrie)) #'active-layers)
-;;
-;;  (#<LAYER UNORDERED {1006A15273}>
-;;   #<LAYER TRANSIENT {1006967EF3}>
-;;   #<LAYER MAP {100E795573}>
-;;   T)
+
+(defmethod ctrie-env ((thing fundamental-ctrie) &optional
+                       (default-context contextl::*active-context*))
+  (or (fundamental-ctrie-env thing)
+    (setf (fundamental-ctrie-env thing)
+      (apply #'combined-layer-context default-context
+        (fundamental-ctrie-context thing)))))
+
+(defmethod ctrie-env ((thing transient-ctrie) &optional
+                       (default-context contextl::*active-context*))
+  (or (slot-value thing 'env)
+    (setf (slot-value thing 'env)
+      (apply #'combined-layer-context default-context
+        (ctrie-context thing)))))
+
+(defmethod ctrie-env ((thing persistent-ctrie) &optional
+                       (default-context contextl::*active-context*))
+  (or (slot-value thing 'env)
+    (setf (slot-value thing 'env)
+      (apply #'combined-layer-context default-context
+        (ctrie-context thing)))))
 
 
 (defmethod print-object ((ctrie persistent-ctrie) stream)
@@ -185,193 +248,164 @@
       (string-downcase  (princ-to-string (ctrie-test ctrie)))
       (string-downcase  (princ-to-string (ctrie-hash ctrie))))))
 
-(deftype ctrie ()
-  '(or transient-ctrie persistent-ctrie))
 
-(defun ctrie-p (thing)
-  (typep thing 'ctrie))
+(defmethod ctrie-p ((thing t))
+  nil)
+
+(defmethod ctrie-p ((thing fundamental-ctrie))
+  t)
+
+(defmethod ctrie-p ((thing transient-ctrie))
+  t)
+
+(defmethod ctrie-p ((thing persistent-ctrie))
+  t)
 
 
-(defun persistent-p (thing)
-  (typecase thing
-    (mm:mm-object t)
-    (t            nil)))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Node Equality
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defmethod node-eq ((node1 t) (node2 t))
+  (eq node1 node2))
+
+(defmethod node-eq ((node1 fixnum) (node2 fixnum))
+  (eql node1 node2))
+
+(defmethod node-eq ((node1 mm:mm-object) (node2 mm:mm-object))
+  (mm:meq node1 node2))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Special CTRIES
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;; (defvar *context* nil)
-
-;; (defvar *default-context* nil)
-
-;; (defclass context (uuid:uuid)
-;;   ())
-
-;; (defun compute-default-context (&optional (site-name (or
-;;                                                        (short-site-name)
-;;                                                        (machine-instance))))
-;;   (obj:cloned-object-as 'context
-;;     (uuid:make-v5-uuid uuid:+namespace-url+
-;;       (princ-to-string (make-instance 'puri:uri :host site-name :scheme :http)))))
-
-;; (defun default-context ()
-;;   (or *default-context*
-;;     (setf *default-context* (compute-default-context))))
-
-;; (defun context (&rest path)
-;;   (print path)
-;;   (cond
-;;     ((null (car path))  (or *context* (default-context)))
-;;     (t                  (obj:cloned-object-as 'context
-;;                           (uuid:make-v5-uuid (context (rest path)) (string (car path)))))))
-
-;; ;; (context)
-;; ;; A875B96A-2B00-55D9-90A0-2DC0FD75746F
-;; ;; (default-context)
-;; ;; A875B96A-2B00-55D9-90A0-2DC0FD75746F
-;; ;; (context "one")
-
-
-;; (defclass entity (uuid:uuid)
-;;   ((context :initarg :context :accessor context-of)
-;;     (identifier :initarg :identifier :initarg :id :accessor identifier-of)))
-
-;; ;;(make-instance 'entity :context (uuid:make-v4-uuid))
-
-
-;; (defclass collection (entity)
-;;   ((allocation-layer
-;;      :initarg :allocation
-;;      :initarg :allocation-layer
-;;      :accessor allocation-layer-of)
-;;     (index-class
-;;       :initarg :index-class
-;;       :accessor index-class-of)))
-
-
-;; (defclass special-collection (collection)
-;;   ((package-name :initarg :package-name :accessor package-name-of)
-;;     (symbol-name :initarg :symbol-name :accessor symbol-name-of)))
-
-
-;; (defclass graph (special-collection)
-;;   ((root :initarg :root :accessor root-of)))
-
-
-(mm:defmmclass ctrie-index (persistent-ctrie)
+    
+(mm:defmmclass special-persistent-ctrie (persistent-ctrie)
   ()
-  (:default-initargs :name "index" :hash 'sb-ext::psxhash :test 'equalp))
+  (:default-initargs :name (princ-to-string (gensym)) :hash 'sb-ext::psxhash :test 'equalp
+    :context (list 'persistent)))
 
-(defun ctrie-index ()
-  (or *ctrie-index*
-    (setf *ctrie-index* (find "index" (mm:retrieve-all-instances 'ctrie-index)
+(defvar  *persistent-ctrie-registry* nil)
+(defvar  *persistent-ctrie-seqs* nil)
+
+(defun persistent-ctrie-registry ()
+  (or *persistent-ctrie-registry*
+    (setf *persistent-ctrie-registry*
+      (find "registry" (mm:retrieve-all-instances 'special-persistent-ctrie)
                           :key #'ctrie-name))
-    (setf *ctrie-index* (make-instance 'ctrie-index :name "index"))))
+    (setf *persistent-ctrie-registry*
+      (make-instance 'special-persistent-ctrie :name "registry"))))
 
-(defun ctrie-seqs ()
-  (or *ctrie-seqs*
-    (setf *ctrie-seqs* (find "sequences" (mm:retrieve-all-instances 'ctrie-index)
+(defun persistent-ctrie-seqs ()
+  (or *persistent-ctrie-seqs*
+    (setf *persistent-ctrie-seqs*
+      (find "sequences" (mm:retrieve-all-instances 'special-persistent-ctrie)
                          :key #'ctrie-name))
-    (setf *ctrie-seqs* (make-instance 'ctrie-index :name "sequences"))))
+    (setf *persistent-ctrie-seqs*
+      (make-instance 'special-persistent-ctrie :name "sequences"))))
 
-(defun find-ctrie (name)
-  (let1 namestring  (typecase name
-                     (string (string-upcase name))
-                     (keyword (symbol-name name))
-                     (symbol (string-upcase (symbol-name name)))
-                     (t  (error "ctries must be named by string or keyword")))
-    (ctrie-get (ctrie-index) namestring)))
-
-(defun (setf find-ctrie) (value name)
+(defun find-persistent-ctrie (name)
   (let1 namestring  (typecase name
                       (string (string-upcase name))
                       (keyword (symbol-name name))
                       (symbol (string-upcase (symbol-name name)))
+                      (package (string-upcase (package-name name)))
+                      (t  (error "persistent-ctries must be named by string or keyword")))
+    (ctrie-get (persistent-ctrie-registry) namestring)))
+
+(defun (setf find-persistent-ctrie) (value name)
+  (let1 namestring  (typecase name
+                      (string (string-upcase name))
+                      (keyword (symbol-name name))
+                      (symbol (string-upcase (symbol-name name)))
+                      (package (string-upcase (package-name name)))
                       (t  (error "ctries must be named by string or keyword")))
     (with-active-layers (persistent)
       (prog1 value
         (etypecase value
-          (null              (ctrie-drop (ctrie-index) namestring))
-          (function          (setf (find-ctrie namestring) (funcall value #'identity)))
-          (persistent-ctrie  (ctrie-put  (ctrie-index) namestring value))
-          (transient-ctrie   (ctrie-put  (ctrie-index) namestring
-                               (aprog1 (ctrie-from-hashtable
-                                         (ctrie-to-hashtable value :atomic t) :persistent t)
-                                 (setf (ctrie-name it) namestring)))))))))
+          (null              (ctrie-drop (persistent-ctrie-registry) namestring))
+          (persistent-ctrie  (ctrie-put  (persistent-ctrie-registry) namestring value))
+          ((or transient-ctrie fundamental-ctrie)
 
-;;          (warn "persisting serialized transient instance as ~A" name)
-;;          (ctrie-put (ctrie-index) name (maybe-box value)))))))
+            ;; (ctrie-put  (ctrie-registry) namestring
+            ;;   (aprog1 (ctrie-from-hashtable
+            ;;             (ctrie-to-hashtable value :atomic t) :persistent t)
+            ;;     (setf (ctrie-name it) namestring)))))))))
+            (warn "persisting serialized transient instance as ~A" name)
+            (ctrie-put (persistent-ctrie-registry) name (maybe-box value))))))))
 
 (defmethod initialize-instance :after ((self persistent-ctrie) &key)
-  (unless (typep self 'ctrie-index)
-    (setf (find-ctrie (ctrie-name self)) self)))
+  (unless (typep self 'special-persistent-ctrie)
+    (setf (find-persistent-ctrie (ctrie-name self)) self)))
 
-(defun all-ctries ()
-  (ctrie-values (ctrie-index)))
+(defun all-persistent-ctries ()
+  (ctrie-values (persistent-ctrie-registry)))
 
-(defun ctrie-names ()
-  (ctrie-keys (ctrie-index)))
+(defun persistent-ctrie-names ()
+  (ctrie-keys (persistent-ctrie-registry)))
 
-(defun ctrie-seq-names ()
-  (ctrie-keys (ctrie-seqs)))
+(defun persistent-ctrie-seq-names ()
+  (ctrie-keys (persistent-ctrie-seqs)))
 
-(defgeneric ctrie-next-id (sequence-designator))
+(defmethod  ctrie-next-index ((string string))
+  (or (ctrie-put-update-if (persistent-ctrie-seqs) string 1 '+ 'numberp)
+    (ctrie-put-ensure (persistent-ctrie-seqs) string 0)))
 
-(defmethod  ctrie-next-id ((string string))
-  (or (ctrie-put-update-if (ctrie-seqs) string 1 '+ 'numberp)
-    (ctrie-put-ensure (ctrie-seqs) string 0)))
+(defmethod  ctrie-next-index ((symbol symbol))
+  (ctrie-next-index (fully-qualified-symbol-name symbol)))
 
-(defmethod  ctrie-next-id ((ctrie persistent-ctrie))
-  (ctrie-next-id (ctrie-name ctrie)))
+(defmethod ctrie-next-index ((ctrie fundamental-ctrie))
+  (index-incf ctrie))
 
-(defmethod  ctrie-next-id ((symbol symbol))
-  (ctrie-next-id (fully-qualified-symbol-name symbol)))
+(defmethod ctrie-next-index ((ctrie transient-ctrie))
+  (index-incf ctrie))
 
+(defmethod  ctrie-next-index ((ctrie persistent-ctrie))
+  (index-incf ctrie))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; CTRIE Creation and Instance Handling
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defun make-ctrie (&rest args &key name persistent ordered (readonly-p nil)
-                    (test 'equal) (hash 'sxhash) (stamp *timestamp-factory*)
-                    &allow-other-keys)
-  "CREATE a new CTRIE instance. This is the entry-point constructor 
-  intended for use by the end-user."
-  (declare (ignorable name readonly-p test hash stamp))
-  (funcall-with-layer-context (if ordered
-                                (with-active-layers (ordered-map)
-                                  (current-layer-context))
-                                (with-inactive-layers (ordered-map)
-                                  (current-layer-context))) 
+(defmethod make-ctrie ((place null) &key (context '(fundamental)) (readonly-p nil)
+                        (test 'equal) (hash 'sxhash) (stamp *timestamp-factory*))
+  (funcall-with-layer-context (configuration-context context)
     (lambda ()
-      (let ((arglist  (remove-from-plist args :ordered :persistent)))
-        (if persistent
-          (with-active-layers (persistent)        
-            (apply #'make-instance 'persistent-ctrie arglist))
-          (with-active-layers (transient)
-            (apply #'make-instance 'transient-ctrie arglist)))))))
+      (make-fundamental-ctrie :name nil :context context :readonly-p readonly-p
+        :test test :hash hash :stamp (when *timestamps-enabled* stamp)))))
 
-;; no
-#+()
-(defmacro def-ctrie (name &key (test 'equal) (hash 'sxhash) (stamp *timestamp-factory*))
-  (let1 namestring (typecase name
-                     (string (string-upcase name))
-                     (keyword (symbol-name name))
-                     (symbol (string-upcase (symbol-name name)))
-                     (t  (error "ctries must be named by string or keyword")))
-    (with-gensyms (gnamestring)
-      `(let1 ,gnamestring ,namestring
-         (or (find-ctrie ,gnamestring)
-           (make-ctrie :name ,gnamestring :persistent t
-             :test ',test :hash ',hash :stamp ',stamp))))))
 
-;; (ppmx (def-ctrie :xyz))
-;; (ppmx (def-ctrie xyz))
-;; (ppmx (def-ctrie "xyz"))
+(defmethod make-ctrie ((place string) &key (context '(persistent)) (readonly-p nil)
+                        (test 'equal) (hash 'sxhash) (stamp *timestamp-factory*))
+  (funcall-with-layer-context (configuration-context context)
+    (lambda ()
+      (make-instance 'persistent-ctrie :name place :context context :readonly-p readonly-p
+        :test test :hash hash :stamp (when *timestamps-enabled* stamp)))))
 
-  
+
+(defmethod pointer:deref ((ctrie fundamental-ctrie) &optional (type 'ctrie) &rest args)
+  (declare (ignore type args))
+  ctrie)
+
+(defmethod pointer:deref ((ctrie transient-ctrie) &optional (type 'ctrie) &rest args)
+  (declare (ignore type args))
+  ctrie)
+
+(defmethod pointer:deref ((ctrie persistent-ctrie) &optional (type 'ctrie) &rest args)
+  (declare (ignore type args))
+  ctrie)
+
+(defmethod funcall-with-ctrie-context ((ctrie fundamental-ctrie) thunk)
+  (let ((*ctrie* ctrie))
+    (funcall-with-layer-context (ctrie-env ctrie) thunk)))
+
+(defmethod funcall-with-ctrie-context ((ctrie transient-ctrie) thunk)
+  (let ((*ctrie* ctrie))
+    (funcall-with-layer-context (ctrie-env ctrie) thunk)))
+
+(defmethod funcall-with-ctrie-context ((ctrie persistent-ctrie) thunk)
+  (let ((*ctrie* ctrie))
+    (funcall-with-layer-context (ctrie-env ctrie) thunk)))
+
 (defmacro/once with-ctrie (&once ctrie &body body)
   "Configure the dynamic environment with the appropriate condition
   handlers, control fixtures, and instrumentation necessary to execute
@@ -383,16 +417,7 @@
   expect that the special variable `*CTRIE*` will be bound to the root
   container of subject CTRIE.  See also the documentation for
   `*CTRIE*`"
-  `(let* ((*ctrie* (typecase ,ctrie
-                     (string   (find-ctrie ,ctrie))
-                     (function (funcall ,ctrie #'identity))
-                     (t        ,ctrie))))
-     (typecase *ctrie*
-       (mm:mm-object   (with-active-layers (persistent)
-                         ,@body))
-       (t              (with-active-layers (transient)
-                         ,@body)))))
-
+  `(funcall-with-ctrie-context ,ctrie (lambda () ,@body)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -411,11 +436,11 @@
   (funcall (ctrie-test *ctrie*) x y))
 
 
-(defun ctstamp ()
+(defun ctstamp (&optional last)
   (when *timestamps-enabled*
     (if *ctrie*
-      (funcall (ctrie-stamp *ctrie*))
-      (funcall *timestamp-factory*))))
+      (apply (ctrie-stamp *ctrie*) (ensure-list last))
+      (apply *timestamp-factory* (ensure-list last)))))
 
 
 (defun flag (key level &optional use-cached-p)
@@ -457,7 +482,7 @@
   "FLAG-VECTOR is a bit-vector representation of the (fixnum)
   BITMAP. It is currently not used for any calculation, however it is
   included within each CNODE as a convenience because it makes it
-  immediately clear from visual inspection which logical arc indexes
+  immediately clear from visual inspection which logical arc indexes1
   are represented in the node. For example, from the bit-vector
   `#*10010000000000000000000000000000` one can easily see that the first
   and fourth positions are occupied, and the rest empty."
@@ -480,29 +505,25 @@
 ;; INODE
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-#+()
-(defstruct (ref
-             (:copier nil))
-  "Atomically Stamped Reference structure _[Herlithy, TAOMP]_ that
-  encapsulates the mutable slots within an inode. Any specific `REF`
-  structure is, itself, never mutated.  Using the `REF` structure
-  as basis of inode implementation provides the capability to 'bundle'
-  additional metadata in an inode while still providing atomic compare
-  and swap using a single comparison of the aggregate `REF` instance.
-   - `STAMP` defines a slot containing implementation-specific metadata
-     that may be maintained internally as a means of tracking inode
-     modification and update behavior.  It should not be referenced by
-     user code, and the format of its contents should not be relied apon.
-   - `VALUE` defines a slot that contains a reference to the MAIN-NODE
-     that the enclosing inode should be interpreted as 'pointing to'
-   - `PREV` defines a slot which, during the `INODE-COMMIT` phase of the
-     _GCAS INODE PROTOCOL_ maintains a reference to the last valid
-     inode state, which may be restored, if necessary, during the
-     course of the `INODE-READ` / `INODE-COMMIT` arbitration process"
-  (stamp (ctstamp)        :read-only t)
-  (value t   :type t      :read-only t)
-  (prev  nil :type t))
 
+(defstruct (fundamental-ref
+             (:copier nil))
+  (prev  nil)
+  (stamp (ctstamp))   
+  (value t))
+
+
+(defmethod ref-prev ((thing fundamental-ref))
+  (fundamental-ref-prev thing))
+
+(defmethod ref-stamp ((thing fundamental-ref))
+  (fundamental-ref-stamp thing))
+
+(defmethod ref-value ((thing fundamental-ref))
+  (fundamental-ref-value thing))
+
+
+      
 (defclass transient-ref ()
   ((prev
       :initform nil
@@ -535,56 +556,36 @@
       :persistent t)))
 
 
-(deftype ref ()
-  '(or transient-ref persistent-ref))
+(defmethod ref-p ((thing t))
+  nil)
 
-(defun ref-p (thing)
-  (typep thing 'ref))
+(defmethod ref-p ((thing fundamental-ref))
+  t)
 
-(define-pool transient-ref (0)
-  (make-instance 'transient-ref :stamp nil :value nil :prev nil))
+(defmethod ref-p ((thing transient-ref))
+  t)
 
-(define-pool persistent-ref (0)
-  (make-instance 'persistent-ref :stamp nil :value nil :prev nil))
+(defmethod ref-p ((thing persistent-ref))
+  t)
 
-
-(define-layered-function make-ref (&key stamp value prev &allow-other-keys))
-
-(define-layered-method   make-ref :in t (&key stamp value prev persistent)
-  (if persistent
-    (with-active-layers (persistent)
-      (make-ref :stamp stamp :value value :prev prev))
-    (with-active-layers (transient)
-      (make-ref :stamp stamp :value value :prev prev))))
-
-(define-layered-method   make-ref :in transient (&key stamp value prev)
-  (if (ctrie-pooling-enabled-p)
-    (aprog1 (allocate 'transient-ref)
-      (setf
-        (slot-value it 'stamp) stamp
-        (slot-value it 'value) value
-        (slot-value it 'prev)  prev))
-    (funcall #'make-instance 'transient-ref :stamp stamp :value value :prev prev)))
+(define-layered-method   make-ref :in t (&rest args &key stamp value prev) ;; persistent)
+  (declare (ignorable args))
+  (make-fundamental-ref :stamp stamp :value value :prev prev))
 
 
-(define-layered-method   make-ref :in persistent (&key stamp value prev)
-  (if (ctrie-pooling-enabled-p)
-    (aprog1 (allocate 'persistent-ref)
-      (setf
-        (slot-value it 'stamp) stamp
-        (slot-value it 'value) value
-        (slot-value it 'prev)  prev))
-    (funcall #'make-instance 'persistent-ref :stamp stamp :value value :prev prev)))
+(define-layered-method   make-ref :in transient (&rest args &key stamp value prev)
+  (declare (ignorable args))
+  (make-instance 'transient-ref :stamp stamp :value value :prev prev))
 
+
+(define-layered-method   make-ref :in persistent (&rest args &key stamp value prev)
+  (declare (ignorable args))
+  (funcall #'make-instance 'persistent-ref :stamp stamp :value value :prev prev))
   
-#+()
-(defstruct (failed-ref
-             (:include ref)
-             (:copier nil))
-  "A `FAILED-REF` is a structure that is used to preserve the linkage to
-  prior inode state following a failed GCAS.  Any inode access that
-  detects a `FAILED-REF` will immediately invoke a commit to restore the
-  inode to the state recorded in `FAILED-REF-PREV`")
+
+(defstruct (fundamental-failed-ref
+             (:include fundamental-ref)
+             (:copier nil)))
 
 
 (defclass transient-failed-ref (transient-ref)
@@ -602,62 +603,33 @@
 (defun failed-ref-stamp (ref)
   (ref-stamp ref))
 
-(deftype failed-ref ()
-  '(or transient-failed-ref persistent-failed-ref))
 
-(defun failed-ref-p (thing)
-  (typep thing 'failed-ref))
+(defmethod failed-ref-p ((thing t))
+  nil)
 
+(defmethod failed-ref-p ((thing fundamental-failed-ref))
+  t)
 
-(define-pool transient-failed-ref (0)
-  (make-instance 'transient-failed-ref :stamp nil :value nil :prev nil))
+(defmethod failed-ref-p ((thing transient-failed-ref))
+  t)
 
-(define-pool persistent-failed-ref (0)
-  (make-instance 'persistent-failed-ref :stamp nil :value nil :prev nil))
+(defmethod failed-ref-p ((thing persistent-failed-ref))
+  t)
 
+(define-layered-method make-failed-ref :in t (&key stamp value prev) ; persistent)
+  (make-fundamental-failed-ref :stamp stamp :value value :prev prev))
 
-(define-layered-function make-failed-ref (&key stamp value prev &allow-other-keys))
-
-(define-layered-method make-failed-ref :in t (&key stamp value prev persistent)
-  (if persistent
-    (with-active-layers (persistent)
-      (funcall #'make-instance 'persistent-failed-ref :stamp stamp :value value :prev prev))
-    (with-active-layers (transient)
-      (funcall #'make-instance 'transient-failed-ref :stamp stamp :value value :prev prev))))
 
 (define-layered-method make-failed-ref :in transient (&key stamp value prev)
-  (funcall #'make-instance 'transient-failed-ref :stamp stamp :value value :prev prev))
+  (make-instance 'transient-failed-ref :stamp stamp :value value :prev prev))
 
 (define-layered-method make-failed-ref :in persistent (&key stamp value prev)
-  (funcall #'make-instance 'persistent-failed-ref :stamp stamp :value value :prev prev))
+  (make-instance 'persistent-failed-ref :stamp stamp :value value :prev prev))
 
-
-#+()
-(defstruct (inode
-             (:constructor %make-inode)
+(defstruct (fundamental-inode
              (:copier nil))
-  "An INODE, or 'Indirection Node' is the mutable structure
-  representing the link between other 'main-node' structures found in
-  a ctrie.  An inode is the only type of node that may change the
-  value of its content during its lifetime.  In this implementation,
-  all such values as may change are encapsulated within a `REF`
-  substructure.  Each inode also contains a generational descriptor
-  object, comparible by identity only, which is used to identify the
-  state of synchronization between the inode and the current
-  'generation' indicated by the root inode at the base of the
-  CTRIE. As an inode may not change its 'gen identity' during its
-  lifetime, this disparity with the generation of the root node will
-  immediately result in the replacement of the inode with a new one
-  properly synchronized with the root's `GEN` object. In this
-  implementation, `GEN` objects are implemented by GENSYMS -- unique,
-  uninterned symbols which inherently provide very similar symantics
-  to those required of the generational descriptor.
-  - `GEN` defines a slot containing a generational descriptor object
-  - `REF` defines a slot containing a `REF` struct that encapsulates
-    the mutable content within an INODE"
-  (gen nil :read-only t)
-  (ref nil))
-
+  (ref nil)
+  (gen nil))
 
 (defclass transient-inode ()
   ((ref
@@ -681,134 +653,83 @@
      :initarg :gen
      :persistent t)))
 
+(defmethod inode-ref ((thing fundamental-inode))
+  (fundamental-inode-ref thing))
 
+(defmethod inode-gen ((thing fundamental-inode))
+  (fundamental-inode-gen thing))
 
-(deftype inode ()
-  '(or transient-inode persistent-inode))
+(defmethod inode-p ((thing t))
+  nil)
 
-(defun inode-p (thing)
-  (typep thing 'inode))
+(defmethod inode-p ((thing fundamental-inode))
+  t)
 
+(defmethod inode-p ((thing transient-inode))
+  t)
 
+(defmethod inode-p ((thing persistent-inode))
+  t)
 
-(define-pool transient-inode (0)
-  (make-instance 'transient-inode))
+(define-layered-method   make-inode :in t (link-to &optional gen stamp prev) 
+  (make-fundamental-inode
+    :gen (or gen (make-generational-descriptor))
+    :ref (make-ref :value link-to :stamp (or stamp (ctstamp)) :prev prev)))
 
-(define-pool persistent-inode (0)
-  (make-instance 'persistent-inode))
-
-
-
-#+()
-(defun make-inode (link-to &optional gen stamp prev)
-  "Construct a new INODE that represents a reference to the value
-  provided by argument LINK-TO, optionally augmented with a specified
-  generational descriptor, timestamp, and/or previous state"
-  (%make-inode
-    :gen (or gen (gensym "ctrie"))
+(define-layered-method make-inode :in transient (link-to &optional gen stamp prev) 
+  (make-instance 'transient-inode
+    :gen (or gen (make-generational-descriptor))
     :ref (make-ref :value link-to :stamp (or stamp (ctstamp)) :prev prev)))
 
 
-(define-layered-function make-inode (link-to &optional gen stamp prev persistent))
+(define-layered-method make-inode :in persistent (link-to &optional gen stamp prev)
+  (make-instance 'persistent-inode
+    :gen (or gen (make-generational-descriptor))
+    :ref (make-ref :value link-to :stamp (or stamp (ctstamp)) :prev prev)))
 
-(define-layered-method   make-inode :in t (link-to &optional gen stamp prev persistent)
-  (if persistent
-    (with-active-layers (persistent)
-      (make-inode link-to gen stamp prev))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; GCAS 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defmethod gcas-compare-and-set ((obj fundamental-inode)
+                                  expected new expected-stamp new-stamp prev)
+  (declare (ignore expected-stamp))
+  (let ((ref (inode-ref obj)))
+    (with-active-layers (fundamental)
+      (and
+        (eq (ref-value ref) expected)
+        (eq (cas (fundamental-inode-ref obj) ref (make-fundamental-ref
+                                                   :value new
+                                                   :stamp new-stamp
+                                                   :prev prev))
+                 ref)))))
+
+  
+(defmethod gcas-compare-and-set ((obj transient-inode)
+                                  expected new expected-stamp new-stamp prev)
+  (declare (ignore expected-stamp))
+  (let ((ref (inode-ref obj)))
     (with-active-layers (transient)
-      (make-inode link-to gen stamp prev))))
+      (and
+        (eql (ref-value ref) expected)
+        (eq  (cas (slot-value obj 'ref) ref (make-ref
+                                              :value new
+                                              :stamp new-stamp
+                                              :prev prev))
+          ref)))))
 
-
-(define-layered-method make-inode :in transient (link-to &optional gen stamp prev persistent)
-  (declare (ignore persistent))
-  (if (ctrie-pooling-enabled-p)
-    (aprog1 (allocate 'transient-inode)
-      (setf
-        (inode-gen it) (or gen (make-generational-descriptor))
-        (inode-ref it) (make-ref :value link-to :stamp (or stamp (ctstamp)) :prev prev)))
-    (funcall #'make-instance 'transient-inode
-      :gen (or gen (make-generational-descriptor))
-      :ref (make-ref :value link-to :stamp (or stamp (ctstamp)) :prev prev))))
-
-
-(define-layered-method make-inode :in persistent (link-to &optional gen stamp prev persistent)
-  (declare (ignore persistent))
-  (if (ctrie-pooling-enabled-p)
-    (aprog1 (allocate 'persistent-inode)
-      (setf
-        (inode-gen it) (or gen (make-generational-descriptor))
-        (inode-ref it) (make-ref :value link-to :stamp (or stamp (ctstamp)) :prev prev)))
-    (funcall #'make-instance 'persistent-inode
-      :gen (or gen (make-generational-descriptor))
-      :ref (make-ref :value link-to :stamp (or stamp (ctstamp)) :prev prev))))
-
-
-#+()
-(defmethod print-object ((o inode) stream)
-  "Print a helpful representation of an INODE that can be easily
-  understood by quick visual inspection. This should only be used
-  during development, however, as it is not compliant with the
-  standard common-lisp specification for *PRINT-READABLY*. A
-  trivial example of the printed representation might appear as
-  follows:
-  ```
-  ;;;
-  ;;;    #S(CTRIE
-  ;;;       :READONLY-P NIL
-  ;;;       :TEST EQUAL
-  ;;;       :HASH SXHASH
-  ;;;       :ROOT #<INODE ctrie654349 @2012-08-09T19:31:01.686562-04:00
-  ;;;               (HAS-PREV? NIL)
-  ;;;               :=> #S(CNODE
-  ;;;                      :BITMAP 67108864
-  ;;;                      :FLAGS #*00000000000000000000000000100000
-  ;;;                      :ARCS #(#S(SNODE :KEY 1 :VALUE 2)))>)
-  ```"
-  ;; (if (ref-p (inode-ref o))
-  ;;   (progn
-  ;;   (print-unreadable-object (o stream)
-  ;;     (format stream
-  ;;       "~a ~a ~s~%           ~C~A ~A~C~%           ~s ~s" 
-  ;;       :inode (inode-gen o) (ref-stamp (inode-ref o))        
-  ;;       #\( :has-prev? (not (null (ref-prev (inode-ref o)))) #\)
-  ;;       :=> (ref-value (inode-ref o))))
-  ;;     (terpri stream))
-  (if *debug*
-    (call-next-method)
-    (print-unreadable-object (o stream :identity t)
-      (format stream
-         "~a ~a ~s"
-         :inode (inode-gen o) (ref-stamp (inode-ref o))))))
-
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; CAS / GCAS 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defmacro gcas-compare-and-set (obj expected new expected-stamp new-stamp prev)
-  "A thin, macro layer abstraction over the basic compare-and-swap
-  primitive which provides a consistent interface to the underlying
-  inode structure and manages additional metadata, providing
-  reasonable defaults when they are not specified."
-  `(let ((ref (inode-ref ,obj)))
-     (and
-       (if *debug* (local-time:timestamp= (ref-stamp ref) ,expected-stamp) t)
-       (typecase ,obj
-         (transient-inode
-           (with-active-layers (transient)
-             (and   (eql (ref-value ref) ,expected)
-               (eq  (sb-ext:compare-and-swap (slot-value ,obj 'ref)  ref
-                      (make-ref :value ,new :stamp ,new-stamp :prev ,prev))
-                 ref))))
-         (persistent-inode
-           (with-active-layers (persistent)
-             (let ((ref-ptr (mm:mptr ref)))
-               (and
-                 (eql (mm:mptr (ref-value ref)) (mm:mptr ,expected))
-                 (eql (cas-word-sap (mm::mm-object-pointer ,obj) ref-ptr
-                        (mm:mptr (make-ref :value ,new :stamp ,new-stamp :prev ,prev)))
-                   ref-ptr)))))))))
+(defmethod gcas-compare-and-set ((obj persistent-inode)
+                                  expected new expected-stamp new-stamp prev)
+  (declare (ignore expected-stamp))
+  (let ((ref (inode-ref obj)))
+    (with-active-layers (persistent)
+      (let ((ref-ptr (mm:mptr ref)))
+        (and
+          (eql (mm:mptr (ref-value ref)) (mm:mptr expected))
+          (eql (cas-word-sap (mm::mm-object-pointer obj) ref-ptr
+                 (mm:mptr (make-ref :value new :stamp new-stamp :prev prev)))
+            ref-ptr))))))
 
 
 #+()
@@ -831,19 +752,21 @@
     (gcas-compare-and-set
       #3=#.(make-inode (make-ctrie)) (ref-value (inode-ref #3#)) :x nil nil nil))) 
   
-  
-(defun/inline INODE-READ (inode)
+;; (fmakunbound 'inode-read)
+;; (defun/inline
+(defun INODE-READ (inode)
   "INODE-READ provides the top-level interface to the inode _GCAS ACCESS_
   api, which is the mechanism which must be used to gain access to the
   content of any NON-ROOT inode. For access to the root inode, refer
   to the RDCSS inode api `ROOT-NODE-ACCESS`. Returns as four values,
   the MAIN-NODE, the STAMP, the PREVIOUS STATE (if any), and the REF
   structure encapsulated by the inode."
+  (check-type inode inode)
   (let (ref)
     (setf ref (inode-ref inode))
     (multiple-value-bind (val stamp prev)
-      (values (ref-value ref) (ref-stamp ref) (ref-prev ref))
-      (if (null prev)
+(:printv      (values (ref-value ref) (ref-stamp ref) (ref-prev ref)))
+ (:printv     (if  (null prev)
         (return-from inode-read (values val stamp prev ref))
         (let1 result (inode-commit inode ref)
           (return-from inode-read (values
@@ -851,51 +774,75 @@
                                     (ref-stamp result)
                                     (ref-prev result)
                                     result)))))))
-
-
-(defun/inline INODE-MUTATE (inode old-value new-value)
+)
+;; (fmakunbound 'inode-mutate)
+;;(defun/inline 
+(defun INODE-MUTATE (inode old-value new-value)
   "INODE-MUTATE provides the top-level interface to the inode _GCAS
   MODIFICATION_ api, which is the mechanism which must be used to
   effect any change in a NON-ROOT inode.  For modification of the
   root-inode, refer to the `ROOT-NODE-REPLACE` _RDCSS ROOT NODE
   PROTOCOL_ Returns a boolean value which indicates the success or
   failure of the modification attempt."
+  (check-type inode inode)
+  (check-type old-value (or snode tnode cnode))
+  (check-type new-value (or snode tnode cnode))
   (when (ctrie-readonly-p *ctrie*)
     (ctrie-modification-failed "This CTRIE is READ-ONLY"
       :op 'inode-mutate :place (describe-object inode nil)))
-  (multiple-value-bind (val stamp prev ref) (inode-read inode)
-    (declare (ignore val prev ref))
-    (if (gcas-compare-and-set inode
-          old-value new-value stamp (ctstamp) old-value)
-      (return-from inode-mutate
-        (null (ref-prev (inode-commit inode (inode-ref inode)))))
-      (return-from inode-mutate
-        nil))))
+  (:printv "INODE-MUTATION" :op 'inode-mutate :place (describe-object inode nil))
+  (multiple-value-bind (val stamp prev ref) (:printv (inode-read inode))
+    (declare (ignorable val stamp prev ref))
+    (if (:printv (gcas-compare-and-set inode old-value
+                   new-value stamp (ctstamp stamp) old-value))
+      (:printv (return-from inode-mutate
+                 (null (ref-prev (inode-commit inode (inode-ref inode))))))
+      (:printv (return-from inode-mutate nil)))))
 
-(defmacro cas-failed-ref (inode ref)
-  `(typecase ,inode
-     (transient-inode (with-active-layers (transient)
-                        (let ((prev (ref-prev ,ref)))
-                          (eq (cas (slot-value ,inode 'ref) ,ref (failed-ref-prev prev)) ,ref))))
-     (persistent-inode (with-active-layers (persistent)
-                         (let ((prev (ref-prev ,ref))) 
-                           (eql (cas-word-sap (mm::mm-object-pointer ,inode) (mm:mptr ,ref)
-                                  (mm:mptr (failed-ref-prev prev))) (mm:mptr ,ref))))))) 
 
-(defmacro cas-ref-prev (ref prev new-generator)
-  `(typecase ,ref
-     (transient-ref  (with-active-layers (transient)
-                       (cas (slot-value ,ref 'prev) ,prev (funcall ,new-generator))))
-     (persistent-ref (with-active-layers (persistent)
-                       (let* ((ref-prev-ptr (mm::mm-object-pointer ,ref))
-                               (prev-mptr (mm:mptr ,prev))
-                               (new (funcall ,new-generator))
-                               (new-mptr  (if new (mm:mptr new) 0)))
-                         (cas-word-sap ref-prev-ptr prev-mptr new-mptr))))))
-                                           
 
-(defun INODE-COMMIT (inode ref)
-  "INODE-COMMIT implements the _GCAS COMMIT_ protocol which is invoked
+(defmethod cas-failed-ref ((inode fundamental-inode) ref)
+  (with-active-layers (fundamental)
+    (let* ((prev (fundamental-ref-prev ref))            
+            (failed-ref-prev (fundamental-failed-ref-prev prev)))
+      (eq (cas (fundamental-inode-ref inode) ref failed-ref-prev) ref))))
+
+(defmethod cas-failed-ref ((inode transient-inode) ref)
+  (with-active-layers (transient)
+    (let* ((prev (ref-prev ref))
+           (failed-ref-prev (failed-ref-prev prev)))
+      (eq (cas (slot-value inode 'ref) ref failed-ref-prev) ref))))
+
+(defmethod cas-failed-ref ((inode persistent-inode) ref)
+  (with-active-layers (persistent)
+    (let* ((prev (ref-prev ref))
+            (failed-ref-prev (failed-ref-prev prev)))
+      (eql (cas-word-sap (mm::mm-object-pointer inode)
+             (mm:mptr ref) (mm:mptr failed-ref-prev))
+        (mm:mptr ref)))))
+
+
+(defmethod cas-ref-prev ((ref fundamental-ref) prev new-generator)
+  (with-active-layers (fundamental)
+    (cas (fundamental-ref-prev ref) prev (funcall new-generator))))
+
+
+(defmethod cas-ref-prev ((ref transient-ref) prev new-generator)
+  (with-active-layers (transient)
+    (cas (slot-value ref 'prev) prev (funcall new-generator))))
+
+(defmethod cas-ref-prev ((ref persistent-ref) prev new-generator)
+  (with-active-layers (persistent)
+    (let* ((ref-prev-ptr (mm::mm-object-pointer ref))
+            (prev-mptr   (mm:mptr prev))
+            (new         (funcall new-generator))
+            (new-mptr    (if new (mm:mptr new) 0)))
+      (unless (zerop (cas-word-sap ref-prev-ptr prev-mptr new-mptr))
+        prev))))
+
+
+ (defun INODE-COMMIT (inode ref)
+   "INODE-COMMIT implements the _GCAS COMMIT_ protocol which is invoked
   as necessary by the `INODE-READ` and `INODE-MUTATE` entry-points.  It is
   not meant to be invoked directly, as this would most likely result
   in corruption. Returns the `REF` structure representing the content of
@@ -906,37 +853,37 @@
   by a forward reference to a RDCSS-aware `ROOT-NODE-ACCESS` in order
   to safely compare INODE's generational descriptor with the one found
   in the root inode of the subject CTRIE."
-  (when (ctrie-readonly-p *ctrie*)
-    (ctrie-modification-failed "This CTRIE is READ-ONLY"
-      :op 'inode-commit :place (describe-object inode nil)))
-  (flet ((ABORTABLE-READ (ctrie)
-           (root-node-access ctrie t)))
-    (let1 prev (printv (ref-prev ref))
-      (typecase prev
-        (null
-          (return-from inode-commit ref))
-        (failed-ref
-         (printv  (if (cas-failed-ref inode ref)     ;; (cas (inode-ref inode) ref (failed-ref-prev prev))
-            (return-from inode-commit
-              (failed-ref-prev prev))
-            (return-from inode-commit
-              (inode-commit inode (inode-ref inode))))))
-        (t
-    (if     (printv  (and (not (ctrie-readonly-p *ctrie*))
-                       (gen-eq (printv  (inode-gen (ABORTABLE-READ *ctrie*)))
-                        (printv (inode-gen inode)))))
-            (if     (printv  (cas-ref-prev ref prev (constantly nil)) ) ;; (cas (ref-prev ref) prev nil)
-              (return-from inode-commit ref)
-              (return-from inode-commit
-                (inode-commit inode ref)))
-            (printv      (progn (cas-ref-prev ref prev    ;; (cas (ref-prev ref) prev
-                     (lambda ()
-                       (make-failed-ref
-                       :value (ref-value prev)
-                       :stamp (ref-stamp prev)
-                       :prev  (ref-prev  prev))))
-              (return-from inode-commit
-                (inode-commit inode (inode-ref inode)))))))))))
+     (when (ctrie-readonly-p *ctrie*)
+       (ctrie-modification-failed "This CTRIE is READ-ONLY"
+         :op 'inode-commit :place (describe-object inode nil)))
+   (:printv :inode-commit  inode ref (ref-prev ref))
+     (flet ((ABORTABLE-READ (ctrie)
+              (root-node-access ctrie t)))
+       (let1 prev  (ref-prev ref)
+         (typecase prev
+           (null (:printv prev)
+             (:printv (return-from inode-commit ref)))
+           (failed-ref (:printv prev) 
+             (if (:printv inode ref (cas-failed-ref inode ref))
+               (return-from inode-commit (:printv "cas-failed-ref ok" prev
+                                           (failed-ref-prev prev)))
+               (return-from inode-commit (:printv "cas-failed-ref retry"
+                                           (inode-commit inode (inode-ref inode))))))
+           (t (:printv "Generational CAS/COMMIT")
+             (if (:printv (gen-eq  (inode-gen (ABORTABLE-READ *ctrie*))
+                            (inode-gen inode)))
+               (let1 committed (:printv (cas-ref-prev ref prev (constantly nil)))
+                 (if (null committed) ;;(zerop committed))
+                   (:printv (return-from inode-commit  (inode-commit inode ref)))
+                   (:printv (return-from inode-commit ref))))
+               (progn (:printv (cas-ref-prev ref prev   
+                        (lambda ()
+                          (make-failed-ref
+                            :value (ref-value prev)
+                            :stamp (ref-stamp prev)
+                            :prev  (ref-prev  prev)))) )
+                 (return-from inode-commit 
+                   (inode-commit inode (inode-ref inode))))))))))
 
 
 
@@ -951,36 +898,21 @@
      :persistent t
      :initform nil)))
 
-(define-layered-function maybe-box (thing))
 
 (define-layered-method maybe-box :in t (thing)
   thing)
 
 (define-layered-method maybe-box :in persistent ((thing t))
-  (if (ctrie-pooling-enabled-p)
-    (let ((byte-vector (hu.dwim.serializer:serialize thing))
-           (result (sb-concurrency:make-mailbox)))
-      (request-dynamic-action! (lambda (x) (sb-concurrency:send-message result
-                                        (make-instance 'serial-box
-                                          :contents (mm:lisp-object-to-mptr x))))
-        byte-vector)
-      (return-from maybe-box (sb-concurrency:receive-message result))
+  ;; (if (ctrie-pooling-enabled-p)
+  ;;   (let ((byte-vector (hu.dwim.serializer:serialize thing))
+  ;;          (result (sb-concurrency:make-mailbox)))
+  ;;     (request-dynamic-action! (lambda (x) (sb-concurrency:send-message result
+  ;;                                       (make-instance 'serial-box
+  ;;                                         :contents (mm:lisp-object-to-mptr x))))
+  ;;       byte-vector)
+  ;;     (return-from maybe-box (sb-concurrency:receive-message result)))
     (let ((byte-vector (hu.dwim.serializer:serialize thing)))
-      (make-instance 'serial-box :contents (mm:lisp-object-to-mptr byte-vector))))))
-
-#+()
-(define-layered-method maybe-box :in persistent ((thing string))
-  (if (ctrie-pooling-enabled-p)
-    (let ((result (sb-concurrency:make-mailbox)))
-      (request-dynamic-action!
-        (lambda (thing)
-          (sb-concurrency:send-message result
-            (mm:make-mm-fixed-string (+ 3 (length thing)) :value (first thing))))
-        thing)
-      (return-from maybe-box
-        (sb-concurrency:receive-message result)))
-    (return-from maybe-box
-      (mm:make-mm-fixed-string (+ 3 (length thing)) :value thing))))
+      (make-instance 'serial-box :contents (mm:lisp-object-to-mptr byte-vector))))
  
 
 (define-layered-method maybe-box :in persistent ((thing mm:mm-object))
@@ -995,28 +927,20 @@
 (define-layered-method maybe-box :in persistent ((thing null))
   thing)
 
-#+()
-(define-layered-method maybe-box :in persistent ((thing cons))
-  thing)
-
-#+()
-(define-layered-method maybe-box :in persistent ((thing array))
-  thing)
-
 (define-layered-method maybe-box :in persistent ((thing string))
   thing)
 
-
-(define-layered-function maybe-unbox (thing))
 
 (define-layered-method maybe-unbox :in t (thing)
   thing)
 
 (define-layered-method maybe-unbox :in t ((box serial-box))
-  (hu.dwim.serializer:deserialize (first (mm:mptr-to-lisp-object (serial-box-contents box)))))
+  (hu.dwim.serializer:deserialize (first (mm:mptr-to-lisp-object
+                                           (serial-box-contents box)))))
 
 (define-layered-method maybe-unbox :in persistent ((box serial-box))
-  (hu.dwim.serializer:deserialize (first (mm:mptr-to-lisp-object (first (serial-box-contents box))))))
+  (hu.dwim.serializer:deserialize (first (mm:mptr-to-lisp-object
+                                           (first (serial-box-contents box))))))
 
 (define-layered-method maybe-unbox :in persistent ((thing t))
   thing)
@@ -1032,142 +956,64 @@
 ;; SNODE 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-#+()
-(defstruct (snode
+
+(defstruct (fundamental-snode
              (:copier nil))
-  "SNODE, i.e., 'Storage Node', is the LEAF-NODE structure ultimately
-  used for the storage of each key/value pair contained in the CTRIE.
-  An SNODE is considered to be immutable during its lifetime.
-   - `KEY` defines the slot containing an element of the map's domain.
-   - `VALUE` defines the slot containing the range-element mapped to `KEY`"
-  (key   nil  :read-only t)
-  (value nil  :read-only t))
+  (key   nil)  
+  (value nil)) 
 
 (defclass transient-snode ()
-  ((key
-     :initform nil
-     :accessor %snode-key
-     :initarg :key)
-    (value
-      :initform nil
-      :accessor %snode-value
-      :initarg :value)))
+  ((key :initform nil :initarg :key :accessor snode-key)
+    (value :initform nil :initarg :value :accessor snode-value)))
 
 (mm:defmmclass persistent-snode ()
-  ((key
-     :initform nil
-     :accessor %snode-key
-     :initarg :key
-     :persistent t)
-    (value
-      :initform nil
-      :accessor %snode-value
-      :initarg :value
-      :persistent t)))
-
-(deftype snode ()
-  '(or transient-snode persistent-snode))
-
-(defun snode-p (thing)
-  (typep thing 'snode))
-
-(define-pool transient-snode  (0)
-  (make-instance 'transient-snode))
-
-(define-pool persistent-snode (0)
-  (make-instance 'persistent-snode))
+  ((key :initform nil :initarg :key :accessor %snode-key :persistent t)
+    (value :initform nil :initarg :value :accessor %snode-value :persistent t)))
 
 
-(define-layered-function snode (key value &key &allow-other-keys))
+(defmethod snode-p ((thing t))
+  nil)
 
-(define-layered-method snode :in t (key value &key persistent)
-  (if persistent
-    (with-active-layers (persistent)
-      (snode key value))
-    (with-active-layers (transient)
-      (snode key value))))
+(defmethod snode-p ((thing fundamental-snode))
+  t)
+
+(defmethod snode-p ((thing transient-snode))
+  t)
+
+(defmethod snode-p ((thing persistent-snode))
+  t)
+
+(define-layered-method snode :in t (key value &key)
+  (make-fundamental-snode :key key :value value))
 
 (define-layered-method snode :in transient (key value &key)
-  (if (ctrie-pooling-enabled-p)
-    (aprog1 (allocate 'transient-snode)
-      (setf
-        (%snode-key   it) key
-        (%snode-value it) value))
-    (funcall #'make-instance 'transient-snode :key key :value value)))
+  (make-instance 'transient-snode :key key :value value))
 
 (define-layered-method snode :in persistent (key value &key)
-  (if (ctrie-pooling-enabled-p)
-    (aprog1 (allocate 'persistent-snode)
-      (setf
-        (%snode-key   it) (maybe-box key)
-        (%snode-value it) (maybe-box value)))
-    (funcall #'make-instance 'persistent-snode :key (maybe-box key) :value (maybe-box value))))
+  (make-instance 'persistent-snode :key (maybe-box key) :value (maybe-box value)))
 
 
-(defgeneric snode-key (snode))
+(defmethod snode-key ((snode fundamental-snode))
+  (fundamental-snode-key snode))
 
-(defmethod snode-key ((snode transient-snode))
-  (%snode-key snode))
+(defmethod snode-value ((snode fundamental-snode))
+  (fundamental-snode-value snode))
 
 (defmethod snode-key ((snode persistent-snode))
   (maybe-unbox (%snode-key snode)))
 
-(defgeneric (setf snode-key) (value snode))
-
-(defmethod (setf snode-key) (value (snode transient-snode))
-  (setf (%snode-key snode) value))
-
-(defmethod (setf snode-key) (value (snode persistent-snode))
-  (prog1 value
-    (setf (%snode-key snode) (maybe-box value))))
-
-
-(defgeneric snode-value (snode))
-
-(defmethod snode-value ((snode transient-snode))
-  (%snode-value snode))
-
 (defmethod snode-value ((snode persistent-snode))
   (maybe-unbox (%snode-value snode)))
-
-(defgeneric (setf snode-value) (value snode))
-
-(defmethod (setf snode-value) (value (snode transient-snode))
-  (setf (%snode-value snode) value))
-
-(defmethod (setf snode-value) (value (snode persistent-snode))
-  (prog1 value
-    (setf (%snode-value snode) (maybe-box value))))
-
-
-
-#+()
-(defun snode (key value)
-  "Construct a new SNODE which represents the mapping from
-  domain-element KEY to range-element VALUE."
-  (make-snode :key key :value value))
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; LNODE
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-#+()
-(defstruct (lnode
+
+(defstruct (fundamental-lnode
              (:copier nil))
-  "LNODE, i.e., 'List Node', is a special structure used to enclose
-  SNODES in a singly-linked chain when the hash-codes of the
-  respective SNODE-KEYS collide, but those keys are determined to be
-  unique by the `CTRIE-TEST` function defined for that ctrie.  An
-  LNODE (and therefore a chain of LNODEs) is considered to be
-  immutable during its lifetime.  The order of the list is
-  implemented (arbitrarily) as most recently added first, analogous to
-  `CL:PUSH`
-   - `ELT` defines the slot containing an enclosed SNODE
-   - `NEXT` defines a slot referencing the next LNODE in the chain, or
-     `NIL` if no further LNODES remain."
-  (elt  nil :read-only t) 
-  (next nil :read-only t))
+  (elt  nil) 
+  (next nil))
 
 (defclass transient-lnode ()
   ((elt
@@ -1191,45 +1037,33 @@
       :initarg :next
       :persistent t)))
 
-(deftype lnode ()
-  '(or transient-lnode persistent-lnode))
+(defmethod lnode-elt ((lnode fundamental-lnode))
+  (fundamental-lnode-elt lnode))
 
-(defun lnode-p (thing)
-  (typep thing 'lnode))
-
-
-(define-pool transient-lnode (0)
-  (make-instance 'transient-lnode))
-
-(define-pool persistent-lnode (0)
-  (make-instance 'persistent-lnode))
+(defmethod lnode-next ((lnode fundamental-lnode))
+  (fundamental-lnode-next lnode))
 
 
-(define-layered-function make-lnode (&key elt next &allow-other-keys)) 
+(defmethod lnode-p ((thing t))
+  nil)
 
-(define-layered-method   make-lnode :in t (&key elt next persistent) 
-  (if persistent
-    (with-active-layers (persistent)
-      (make-lnode :elt elt :next next))
-    (with-active-layers (transient)
-      (make-lnode :elt elt :next next))))
+(defmethod lnode-p ((thing fundamental-lnode))
+  t)
+
+(defmethod lnode-p ((thing transient-lnode))
+  t)
+
+(defmethod lnode-p ((thing persistent-lnode))
+  t)
+
+(define-layered-method   make-lnode :in t (&key elt next)
+  (make-fundamental-lnode :elt elt :next next))
   
-(define-layered-method make-lnode :in transient  (&key elt next)
-  (if (ctrie-pooling-enabled-p)
-    (aprog1 (allocate 'transient-lnode)
-      (setf
-        (lnode-elt  it) elt
-        (lnode-next it) next))
-    (funcall #'make-instance 'transient-lnode :elt elt :next next)))
+(define-layered-method make-lnode :in transient (&key elt next)
+  (make-instance 'transient-lnode :elt elt :next next))
 
-(define-layered-method make-lnode :in persistent  (&key elt next)
-  (if (ctrie-pooling-enabled-p)
-    (aprog1 (allocate 'persistent-lnode)
-      (setf
-        (lnode-elt  it) elt
-        (lnode-next it) next))
-    (funcall #'make-instance 'persistent-lnode :elt elt :next next)))
-
+(define-layered-method make-lnode :in persistent (&key elt next)
+  (make-instance 'persistent-lnode :elt elt :next next))
 
 (defun enlist (&rest rest)
   "Construct a chain of LNODE structures enclosing the values supplied.
@@ -1239,6 +1073,10 @@
     (awhen (car rest)
       (make-lnode :elt it :next (apply #'enlist (cdr rest))))))
 
+(defun lnode-collected (lnode)
+  "Return a list of ELTS in the chain beginning at LNODE"
+  (loop for current = lnode then  (lnode-next current)
+    while current collect (lnode-elt current)))
 
 (defun lnode-removed (orig-lnode key test)
   "Construct a chain of LNODE structures identical to the chain starting
@@ -1250,7 +1088,6 @@
                unless (funcall test key (leaf-node-key (lnode-elt lnode)))
                collect (lnode-elt lnode))
     (apply #'enlist elts)))
-
 
 (defun lnode-inserted (orig-lnode key value test)
   "Construct a chain of LNODE structures identical to the chain starting
@@ -1278,7 +1115,6 @@
     return (values (leaf-node-value (lnode-elt current)) t)
     finally (return (values nil nil))))
 
-
 (defun lnode-length (lnode)
   "Return the number of LNODES present in the chain beginning at LNODE"
   (loop with len = 0
@@ -1286,24 +1122,12 @@
     while current do (incf len)
     finally (return len)))
 
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; TNODE 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-#+()
-(defstruct (tnode
-             (:copier nil))
-  "A TNODE, or 'Tomb Node', is a special node structure used to preserve
-  ordering during `CTRIE-DROP` (`%remove`) operations.
-  Any time a TNODE is encountered during the course of a `CTRIE-GET` (`%lookup`)
-  operation, the operative thread is required to invoke a `CLEAN` operation
-  on the TNODE it has encountered and throw to `:RESTART` its lookup activity
-  over again.  A TNODE is considered to be immutable and may not change its
-  value during its lifetime.
-   - `CELL` defines a slot which contains the entombed node structure.
-      Only LNODE and SNODE type nodes are ever entombed"
-  (cell nil :type (or snode lnode) :read-only t))
+(defstruct (fundamental-tnode (:copier nil))
+  (cell nil :type (or snode lnode)))
 
 (defclass transient-tnode ()
   ((cell
@@ -1318,54 +1142,36 @@
      :initarg :cell
      :persistent t)))
 
-(deftype tnode ()
-  '(or transient-tnode persistent-tnode))
+(defmethod tnode-cell ((thing fundamental-tnode))
+  (fundamental-tnode-cell thing))
 
-(defun tnode-p (thing)
-  (typep thing 'tnode))
+(defmethod tnode-p ((thing t))
+  nil)
 
-(define-pool transient-tnode (0)
-  (make-instance 'transient-tnode))
+(defmethod tnode-p ((thing fundamental-tnode))
+  t)
 
-(define-pool persistent-tnode (0)
-  (make-instance 'persistent-tnode))
+(defmethod tnode-p ((thing transient-tnode))
+  t)
 
+(defmethod tnode-p ((thing persistent-tnode))
+  t)
 
-(define-layered-function make-tnode (&key cell &allow-other-keys)) 
-
-(define-layered-method   make-tnode :in t (&key cell persistent) 
-  (if persistent
-    (with-active-layers (persistent)
-      (make-tnode :cell cell))
-    (with-active-layers (transient)
-      (make-tnode :cell cell))))
+(define-layered-method   make-tnode :in t (&key cell)
+  (make-fundamental-tnode :cell cell))
 
 (define-layered-method   make-tnode :in transient  (&key cell)
-  (if (ctrie-pooling-enabled-p)
-    (aprog1 (allocate 'transient-tnode)
-      (setf
-        (tnode-cell it) cell))
-    (funcall #'make-instance 'transient-tnode :cell cell)))
+  (make-instance 'transient-tnode :cell cell))
 
 (define-layered-method   make-tnode :in persistent (&key cell)
-  (if (ctrie-pooling-enabled-p)
-    (aprog1 (allocate 'persistent-tnode)
-      (setf
-        (tnode-cell it) cell))
-    (funcall #'make-instance 'persistent-tnode :cell cell)))
-
-
-
-
-(defgeneric entomb (node)
-  (:documentation "Return a newly constructed TNODE enclosing the argument
-  LEAF-NODE structure `NODE`"))
+  (make-instance 'persistent-tnode :cell cell))
 
 (defmethod entomb (node)
-  "Unless the provided argument is of a type for which an entombment
-    specialization has been defined, signal an error, as we have arrived
-    at an undefined state and cannot continue processing."
   (error "Entombment of ~A (type ~S) is undefined." node (type-of node)))
+
+(defmethod entomb ((lnode fundamental-lnode))
+  "Entomb an LNODE in a newly created TNODE"
+  (make-fundamental-tnode :cell lnode))
 
 (defmethod entomb ((lnode transient-lnode))
   "Entomb an LNODE in a newly created TNODE"
@@ -1377,6 +1183,10 @@
   (with-active-layers (persistent)
     (make-tnode :cell lnode)))
 
+(defmethod entomb ((snode vector))
+  "Entomb an SNODE in a newly created TNODE"
+  (make-fundamental-tnode :cell snode))
+
 (defmethod entomb ((snode transient-snode))
   "Entomb an SNODE in a newly created TNODE"
   (with-active-layers (transient)
@@ -1387,33 +1197,31 @@
   (with-active-layers (persistent)
     (make-tnode :cell snode)))
 
-#+()
-(defmethod entomb ((snode snode))
-  "Entomb an SNODE in a newly created TNODE"
-  (make-tnode :cell snode))
+(defmethod resurrect (node)
+  node)
 
+(defmethod resurrect ((node fundamental-inode))
+  (atypecase (inode-read node)
+    (tnode (tnode-cell it))
+    (t     node)))
 
-(defgeneric resurrect (node)
-  (:documentation "Return the 'resurection' of the NODE argument.  The
-  resurrection of an INODE that references a TNODE is the
-  LEAF-NODE structure entombed by that TNODE.  The resurrection of
-  any other node is simply itself.")
-  (:method (node)
-    node)
-  (:method ((node transient-inode))
-    (atypecase (inode-read node)
-      (tnode (tnode-cell it))
-      (t     node)))
-  (:method ((node persistent-inode))
-    (atypecase (inode-read node)
-      (tnode (tnode-cell it))
-      (t     node))))
+(defmethod resurrect ((node transient-inode))
+  (atypecase (inode-read node)
+    (tnode (tnode-cell it))
+    (t     node)))
 
-
+(defmethod resurrect ((node persistent-inode))
+  (atypecase (inode-read node)
+    (tnode (tnode-cell it))
+    (t     node)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; CNODE
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defstruct (fundamental-cnode (:copier nil))
+  (bitmap 0           )  
+  (arcs   %empty-map%)) 
 
 (defclass transient-cnode ()
   ((bitmap
@@ -1437,47 +1245,44 @@
       :initarg :arcs
       :persistent t)))
 
-(deftype cnode ()
-  '(or transient-cnode persistent-cnode))
+(defmethod cnode-bitmap ((thing fundamental-cnode))
+  (fundamental-cnode-bitmap thing))
 
-(defun cnode-p (thing)
-  (typep thing 'cnode))
+(defmethod cnode-arcs ((thing fundamental-cnode))
+  (fundamental-cnode-arcs thing))
 
-(define-pool transient-cnode (32)
-  (make-instance 'transient-cnode :bitmap 0 :arcs (make-array (or bucket 0)))) 
+(defmethod cnode-p ((thing t))
+  nil)
 
-(define-pool persistent-cnode (32)
-  (make-instance 'persistent-cnode :bitmap 0 :arcs (mm:make-marray (or bucket 0))))
+(defmethod cnode-p ((thing fundamental-cnode))
+  t)
 
+(defmethod cnode-p ((thing transient-cnode))
+  t)
 
+(defmethod cnode-p ((thing persistent-cnode))
+  t)
 
-(define-layered-function make-cnode (&optional bitmap persistent)) 
+(define-layered-method   make-cnode :in t (&key (bitmap 0) initial-contents)
+  (assert (= (logcount bitmap) (length initial-contents)))
+  (make-fundamental-cnode
+    :bitmap bitmap
+    :arcs (make-array (logcount bitmap) :initial-contents initial-contents)))
 
-(define-layered-method   make-cnode :in t (&optional (bitmap 0) persistent) 
-  (if persistent
-    (with-active-layers (persistent)
-      (make-cnode bitmap))
-    (with-active-layers (transient)
-      (make-cnode bitmap))))
+(define-layered-method   make-cnode :in transient (&key (bitmap 0) initial-contents)
+  (assert (= (logcount bitmap) (length initial-contents)))
+  (make-instance 'transient-cnode
+    :bitmap bitmap 
+    :arcs (make-array (logcount bitmap) :initial-contents initial-contents)))
 
-(define-layered-method   make-cnode :in transient (&optional (bitmap 0) persistent)
-  (declare (ignore persistent))
-  (if (ctrie-pooling-enabled-p)
-    (aprog1 (allocate 'transient-cnode (logcount bitmap))
-      (setf (cnode-bitmap it) bitmap))
-    (make-instance 'transient-cnode :bitmap bitmap :arcs (make-array (logcount bitmap)))))
+(define-layered-method   make-cnode :in persistent (&key (bitmap 0) initial-contents)
+  (assert (= (logcount bitmap) (length initial-contents)))
+  (make-instance 'persistent-cnode
+    :bitmap bitmap
+    :arcs (mm:make-marray (logcount bitmap) :initial-contents initial-contents)))
 
-
-(define-layered-method   make-cnode :in persistent (&optional (bitmap 0) persistent)
-  (declare (ignore persistent))
-  (if (ctrie-pooling-enabled-p)
-    (aprog1 (allocate 'persistent-cnode (logcount bitmap))
-      (setf (cnode-bitmap it) bitmap))
-    (make-instance 'persistent-cnode :bitmap bitmap :arcs (mm:make-marray (logcount bitmap)))))
-
-
-
-(defgeneric arc-aref (place index))
+(defmethod arc-aref ((cnode fundamental-cnode) index)
+  (svref (fundamental-cnode-arcs cnode) index))
 
 (defmethod arc-aref ((cnode transient-cnode) index)
   (svref (cnode-arcs cnode) index))
@@ -1491,23 +1296,23 @@
 (defmethod arc-aref ((marray mm:marray) index)
   (mm:marray-ref marray index))
 
+;; (defmethod (setf arc-aref) (value (cnode fundamental-cnode) index)
+;;   (setf (svref (fundamental-cnode-arcs cnode) index) value))
 
-(defgeneric (setf arc-aref) (value place index))
+;; (defmethod (setf arc-aref) (value (cnode transient-cnode) index)
+;;   (setf (svref (cnode-arcs cnode) index) value))
 
-(defmethod (setf arc-aref) (value (cnode transient-cnode) index)
-  (setf (svref (cnode-arcs cnode) index) value))
+;; (defmethod (setf arc-aref) (value (vector vector) index)
+;;   (setf (svref vector index) value))
 
-(defmethod (setf arc-aref) (value (vector vector) index)
-  (setf (svref vector index) value))
+;; (defmethod (setf arc-aref) (value (marray mm:marray) index)
+;;   (setf (mm:marray-ref marray index) value))
 
-(defmethod (setf arc-aref) (value (marray mm:marray) index)
-  (setf (mm:marray-ref marray index) value))
+;; (defmethod (setf arc-aref) (value (cnode persistent-cnode) index)
+;;   (setf (mm:marray-ref (cnode-arcs cnode) index) value))
 
-(defmethod (setf arc-aref) (value (cnode persistent-cnode) index)
-  (setf (mm:marray-ref (cnode-arcs cnode) index) value))
-
-
-(defgeneric arcs-len (place))
+(defmethod arcs-len ((cnode fundamental-cnode))
+  (length (fundamental-cnode-arcs cnode)))
 
 (defmethod arcs-len ((cnode transient-cnode))
   (length (cnode-arcs cnode)))
@@ -1519,45 +1324,7 @@
   (length vector))
 
 (defmethod arcs-len ((marray mm:marray))
-  (mm:marray-length marray ))
-
-
-#+()
-(defstruct (cnode
-             (:constructor %make-cnode)
-             (:copier nil))
-  "A CNODE, or 'Ctrie Node' is a MAIN-NODE containing a vector of up
-  to `2^W` 'arcs' -- i.e., references to either an SNODE or INODE
-  structure, collectively referred to as `BRANCH-NODES.` Each CNODE
-  also contains a (fixnum) bitmap that describes the layout of which
-  logical indices within the total capacity of `2^W` arcs are actually
-  allocated within that node with BRANCH-NODES physically present.
-  For more specific details on these BITMAP and ARC-VECTOR
-  constituents, refer to the following related functions: `FLAG`
-  `FLAG-PRESENT-P` `FLAG-VECTOR` and `FLAG-ARC-POSITION. The CNODE
-  structure is considered to be immutable and arcs may not be added or
-  removed during its lifetime.  The storage allocated within a CNODE
-  is fixed and specified at the time of its creation based on the
-  value of BITMAP during initialization
-   - `BITMAP`
-   - `ARCS` "
-  (bitmap 0           )  ;;:read-only t)
-  (arcs   %empty-map% )) ;;:read-only t))
-
-#+()
-(defun make-cnode (&optional (bitmap 0))
-  "Construct a CNODE with internal storage allocated for the number of
-  arcs equal to the Hamming-Weight of the supplied BITMAP parameter.
-  If no BITMAP is provided, the CNODE created will be empty -- a state
-  which is only valid for the level 0 node referenced by the root of
-  the CTRIE.  This constructor is otherwise never called directly, but
-  is invoked during the course of higher-level operations such as
-  `CNODE-EXTENDED` `CNODE-UPDATED` `CNODE-TRUNCATED` and `MAP-CNODE`"
-  (if *pool-enabled*
-    (aprog1 (allocate-cnode (logcount bitmap))
-      (setf (cnode-bitmap it) bitmap))
-    (%make-cnode :bitmap bitmap :arcs (make-array (logcount bitmap)))))
-
+  (mm:marray-length marray))
 
 (defun cnode-extended (cnode flag position new-arc)
   "Construct a new cnode structure that is exactly like CNODE, but
@@ -1574,17 +1341,18 @@
   LOGICAL index and the current CNODE BITMAP as described in more
   detail by the documentation for the functions `FLAG` `FLAG-VECTOR` and
   `FLAG-ARC-POSITION`"
-  (let* ((new-bitmap (logior flag (cnode-bitmap cnode)))
-          (new-cnode  (make-cnode new-bitmap)))
-    (prog1 new-cnode
-      (loop for i from 0 to (1- (arcs-len cnode))
-        do (setf (arc-aref new-cnode i) (arc-aref cnode i)))
-      (setf (arc-aref new-cnode position) new-arc)
-      (unless (> position (arcs-len cnode))
-        (loop
-          for new-index from (+ position 1) to (1- (arcs-len new-cnode))
-          for old-index from position
-          do (setf (arc-aref new-cnode new-index) (arc-aref cnode old-index)))))))
+  (let* ((old-bitmap (cnode-bitmap cnode))
+          (new-bitmap (logior flag old-bitmap))
+          (contents (make-array (logcount new-bitmap))))    
+    (loop for i from 0 to (1- (logcount old-bitmap))
+      do (setf (aref contents i) (arc-aref cnode i)))
+    (setf (aref contents position) new-arc)
+    (unless (> position (logcount old-bitmap))
+      (loop for new-index from (+ position 1) to (1- (logcount new-bitmap))
+        for old-index from position do
+          (setf (aref contents new-index) (arc-aref cnode old-index))))
+    (make-cnode :bitmap new-bitmap
+      :initial-contents (coerce contents 'list))))
 
 
 (defun cnode-updated (cnode position replacement-arc)
@@ -1595,12 +1363,20 @@
   existing BITMAP of this CNODE will remain unchanged (as this is
   simply a one-for-one replacement) and correspondingly, no reordering
   of other nodes within the storage vector will occur"
-  (let ((new-cnode (make-cnode (cnode-bitmap cnode))))
-    (prog1 new-cnode
-      (loop for i from 0 to (1- (arcs-len cnode))
-        do (setf (arc-aref new-cnode i) (arc-aref cnode i)))
-      (setf (arc-aref new-cnode position) replacement-arc))))
-
+  (let* ((bitmap (cnode-bitmap cnode))
+          (contents (make-array (logcount bitmap))))
+    (loop for i from 0 to (1- (logcount bitmap))
+      do (setf (aref contents i) (arc-aref cnode i)))
+    (setf (aref contents position) replacement-arc)
+    (make-cnode :bitmap bitmap
+      :initial-contents (coerce contents 'list))))
+    
+  
+  ;; (let ((new-cnode (make-cnode (cnode-bitmap cnode))))
+  ;;   (prog1 new-cnode
+  ;;     (loop for i from 0 to (1- (arcs-len cnode))
+  ;;       do (setf (arc-aref new-cnode i) (arc-aref cnode i)))
+  ;;     (setf (arc-aref new-cnode position) replacement-arc))))
 
 (defun cnode-truncated (cnode flag pos)
   "Construct a new cnode structure that is exactly like CNODE, but
@@ -1613,15 +1389,26 @@
  documentation for the functions `FLAG` `FLAG-VECTOR` and
  `FLAG-ARC-POSITION`"
   (let* ((new-bitmap (logxor flag (cnode-bitmap cnode)))
-          (new-cnode (make-cnode new-bitmap)))
-    (prog1 new-cnode
-      (loop with src-index = 0
-        for dest-index from 0 to (1- (arcs-len new-cnode))
-        for dest = (arc-aref new-cnode dest-index) 
-        when  (= src-index pos) do (incf src-index)
-        do (setf (arc-aref new-cnode dest-index)
-             (arc-aref cnode (post-incf src-index)))))))
+          (contents (make-array (logcount new-bitmap))))
+    (loop  with src-index = 0
+      for  dest-index from 0 to (1- (logcount new-bitmap))
+      for  dest = (aref contents dest-index) 
+      when (= src-index pos) do (incf src-index)
+      do   (setf (aref contents dest-index)
+             (arc-aref cnode (post-incf src-index))))
+    (make-cnode :bitmap new-bitmap
+      :initial-contents (coerce contents 'list))))
 
+  
+  ;; (let* ((new-bitmap (logxor flag (cnode-bitmap cnode)))
+  ;;         (new-cnode (make-cnode new-bitmap)))
+  ;;   (prog1 new-cnode
+  ;;     (loop  with src-index = 0
+  ;;       for  dest-index from 0 to (1- (arcs-len new-cnode))
+  ;;       for  dest = (arc-aref new-cnode dest-index) 
+  ;;       when (= src-index pos) do (incf src-index)
+  ;;       do   (setf (arc-aref new-cnode dest-index)
+  ;;              (arc-aref cnode (post-incf src-index)))))))
 
 (defun map-cnode (fn cnode)
   "Construct a new cnode structure that is exactly like CNODE, but
@@ -1633,18 +1420,25 @@
   vector will occur"
   (check-type fn function)
   (check-type cnode cnode)
-  (aprog1 (make-cnode (cnode-bitmap cnode))
-    (loop for i from 0 to (1- (arcs-len cnode))
-      do (setf (arc-aref it i) (funcall fn (arc-aref cnode i))))))
+  (let* ((bitmap (cnode-bitmap cnode))
+          (contents (make-array (logcount bitmap)))) 
+    (loop for i from 0 to (1- (length contents))
+      do (setf (aref contents i) (funcall fn (arc-aref cnode i))))
+    (make-cnode :bitmap bitmap
+      :initial-contents (coerce contents 'list))))
+
+    
+  ;; (aprog1 (make-cnode (cnode-bitmap cnode))
+  ;;   (loop for i from 0 to (1- (arcs-len cnode))
+  ;;     do (setf (arc-aref it i) (funcall fn (arc-aref cnode i))))))
 
 
+;; CNODE
 
-(defgeneric refresh (place gen)
-  (:documentation "Reconcile the node specified by PLACE with an
-  updated generational descriptor object, GEN. The actions required
-  for this reconciliation vary according to the node type and 
-  specializations are defined on a casewise basis."))
-
+(defmethod refresh ((cnode fundamental-cnode) gen)
+  "Return a new cnode structure identical to CNODE, but with any
+    arcs that are INODES refreshed to generational descriptor GEN"
+  (map-cnode (lambda (arc) (refresh arc gen)) cnode))
 
 (defmethod refresh ((cnode transient-cnode) gen)
   "Return a new cnode structure identical to CNODE, but with any
@@ -1656,8 +1450,9 @@
     arcs that are INODES refreshed to generational descriptor GEN"
   (map-cnode (lambda (arc) (refresh arc gen)) cnode))
 
+;; INODE
 
-(defmethod refresh ((inode transient-inode) gen)
+(defmethod refresh ((inode fundamental-inode) gen)
   "Generate a replacement for inode that continues to reference the
     same MAIN-NODE as before, but otherwise contains the new generational
     descriptor GEN, and a new REF substructure initialized
@@ -1667,37 +1462,36 @@
     not eagerly descend and propagate until needed, eliminating the
     overhead incurred by full traversals which, in many situations, turn out
     to be not even necessary."    
+  (multiple-value-bind (val stamp) (inode-read inode)
+    (declare (ignore stamp))
+    (make-inode val gen (ctstamp))))
+
+(defmethod refresh ((inode transient-inode) gen)
   (multiple-value-bind (val stamp) (inode-read inode)
     (declare (ignore stamp))
     (make-inode val gen (ctstamp))))
 
 (defmethod refresh ((inode persistent-inode) gen)
-  "Generate a replacement for inode that continues to reference the
-    same MAIN-NODE as before, but otherwise contains the new generational
-    descriptor GEN, and a new REF substructure initialized
-    with freshly generated metadata, unconditionally discarding the old.
-    Note that the refresh of an inode is not transitive to the nodes contained
-    in the portion of the CTRIE that it references.  I.e., the process does
-    not eagerly descend and propagate until needed, eliminating the
-    overhead incurred by full traversals which, in many situations, turn out
-    to be not even necessary."    
   (multiple-value-bind (val stamp) (inode-read inode)
     (declare (ignore stamp))
     (make-inode val gen (ctstamp))))
 
+;; SNODE
 
-(defmethod refresh ((snode transient-snode) gen)
+(defmethod refresh ((snode fundamental-snode) gen)
   "An SNODE represents a LEAF storage cell and does not require
     any coordination with generational descriptors, and so is simply
     returned as-is. "
+  (declare (ignore gen))
+  snode)
+
+(defmethod refresh ((snode transient-snode) gen)
+  (declare (ignore gen))
   snode)
 
 (defmethod refresh ((snode persistent-snode) gen)
-  "An SNODE represents a LEAF storage cell and does not require
-    any coordination with generational descriptors, and so is simply
-    returned as-is. "
+  (declare (ignore gen))
   snode)
-
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1723,7 +1517,6 @@
         (t     cnode))
       cnode)))
 
-
 (defun/inline cnode-compressed (cnode level)
   "The _COMPRESSION_ of a CNODE is the second step of the _ARC
   RETRACTION PROTOCOL_ completing a retraction that has been initiated
@@ -1740,7 +1533,6 @@
   (check-type cnode cnode)
   (cnode-contracted (map-cnode #'resurrect cnode) level))
 
-
 (defun/inline clean (inode level)
   "CLEAN is the basic entry-point into the arc retraction protocol. Given an
   arbitrary, non-root inode referencing a CNODE that can be compressed,
@@ -1753,7 +1545,6 @@
       (if (cnode-p node)
         (inode-mutate inode node (cnode-compressed node level))
         t))))
-
 
 (defun clean-parent (parent-inode target-inode key level)
   "During a `CTRIE-DROP` (`%remove`) operation, if the result of a KEY/VALUE
@@ -1780,72 +1571,62 @@
                   (not (inode-mutate parent-inode parent-ref
                          (cnode-contracted new-cnode level))))))))))))
 
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; node type abstractions
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(deftype leaf-node ()
-  "A LEAF-NODE represents a terminal value in a CTRIE arc.
-  LEAF-NODEs always contain a unit-payload of CTRIE data
-  storage; For example, an SNODE contains a key/value pair."
-  `(or snode tnode))
-
 (defun leaf-node-p (thing)
   (subtypep (type-of thing) 'leaf-node))
-    
-(deftype branch-node ()
-  "a BRANCH-NODE represents a single arc typically contained
-  within A CNODE."
-  `(or inode snode))
 
 (defun branch-node-p (thing)
   (subtypep (type-of thing) 'branch-node))
 
-(deftype main-node ()
-  "A MAIN-NODE is a node that typically represents a specific
-  depth or level within the ctrie and is referenced
-  by its own unique inode."
-  `(or cnode lnode tnode))
-
 (defun main-node-p (thing)
   (subtypep (type-of thing) 'main-node))
 
+(defmethod leaf-node-key ((snode fundamental-snode))
+  (fundamental-snode-key snode))
 
-(defgeneric leaf-node-key (resource)
-  (:documentation "Return the KEY contained in a node that may be
-  either an SNODE or entombed SNODE, regardless of which kind it
-  happens to be")
-  (:method ((snode transient-snode))
-    (snode-key snode))
-  (:method ((snode persistent-snode))
-    (snode-key snode))
-  (:method ((tnode transient-tnode))
-    (leaf-node-key (tnode-cell tnode)))
-  (:method ((tnode persistent-tnode))
-    (leaf-node-key (tnode-cell tnode))))
+(defmethod leaf-node-key ((snode transient-snode))
+  (snode-key snode))
 
+(defmethod leaf-node-key ((snode persistent-snode))
+  (snode-key snode))
 
-(defgeneric leaf-node-value (resource)
-  (:documentation "Return the VALUE contained in a node that may be
-  either an SNODE or entombed SNODE, regardless of which kind it
-  happens to be")
-  (:method ((snode transient-snode))
-    (snode-value snode))
-  (:method ((snode persistent-snode))
-    (snode-value snode))
-  (:method ((tnode transient-tnode))
-    (leaf-node-value (tnode-cell tnode)))
-  (:method ((tnode persistent-tnode))
-    (leaf-node-value (tnode-cell tnode))))
+(defmethod leaf-node-key ((tnode fundamental-tnode))
+  (leaf-node-key
+    (fundamental-tnode-cell tnode)))
+
+(defmethod leaf-node-key ((tnode transient-tnode))
+  (leaf-node-key
+    (tnode-cell tnode)))
+
+(defmethod leaf-node-key ((tnode persistent-tnode))
+  (leaf-node-key
+    (tnode-cell tnode)))
+
+(defmethod leaf-node-value ((snode fundamental-snode))
+  (fundamental-snode-value snode))
+
+(defmethod leaf-node-value ((snode transient-snode))
+  (snode-value snode))
+
+(defmethod leaf-node-value ((snode persistent-snode))
+  (snode-value snode))
+
+(defmethod leaf-node-value ((tnode fundamental-tnode))
+  (leaf-node-value (fundamental-tnode-cell tnode)))
+
+(defmethod leaf-node-value ((tnode transient-tnode))
+  (leaf-node-value (tnode-cell tnode)))
+
+(defmethod leaf-node-value ((tnode persistent-tnode))
+  (leaf-node-value (tnode-cell tnode)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; RDCSS root-inode protocol
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;;; Reimplemented as a regular function in order to reduce the cost
-;;; of generic dispatch, as this is heavily used.
 
 (defun/inline find-ctrie-root (ctrie-designator)
   "FIND-CTRIE-ROOT is a subprimitive used by the
@@ -1862,57 +1643,10 @@
     (ctrie-root ctrie-designator)))
 
 
-;; (defgeneric find-ctrie-root (ctrie-designator)
-;;   (:documentation "FIND-CTRIE-ROOT is a subprimitive used by the
-;;   internal CTRIE implementation to access the root inode of a given
-;;   ctrie root-container. It does not provide safe access to the
-;;   contents of that inode and should not be referenced by the
-;;   higher-level implementation or end-user code.  The purpose of
-;;   FIND-CTRIE-ROOT is to incorporate a level of indirection specialized
-;;   on the class of the root container to facilitate future extension
-;;   with alternate storage models, e.g., an external persistent disk-based
-;;   store. See also `(cas cl-ctrie::find-ctrie-root)`")
-;;   (:method ((ctrie ctrie))
-;;     (ctrie-root ctrie))
-;;   (:method ((ctrie function))
-;;     (find-ctrie-root (funcall ctrie #'identity))))
-
-
-;; (defgeneric (cas find-ctrie-root) (ctrie-designator old new)
-;;   (:documentation "(CAS FIND-CTRIE-ROOT) implements the atomic
-;;   compare-and swap subprimitive that is the operational analogue to
-;;   `FIND-CTRIE-ROOT`. It should not be referenced by the higher-level
-;;   implementation or end-user code. The purpose of
-;;   `(CAS FIND-CTRIE-ROOT)` is to incorporate a level of indirection
-;;   specialized on the class of the root container to facilitate future
-;;   extension with alternate storage models, e.g., an external
-;;   persistent disk-based store.")
-;;   (:method ((ctrie ctrie) old new)
-;;     (cas (ctrie-root ctrie) old new)))
-
-#+()
-(defstruct (rdcss-descriptor
-             (:copier nil))
-  "An RDCSS-DESCRIPTOR object represents a 'plan' for a proposed RDCSS
-  (restricted double compare single swap) operation. The use of this
-  descriptor object provides the means to effect an atomic RDCSS in
-  software, requiring only hardware support for single-word CAS, which is
-  preferable because it is commonly available on curent consumer hardware.
-   - `OV`        designates a slot containing the OLD (current) root inode.
-                 If the swap is unsuccessful, the resulting ctrie will revert
-                 to this structure as the root inode. 
-   - `OVMAIN`    designates a slot containing the CNODE that is referenced
-                 by the OLD (current) root inode.
-   - `NV`        designates a slot containing a fully assembled replacement
-                 root inode referencing a valid CNODE. This pair will become
-                 the root inode and level 0 MAIN-NODE of the ctrie if the
-                 swap is successful.
-   - `COMMITTED` designates a flag which, when not NIL, indicates that the
-                 RDCSS plan defined by this descriptor has completed
-                 successfully"
-  (ov        nil :read-only t)
-  (ovmain    nil :read-only t)
-  (nv        nil :read-only t)
+(defstruct (fundamental-rdcss-descriptor (:copier nil))
+  (ov        nil)
+  (ovmain    nil)
+  (nv        nil)
   (committed nil))
 
 
@@ -1956,51 +1690,40 @@
       :initarg :committed
       :persistent t)))
 
-(deftype rdcss-descriptor ()
-  '(or transient-rdcss-descriptor persistent-rdcss-descriptor))
+(defmethod rdcss-descriptor-p ((thing fundamental-rdcss-descriptor))
+  t)
 
-(defun rdcss-descriptor-p (thing)
-  (typep thing 'rdcss-descriptor))
+(defmethod rdcss-descriptor-p ((thing transient-rdcss-descriptor))
+  t)
 
-(define-pool transient-rdcss-descriptor (0)
-  (make-instance 'transient-rdcss-descriptor))
+(defmethod rdcss-descriptor-p ((thing persistent-rdcss-descriptor))
+  t)
 
-(define-pool persistent-rdcss-descriptor (0)
-  (make-instance 'persistent-rdcss-descriptor))
+(defmethod rdcss-descriptor-ov ((thing fundamental-rdcss-descriptor))
+  (fundamental-rdcss-descriptor-ov thing))
 
+(defmethod rdcss-descriptor-ovmain ((thing fundamental-rdcss-descriptor))
+  (fundamental-rdcss-descriptor-ovmain thing))
 
-(define-layered-function make-rdcss-descriptor (&key ov ovmain nv committed &allow-other-keys)) 
+(defmethod rdcss-descriptor-nv ((thing fundamental-rdcss-descriptor))
+  (fundamental-rdcss-descriptor-nv thing))
 
-(define-layered-method   make-rdcss-descriptor :in t (&key ov ovmain nv committed persistent)
-  (if persistent
-    (with-active-layers (persistent)
-      (make-rdcss-descriptor :ov ov :ovmain ovmain :nv nv :committed committed))
-    (with-active-layers (transient)
-      (make-rdcss-descriptor :ov ov :ovmain ovmain :nv nv :committed committed))))
+(defmethod rdcss-descriptor-committed ((thing fundamental-rdcss-descriptor))
+  (fundamental-rdcss-descriptor-committed thing))
+
+(defmethod (setf rdcss-descriptor-committed) (value  (thing fundamental-rdcss-descriptor))
+  (setf (fundamental-rdcss-descriptor-committed thing) value))
+
+(define-layered-method   make-rdcss-descriptor :in t (&key ov ovmain nv committed)
+  (make-fundamental-rdcss-descriptor :ov ov :ovmain ovmain :nv nv :committed committed))
 
 (define-layered-method   make-rdcss-descriptor :in transient  (&key ov ovmain nv committed)
-  (if (ctrie-pooling-enabled-p)
-    (aprog1 (allocate 'transient-rdcss-descriptor)
-      (setf 
-        (rdcss-descriptor-ov        it) ov
-        (rdcss-descriptor-ovmain    it) ovmain
-        (rdcss-descriptor-nv        it) nv
-        (rdcss-descriptor-committed it) committed))
-    (funcall #'make-instance 'transient-rdcss-descriptor
-      :ov ov :ovmain ovmain :nv nv :committed committed)))
+  (make-instance 'transient-rdcss-descriptor
+    :ov ov :ovmain ovmain :nv nv :committed committed))
 
 (define-layered-method   make-rdcss-descriptor :in persistent (&key ov ovmain nv committed)
-  (if (ctrie-pooling-enabled-p)
-    (aprog1 (allocate 'persistent-rdcss-descriptor)
-      (setf 
-        (rdcss-descriptor-ov        it) ov
-        (rdcss-descriptor-ovmain    it) ovmain
-        (rdcss-descriptor-nv        it) nv
-        (rdcss-descriptor-committed it) committed))
-    (funcall #'make-instance 'persistent-rdcss-descriptor
-      :ov ov :ovmain ovmain :nv nv :committed committed)))
-
-
+  (make-instance 'persistent-rdcss-descriptor
+    :ov ov :ovmain ovmain :nv nv :committed committed))
 
 (defun root-node-access (ctrie &optional abort)
   "ROOT-NODE-ACCESS extends `FIND-CTRIE-ROOT`,
@@ -2021,17 +1744,22 @@
       node
       (root-node-commit ctrie abort))))
 
+(defmethod cas-ctrie-root ((ctrie fundamental-ctrie) old new)
+  (eq
+    (cas (fundamental-ctrie-root ctrie) old new)
+    old))
 
-(defun cas-ctrie-root (ctrie old new)
-  (typecase ctrie
-    (persistent-ctrie (with-active-layers (persistent)
-            (printv        (eql (cas-word-sap (printv (mm::mm-object-pointer ctrie))
-                   (printv        (mm:mptr old)) (printv (mm:mptr new)))
-             (printv         (mm:mptr old))))))
-    (transient-ctrie            (with-active-layers (transient)
-         (printv           (eq (cas (slot-value ctrie 'root) old new)
-                      old))))))
+(defmethod cas-ctrie-root ((ctrie persistent-ctrie) old new)
+  (with-active-layers (persistent)
+    (eql
+      (cas-word-sap (mm::mm-object-pointer ctrie) (mm:mptr old) (mm:mptr new))
+      (mm:mptr old))))
 
+(defmethod cas-ctrie-root ((ctrie transient-ctrie) old new)
+  (with-active-layers (transient)
+    (eq
+      (cas (slot-value ctrie 'root) old new)
+      old)))
 
 (defun root-node-replace (ctrie ov ovmain nv)
   "ROOT-NODE-REPLACE implements the _RDCSS ROOT NODE PROTOCOL_ for
@@ -2063,32 +1791,30 @@
   (when (ctrie-readonly-p ctrie)
     (ctrie-modification-failed "This CTRIE is READ-ONLY"
       :op 'root-node-replace :place (list :ov ov :nv nv)))
-  (let1 desc (printv  (make-rdcss-descriptor :ov ov :ovmain ovmain :nv nv))
-   (printv (if (cas-ctrie-root ctrie ov desc)
-      (prog2 (printv (root-node-commit ctrie nil))
+  (let1 desc  (make-rdcss-descriptor :ov ov :ovmain ovmain :nv nv)
+    (if (cas-ctrie-root ctrie ov desc)
+      (prog2 (root-node-commit ctrie nil)
         (rdcss-descriptor-committed desc))
-      nil))))
+      nil)))
 
 
 (defun root-node-commit (ctrie &optional abort)
   "rdcss api to complete a root-node transaction"
   (atypecase (ctrie-root ctrie)
-    (inode (printv it))
+    (inode            it)
     (rdcss-descriptor (if abort
-                    (printv    (if (printv (cas-ctrie-root ctrie it (rdcss-descriptor-ov it)))
+                        (if (cas-ctrie-root ctrie it (rdcss-descriptor-ov it))
                           (rdcss-descriptor-ov it)
-                          (root-node-commit ctrie abort)))
-                (printv        (let1 oldmain (inode-read (rdcss-descriptor-ov it))
-                                 (if (printv  (funcall (if (persistent-p ctrie) #'mm:meq #'eq);;(eq
-
-                                               (printv oldmain) (printv (rdcss-descriptor-ovmain it))))
-                           (printv  (if (cas-ctrie-root ctrie it (rdcss-descriptor-nv it))
+                          (root-node-commit ctrie abort))
+                        (let1 oldmain (inode-read (rdcss-descriptor-ov it))
+                          (if (node-eq oldmain (rdcss-descriptor-ovmain it))
+                            (if (cas-ctrie-root ctrie it (rdcss-descriptor-nv it))
                               (prog1 (rdcss-descriptor-nv it)
                                 (setf (rdcss-descriptor-committed it) t))
-                              (root-node-commit ctrie abort)))
-                         (printv   (if (cas-ctrie-root ctrie it (rdcss-descriptor-ov it))
+                              (root-node-commit ctrie abort))
+                            (if (cas-ctrie-root ctrie it (rdcss-descriptor-ov it))
                               (rdcss-descriptor-ov it)
-                              (root-node-commit ctrie abort))))))))))
+                              (root-node-commit ctrie abort))))))))
 
 
 
@@ -2112,11 +1838,20 @@
         (when (root-node-replace ctrie root main
                 (make-inode main (make-generational-descriptor)))
           (return-from ctrie-snapshot
-            (if read-only
-              (make-ctrie :readonly-p t :root root
-                :persistent (persistent-p ctrie))
-              (make-ctrie :root (make-inode main (make-generational-descriptor))
-                :persistent (persistent-p ctrie)))))))))
+
+              (aprog1 (funcall #'make-instance (class-of ctrie))
+                (setf
+                  (ctrie-readonly-p it) (or read-only (ctrie-readonly-p ctrie))
+                  (ctrie-root it) root
+                  (ctrie-context it) (copy-list (ctrie-context ctrie))
+                  (ctrie-stamp it) (ctrie-stamp ctrie)
+                  (ctrie-test it) (ctrie-test ctrie)
+                  (ctrie-hash it) (ctrie-hash ctrie)))))))))
+
+              ;; (funcall #'make-instance (class-of x)
+              ;;   :root (make-inode main (make-generational-descriptor))
+              ;;   :context (ctrie-context ctrie) :stamp (ctrie-stamp ctrie)
+              ;;   :test (ctrie-test ctrie) :hash (ctrie-hash ctrie)))))))))
 
 
 (defun ctrie-fork (ctrie)
@@ -2136,32 +1871,6 @@
         (when (root-node-replace ctrie root main
                 (make-inode (make-cnode) (make-generational-descriptor)))
           (return-from ctrie-clear ctrie))))))
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; cas-ctrie-root / This Operation Appears to have changed in recently published
-;; descriptions of the ctrie which change the protocol to eliminate this
-;; possibility by starting with a fully initialized level 0 cnode
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-#+()
-(defun cas-ctrie-root (ctrie new-value)
-  "Perform operation on root-inode of ctrie, potentially applying the specified
-  'null-root-inode' normalization steps first, if required."
-  (labels ((try (n)
-             (when (minusp (decf n)) (error "cas failed"))
-             (let ((current (ctrie-root ctrie)))
-               (etypecase current
-                 (null   (or (awhen (cas (ctrie-root ctrie) nil new-value)
-                               (if (not (null new-value))
-                                 (return-from cas-ctrie-root it)
-                                 (return-from cas-ctrie-root nil)))
-                           (try n)))
-                 (inode  (if (null (inode-read current))
-                           (if (eq current (cas (ctrie-root ctrie) current new-value))
-                             (return-from cas-ctrie-root current)
-                             (try n))))))))
-    (try 10)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -2484,22 +2193,27 @@
     ;;;;;;;;;;;;;;;;;;;;;;;;
     ;; 4.  INODE -> LNODE ;;
     ;;;;;;;;;;;;;;;;;;;;;;;;
-
     (LNODE
       (multiple-value-bind (val found) (lnode-search it key #'ctequal)
-        (printv "LNODE" val found it key
+        (:printv val found)
           (if found
             (let1 newvalue (funcall *compute-updated-value* val value)
               (if (funcall *applicable-when-found-p* val value)
-                (unless (ctequal val newvalue)
+                (:printv 
+                (if (ctequal val newvalue)
+                  (return-from %insert (values val nil))
+                  (with-delta 0
                   (unless (inode-mutate inode it
                             (lnode-inserted (lnode-removed it key #'ctequal)
                               key newvalue #'ctequal))
-                    (throw :restart it)))
-                (throw :does-not-apply newvalue)))
-            (if (funcall *applicable-when-not-found-p* value)
-              (unless (inode-mutate inode it (lnode-inserted it key value #'ctequal))
-                (throw :restart it))
+                    (throw :restart it)))))
+                (:printv             (throw :does-not-apply newvalue))))
+            (:printv
+              (if (funcall *applicable-when-not-found-p* value)
+                (with-delta 1
+              (if (inode-mutate inode it (lnode-inserted it key value #'ctequal))
+                (return-from %insert (values val nil))
+                (throw :restart it)))
               (throw :does-not-apply value))))))
 
     ;;;;;;;;;;;;;;;;;;;;;;;;
@@ -2518,9 +2232,10 @@
              (if (not (flag-present-p flag bmp))
                (if (funcall *applicable-when-not-found-p* value)
                  (let ((new-cnode (cnode-extended cnode flag pos (snode key value))))
-                   (if (inode-mutate inode cnode new-cnode)
-                     (return-from %insert value)
-                     (throw :restart cnode)))
+                   (with-delta 1
+                     (if (inode-mutate inode cnode new-cnode)
+                       (return-from %insert value)
+                       (throw :restart cnode))))
                  (throw :does-not-apply value))
                
                (let ((present (arc-aref (cnode-arcs cnode) pos)))    
@@ -2541,7 +2256,7 @@
                    ;; 8.  CNODE -> SNODE ;; 
                    ;;;;;;;;;;;;;;;;;;;;;;;;
                    
-                   (SNODE (if (ctequal key (snode-key present))
+                   (SNODE (if (:printv (ctequal key (snode-key present)))
                             (let1 new-value (funcall *compute-updated-value*
                                               (snode-value present) value)
                               (if (funcall *applicable-when-found-p* (snode-value present) value)
@@ -2566,31 +2281,41 @@
                                 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
                                   ;; 10.  SNODE -> SNODE / new INODE->LNODE (hash collision) ;;
                                 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-                                  (if (inode-mutate inode cnode new-cnode)
-                                    (return-from %insert value)
-                                    (throw :restart lnode-chain)))
+                                  (with-delta 1
+                                    (if (inode-mutate inode cnode new-cnode)
+                                      (return-from %insert value)
+                                      (throw :restart lnode-chain))))
                                 
                                 (let* ((new-flag-other (flag (snode-key present) (+ level 5)))
                                         (new-bitmap (logior new-flag-other))
-                                        (new-cnode (make-cnode new-bitmap))
-                                        (new-inode (make-inode new-cnode startgen)))
+                                        (contents (make-array (logcount new-bitmap)))
+                                        new-cnode new-inode)
+
+;;                                       (new-cnode (make-cnode new-bitmap))
+;;                                       (new-inode (make-inode new-cnode startgen)))
 
                                 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
                                   ;; 11.  SNODE-> SNODE / new INODE->CNODE (ctrie growth) ;;
                                 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-                                  (setf (arc-aref (cnode-arcs new-cnode) (flag-arc-position
-                                                                           new-flag-other
-                                                                           new-bitmap))
-                                    present)
+                                  (setf (aref contents (flag-arc-position
+                                                         new-flag-other
+                                                         new-bitmap))    present)
+                                  (setf new-cnode (make-cnode :bitmap new-bitmap
+                                                    :initial-contents (coerce contents 'list)))
+                                  (setf new-inode (make-inode new-cnode startgen))
+
+                                  ;; (setf (arc-aref (cnode-arcs new-cnode) (flag-arc-position
+                                  ;;                                          new-flag-other
+                                  ;;                                          new-bitmap))
+                                  ;;   present)
                                   
                                   (%insert new-inode key value (+ level 5) inode startgen)
-                                  
-                                  (if (inode-mutate inode cnode
-                                        (cnode-updated cnode pos new-inode))
-                                    (return-from %insert value)
-                                    (throw :restart present))))
+                                  (with-delta 1
+                                    (if (inode-mutate inode cnode
+                                          (cnode-updated cnode pos new-inode))
+                                      (return-from %insert value)
+                                      (throw :restart present)))))
                               (throw :does-not-apply value)))))))))))
 
 
@@ -2769,9 +2494,10 @@
                                     (entomb (lnode-elt new-lnode))
                                     new-lnode))
                    (leaf-value    (%lookup inode key level parent startgen)))
-             (if (inode-mutate inode it groomed-lnode)
-               (values leaf-value t)
-               (values it :restart))))
+             (with-delta -1
+               (if (inode-mutate inode it groomed-lnode)
+                 (values leaf-value t)
+                 (values it :restart)))))
     (cnode (let* ((bmp  (cnode-bitmap it))
                    (flag (flag key level t))
                    (pos  (flag-arc-position flag bmp)))
@@ -2783,16 +2509,18 @@
                      (inode
                        (if (gen-eq startgen (inode-gen found))
                          (return-from %remove (%remove found key (+ level 5) inode startgen))
-                         (if (inode-mutate inode it (refresh it startgen))
-                           (%remove inode key level parent startgen)
-                           (throw :restart startgen))))
+                         (with-delta -1
+                           (if (inode-mutate inode it (refresh it startgen))
+                             (%remove inode key level parent startgen)
+                             (throw :restart startgen)))))
                      ((or snode tnode)
                        (if (ctequal key (leaf-node-key found))
                          (if (funcall *applicable-when-found-p* (leaf-node-value found) nil)
                            (let1 new-cnode (cnode-truncated it flag pos)
-                             (if (inode-mutate inode it (cnode-contracted new-cnode level))
-                               (values (leaf-node-key found) t)
-                               (values nil :restart)))
+                             (with-delta -1 
+                               (if (inode-mutate inode it (cnode-contracted new-cnode level))
+                                 (values (leaf-node-key found) t)
+                                 (values nil :restart))))
                            (values (leaf-node-value found) :does-not-apply))
                          (values nil :notfound))))
                    (case result-kind
@@ -2932,12 +2660,6 @@
 ;; Mapping Operators
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defgeneric map-node (node fn)
-  (:documentation "Applies a function two arguments, FN, to all (key . value)
-  pairs contained in and below NODE.  This function is expected to be specialized
-  with appropriate implementations for each specific type of possible NODE"))
-
-
 (defun ctrie-map (ctrie fn &key atomic &aux
                    accum)
   
@@ -2975,11 +2697,17 @@
 (defmethod map-node ((node null) fn)
   (values))
 
+(defmethod map-node ((node fundamental-inode) fn)
+  (map-node (inode-read node) fn))
+
 (defmethod map-node ((node transient-inode) fn)
   (map-node (inode-read node) fn))
 
 (defmethod map-node ((node persistent-inode) fn)
   (map-node (inode-read node) fn))
+
+(defmethod map-node ((snode fundamental-snode) fn)
+  (funcall fn (snode-key snode) (snode-value snode)))
 
 (defmethod map-node ((node transient-snode) fn)
   (funcall fn (snode-key node) (snode-value node)))
@@ -2987,11 +2715,18 @@
 (defmethod map-node ((node persistent-snode) fn)
   (funcall fn (snode-key node) (snode-value node)))
 
+(defmethod map-node ((node fundamental-tnode) fn)
+  (map-node (tnode-cell node) fn))
+
 (defmethod map-node ((node transient-tnode) fn)
   (map-node (tnode-cell node) fn))
 
 (defmethod map-node ((node persistent-tnode) fn)
   (map-node (tnode-cell node) fn))
+
+(defmethod map-node ((node fundamental-lnode) fn)
+  (map-node (lnode-elt node) fn)
+  (map-node (lnode-next node) fn))
 
 (defmethod map-node ((node transient-lnode) fn)
   (map-node (lnode-elt node) fn)
@@ -3000,6 +2735,10 @@
 (defmethod map-node ((node persistent-lnode) fn)
   (map-node (lnode-elt node) fn)
   (map-node (lnode-next node) fn))
+
+(defmethod map-node ((node fundamental-cnode) fn)
+  (loop for arc across (cnode-arcs node)
+    do (map-node arc fn)))
 
 (defmethod map-node ((node transient-cnode) fn)
   (loop for arc across (cnode-arcs node)
@@ -3163,7 +2902,8 @@
   "Return a CTRIE containing all (key . value) pairs found in ALIST.
   If CTRIE is specified, it will be used as the destination ctrie.
   Otherwise, a new ctrie will be created. Atomicity is not guaranteed"
-  (with-ctrie (or ctrie (make-ctrie :persistent persistent))
+  (with-ctrie (or ctrie (make-ctrie (when persistent (byte-vector-to-hex-string
+                                                       (create-unique-id-byte-vector)))))
     (prog1 *ctrie*
       (mapc (lambda (pair)
               (ctrie-put *ctrie* (car pair) (cdr pair)))
@@ -3176,8 +2916,8 @@
   of HASH-TABLE. The hash-function will NOT be preserved, as that
   information does not appear to be recoverable from a hash-table once
   created"
-  (with-ctrie (or ctrie (make-ctrie :test (hash-table-test hash-table)
-                          :persistent persistent))
+  (with-ctrie (or ctrie (make-ctrie (when persistent (byte-vector-to-hex-string
+                                                       (create-unique-id-byte-vector)))))
       (prog1 *ctrie* (maphash (lambda (k v) (ctrie-put *ctrie* k v))
                        hash-table))))
 
@@ -3191,16 +2931,19 @@
     (pushnew :cl-store *features*)))
 
 
-(defgeneric ctrie-save (ctrie place &key &allow-other-keys)
-  (:documentation "Save a representation of CTRIE to PLACE such that an
-  identical ctrie may be restored at a later time using `CTRIE-LOAD` on
-  that PLACE.  CTRIE-SAVE guarantees consistency under all circumstances
-  using an atomic, point-in-time snapshot of CTRIE."))
-
 (defmethod  ctrie-save :around (ctrie place &key)
 ;;  (log:info "Saving ctrie to ~A" place)
   (call-next-method))
 
+#+cl-store
+(defmethod  ctrie-save ((ctrie fundamental-ctrie) (pathname pathname) &key)
+  "Save a representation of CTRIE to PATHNAME such that an
+  identical ctrie may be restored at a later time using `CTRIE-LOAD` on
+  that PATHNAME.  CTRIE-SAVE guarantees consistency under all circumstances
+  using an atomic, point-in-time snapshot of CTRIE."
+  (with-ctrie ctrie
+    (prog1 pathname
+      (cl-store:store (ctrie-snapshot *ctrie*) pathname))))
 
 #+cl-store
 (defmethod  ctrie-save ((ctrie transient-ctrie) (pathname pathname) &key)
@@ -3224,14 +2967,14 @@
         (cl-store:store (ctrie-snapshot *ctrie*) pathname)))))
     
 #+cl-store
-(defmethod  ctrie-save ((ctrie-lambda function) (pathname pathname) &key)
+(defmethod  ctrie-save ((ctrie function) (pathname pathname) &key)
   "Save a representation of CTRIE-LAMBDA to PATHNAME such that a ctrie
   identical to `(ctrie-lambda-ctrie CTRIE-LAMBDA)` may be restored at
   a later time using `CTRIE-LOAD` on that PATHNAME.  CTRIE-SAVE
   guarantees consistency under all circumstances using an atomic,
   point-in-time snapshot of CTRIE-LAMBDA."
-  (with-ctrie ctrie-lambda
-    (if (persistent-p *ctrie*)
+  (with-ctrie ctrie
+    (if (typep *ctrie* 'mm::mm-object)
       (with-ctrie (ctrie-from-hashtable (ctrie-to-hashtable *ctrie*))
         (prog1 pathname
           (cl-store:store (ctrie-snapshot *ctrie*) pathname)))       
@@ -3239,25 +2982,22 @@
         (cl-store:store (ctrie-snapshot *ctrie*) pathname)))))
 
 
-(defgeneric ctrie-load (place &key &allow-other-keys)
-  (:documentation "Restore a ctrie that has been saved to PLACE using
-  `CTRIE-SAVE`"))
-
 #+cl-store
 (defmethod  ctrie-load ((pathname pathname) &key)
   "Restore a ctrie that has been saved to PATHNAME using `CTRIE-SAVE`"
   (cl-store:restore pathname))
 
 
-(defgeneric ctrie-export (ctrie place &key &allow-other-keys)
-  (:documentation "Save all (key . value) pairs found in CTRIE to PLACE,
-  such that they may be restored later using `CTRIE-IMPORT`.  Properties
-  of CTRIE (other than the entries contained) are NOT preserved.  Atomicity
-  is not guaranteed.  `CTRIE-EXPORT` provides an alternative to `CTRIE-SAVE`
-  that supports a more compact, space-efficient stored representation, at
-  the expense of losing the consistency and identicality guarantees
-  of `CTRIE-SAVE`"))
 
+#+cl-store 
+(defmethod  ctrie-export ((ctrie fundamental-ctrie) (pathname pathname) &key)
+  "Save all (key . value) pairs found in CTRIE to PATHNAME,
+  such that they may be restored later using `CTRIE-IMPORT` on that
+  PATHNAME.  Properties of CTRIE (other than the entries contained)
+  are NOT preserved.  Atomicity is not guaranteed"
+  (with-ctrie ctrie
+    (prog1 pathname
+      (cl-store:store (ctrie-to-alist *ctrie*) pathname))))
 
 #+cl-store 
 (defmethod  ctrie-export ((ctrie transient-ctrie) (pathname pathname) &key)
@@ -3280,30 +3020,92 @@
       (cl-store:store (ctrie-to-alist *ctrie*) pathname))))
 
 #+cl-store 
-(defmethod  ctrie-export ((ctrie-lambda function) (pathname pathname) &key)
+(defmethod  ctrie-export ((ctrie function) (pathname pathname) &key)
   "Save all (key . value) pairs found in CTRIE-LAMBDA to PATHNAME,
   such that they may be restored later using `CTRIE-IMPORT` on that
   PATHNAME.  Properties of CTRIE-LAMBDA (other than the entries
   contained) are NOT preserved.  Atomicity is not guaranteed"
-  (with-ctrie ctrie-lambda
+  (with-ctrie ctrie
     (prog1 pathname
       (cl-store:store (ctrie-to-alist *ctrie*) pathname))))
 
 
-(defgeneric ctrie-import (place &key ctrie &allow-other-keys)
-  (:documentation "Restore all (key . value) pairs saved to PLACE into
-  either the specified CTRIE if provided, or one newly created with
-  default properties."))
-
 
 #+cl-store
-(defmethod  ctrie-import ((pathname pathname) &key ctrie persistent)
+(defmethod  ctrie-import ((pathname pathname) &key ctrie)
   "Restore all (key . value) pairs saved to PATHNAME into
   either the specified CTRIE if provided, or one newly created with
   default properties."
-  (ctrie-from-alist (cl-store:restore pathname) :ctrie ctrie :persistent persistent))
+  (ctrie-from-alist (cl-store:restore pathname) :ctrie ctrie))
 
 
 
+(defun cons-enum (ctrie &aux counts gens bal)
+  (with-ctrie ctrie
+    (labels ((node (type &key reset)
+               (prog1 type
+                 (if reset
+                   (setf (getf counts type) 0)
+                   (incf (getf counts type)))))
+              (bal (cnode)
+                (setf bal
+                  (loop for n from 0 below (logcount (cnode-bitmap cnode)) 
+                    collect (ctrie-max-depth (arc-aref cnode n)))))
+              (init ()
+                (setf bal nil)
+                (loop for type in '(:inode :cnode :tnode :lnode :snode)
+                  do (node type :reset t)))
+              (rec (node)
+                (typecase node
+                  (null  nil)
+                  (ctrie
+                    (init)
+                    (bal (ref-value (inode-ref (root-node-access node))))
+                    (list :root (rec (root-node-access node))))
+                  (snode
+                    (list (node :snode)
+                      (snode-key node) (snode-value node)))
+                  (tnode
+                    (list (node :tnode)
+                      (rec node)))
+                  (lnode
+                    (list (node :lnode)
+                      (cons (rec (lnode-elt node))
+                        (rec (lnode-next node)))))
+                  (inode
+                    (pushnew (inode-gen node) gens :test #'equalp)
+                    (list (node :inode)
+                      (rec (ref-value (inode-ref node)))))
+                  (cnode
+                    (list* (node :cnode)
+                      (loop for n from 0 below (logcount (cnode-bitmap node)) 
+                        collect (rec (arc-aref node n))))))))
+      (let1 cells (rec ctrie)
+        (values cells gens bal counts)))))
 
 
+  #|  
+  (define-symbol-macro =x=
+  (progn
+  (deflex x (make-ctrie nil))
+  (loop for s from 0 to 127 do  (ctrie-put x s s))
+  (assert (eql 128 (ctrie-size x)))
+  x))
+
+(define-symbol-macro =x0= 
+  (prog1 (deflex x0 (make-ctrie nil))
+    (loop for s from 0 to 127 do  (ctrie-put x0 s s))
+    (assert (eql 128 (ctrie-size x0)))))
+
+(define-symbol-macro =x1= 
+  (prog1 (deflex x1 (make-ctrie nil))
+    (loop for s from 0 to 127 do  (ctrie-put x1 s s))
+    (assert (eql 128 (ctrie-size x1)))))
+
+|#
+;; (ctrie-put z :a :a)
+;; (ctrie-put z :b :b)
+;; (ctrie-put z :c :c)
+
+;; 
+;; (pprint (cons-enum x))

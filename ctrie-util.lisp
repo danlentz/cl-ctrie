@@ -128,6 +128,29 @@
 ;; Some Helpful Utility Functions and Macros
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defun iota* (n &optional (start 0))
+  "Creates a list of n elements starting with element START.
+START can be a number, a character, a string or a symbol."
+  (etypecase start
+    (number (loop for i from start
+                  repeat n
+                  collect i))
+    (character (loop with c = (char-code (or (and (characterp start) start) #\a))
+                     for i from 0
+                     repeat n
+                     collect (code-char (+ c i))))
+    (string (loop with c = (char-code (or (and (stringp start) (aref start 0)) #\a))
+                     for i from 0
+                     repeat n
+                     collect (string (code-char (+ c i)))))
+    (symbol (loop with c = (char-code (or (and (symbolp start) (aref (string start) 0)) #\a))
+                     for i from 0
+                     repeat n
+                     collect (intern (string (code-char (+ c i))) (symbol-package start))))))
+
+(defun repeat (it n)
+  "Returns a list of n elements of IT."
+  (loop repeat n collect it))
 
 #+swank 
 (defun ^ (thing &optional wait)
@@ -355,6 +378,22 @@
 ;; Assorted
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;;; pjb
+
+(defstruct cache
+  alist)
+
+(defun assoc-cache* (cache key &optional default-value-thunk)
+  (let ((entry (assoc key (cache-alist cache))))
+    (unless entry
+      (setf entry (cons key (funcall default-value-thunk)))
+      (push entry (cache-alist cache)))
+    (cdr entry) ))
+
+(defmacro assoc-cachef (cache key &optional default-value)
+  `(assoc-cache* ,cache ,key (lambda () ,default-value)))
+
+
 
 ;; (defun reuse-cons (x y x-y)
 ;;   "Return (cons x y), or reuse x-y if it is equal to (cons x y)"
@@ -575,150 +614,6 @@ For any other use, contact Erik Naggum."
 
 
 
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; printv - extended edition
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Adapted from the Handy PRINTV Macro Written by Dan Corkill
-;; Copyright (C) 2006-2010, Dan Corkill <corkill@GBBopen.org>
-;; Licensed under Apache License 2.0 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defvar *printv-output* (make-broadcast-stream))
-
-(defun printv-enable ()
-  (setf *printv-output* *trace-output*))
-
-(defun printv-disable ()
-  (setf *printv-output* (make-broadcast-stream)))
-
-
-(defun printv-minor-separator ()
-  (format *printv-output* "~&;;; ~72,,,'-<-~>~%")
-  (force-output *printv-output*))
-
-(defun printv-major-separator ()
-  (format *printv-output* "~&;;;~%")
-  (princ
-    (concatenate 'string ";;;"
-      (make-string (- *print-right-margin* 5)
-        :initial-element #\=)) *printv-output*)
-  (force-output *printv-output*))
-
-(defun printv-form-printer (form)
-  (typecase form
-    ;; String (label):
-    (string (format *printv-output* "~&;;; ~a~%" form))
-    ;; Evaluated form:
-    ((or cons (and symbol (not keyword)))
-      (format *printv-output* "~&;;;   ~w =>" form))
-    (vector (format *printv-output* "~&;;   ~s~%" form)) 
-    ;; Self-evaluating form:
-    (t (format *printv-output* "~&;;;   ~s~%" form)))
-  (force-output *printv-output*))
-
-(defun printv-values-printer (values-list)
-  (format *printv-output* "~:[ [returned 0 values]~;~:*~{ ~w~^;~}~]~%"  values-list)
-  (force-output *printv-output*))
-
-
-(defmacro vlet* (bind-forms &body body)
-  `(let* ,(mapcar
-            #'(lambda (form)
-                (if (listp form)
-                  `(,(car form)
-                     (let ((v ,(cadr form)))
-                       (printv `(,(car form) v))
-                       v))
-                  form))
-            bind-forms)
-     ,@body))
-
-(defmacro vlet (bind-forms &body body)
-  `(let ,(mapcar #'(lambda (form)
-		     (if (listp form)
-                       `(,(car form) (let ((v ,(cadr form)))
-                                       (printv (list ',(car form) v))
-                                       v))
-                       form))
-           bind-forms)
-     ,@body))
-
-
-(defmacro vcond (&body clauses)
-  `(cond ,@(mapcar #'(lambda (clause)
-		      `((let ((x ,(car clause)))
-			  (printv (list ',(car clause) '=> x))
-			  x)
-			,@(cdr clause)))
-             clauses)))
-
-
-(defun printv-expander (forms &optional values-trans-fn) ;; Allow for customized printv'ers:
-  (let ((result-sym (gensym)))
-    `(let ((*print-readably* nil) ,result-sym)
-       ,@(loop for form in forms nconcing
-           (cond
-             ;; Markup form:
-             ((eq form ':ff) (list '(printv-major-separator)))
-             ((eq form ':hr) (list '(printv-minor-separator)))
-             
-             ;; Binding form:
-             ((and (consp form) (or (eq (car form) 'let) (eq (car form) 'let*)))
-               `((printv-form-printer ',form)
-                  (printv-values-printer
-                    (setf ,result-sym
-                      ,(if values-trans-fn
-                         `(funcall ,values-trans-fn
-                            (multiple-value-list
-                              (case (car form)
-                                (let (vlet `,(rest form)))
-                                (let* (vlet* `,(rest form))))))
-                         `(multiple-value-list
-                            (case (car form)
-                              (let (vlet `,(rest form)))
-                              (let* (vlet* `,(rest form))))))))))
-             
-             ;; COND form:
-             ((and (consp form) (eq (car form) 'cond)) 
-               `((printv-form-printer ',form)
-                  (printv-values-printer
-                    (setf ,result-sym ,(if values-trans-fn
-                                         `(funcall ,values-trans-fn
-                                            (multiple-value-list (vcond `,(rest form))))
-                                         `(multiple-value-list (vcond `,(rest form))))))))
-             
-             ;; Evaluated form:
-             ((or (consp form) (and (symbolp form) (not (keywordp form))))
-               `((printv-form-printer ',form)
-                  (printv-values-printer
-                    (setf ,result-sym ,(if values-trans-fn
-                                         `(funcall ,values-trans-fn
-                                            (multiple-value-list ,form))
-                                         `(multiple-value-list ,form))))))
-             
-             ;; Self-evaluating form:
-             (t `((printv-form-printer 
-                    (car (setf ,result-sym (list ,form))))))))
-       (values-list ,result-sym))))
-
-
-(defmacro printv (&rest forms)
-  (printv-expander forms))
-
-(defmacro v (&rest forms)
-  (printv-expander forms))
-
-(setf (symbol-function :printv) #'printv-expander)
-
-(define-symbol-macro v/   (printv /))
-(define-symbol-macro v//  (printv //))
-(define-symbol-macro v/// (printv ///))
-
-(define-symbol-macro v+   (printv +))
-(define-symbol-macro v++  (printv ++))
-(define-symbol-macro v+++ (printv +++))
 
 
 (defun ?? (string-designator &optional package external-only)
