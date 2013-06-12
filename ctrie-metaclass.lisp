@@ -31,7 +31,6 @@
 (defclass persistent-class (standard-class)
   ((instances :accessor instances-of)))
 
-
 (defmethod ctrie-next-id ((thing persistent-class))
   (or (ctrie-put-update-if (instances-of thing) 0 1 '+ 'numberp)
     (ctrie-put-ensure (instances-of thing) 0 1)))
