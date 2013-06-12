@@ -60,7 +60,7 @@
   t)
 
 (defclass persistent-object (standard-object)
-  ((slots :reader slots-of)  
+  ((slots :reader slots-of :initarg :slots)  
     (id :reader id-of :initarg :id)))
 
 (defmethod validate-superclass ((class persistent-class) (superclass standard-class))
@@ -176,21 +176,48 @@
           (ctrie-put (instances-of (class-of object)) (id-of object)
             (make-instance 'transient-ctrie :test 'eq :context '(transient))))))))
 
+(mm:defmmclass persistent-ctrie-object (persistent-ctrie)
+  ())
+
+(defvar *persistent-object-cells* (make-instance 'transient-ctrie));; nil)) ;; :test 'eq))
+
+(defgeneric get-cell (object))
+
+(defmethod get-cell ((object persistent-object))
+  (ctrie-put-ensure (ctrie-put-ensure *persistent-object-cells*
+                      (class-name (class-of object)) (make-instance 'transient-ctrie));; nil)) ; :hash 'identity :test 'eql))
+    (id-of object) (dstm:create-var
+                     (or (ctrie-get (instances-of (class-of object)) (id-of object))
+                       (ctrie-put (instances-of (class-of object)) (id-of object)
+                         (with-active-layers (persistent)
+                           (make-instance 'persistent-ctrie-object :name
+                             (format nil "<~A/~D>" (class-name (class-of object))
+                               (slot-value object 'id)) :test 'eq :context '(persistent))))))))
+
+(defmethod get-cell ((object dstm:var))
+  object)
+
+
 (defmethod shared-initialize :before ((object persistent-object) slot-names &rest initargs)
   (declare (ignore slot-names))
   (if (getf initargs :id)
     (setf (slot-value object 'id) (getf initargs :id))
     (unless (slot-boundp object 'id)
       (setf (slot-value object 'id) (ctrie-next-id (class-of object)))))
-  (unless (slot-boundp object 'slots)
-    (setf (slot-value object 'slots)
-      (or (ctrie-get (instances-of (class-of object)) (id-of object))
-        (ctrie-put (instances-of (class-of object)) (id-of object)
-          (with-active-layers (persistent)
-            (make-instance 'persistent-ctrie :name
-               (format nil "<~A/~D>" (class-name (class-of object))
-              (slot-value object 'id))
-            :test 'eq :context '(persistent))))))))
+  (if (getf initargs :slots)
+    (setf (slot-value object 'slots) (getf initargs :slots))
+    (unless (slot-boundp object 'slots)
+      (setf (slot-value object 'slots) (get-cell object)))))
+
+        #+()(or (ctrie-get (instances-of (class-of object)) (id-of object))
+          (ctrie-put (instances-of (class-of object)) (id-of object)
+            (with-active-layers (persistent)
+              (make-instance 'persistent-ctrie-object :name
+                (format nil "<~A/~D>" (class-name (class-of object))
+                  (slot-value object 'id))
+                :test 'eq :context '(persistent)))))
+
+;;      ))))
             
 (defmethod slot-value-using-class ((class ctrie-class) object
                                     (slot ctrie-effective-slot-definition))
@@ -206,14 +233,22 @@
             
 (defmethod slot-value-using-class ((class persistent-class) object
                                     (slot persistent-effective-slot-definition))
-  (multiple-value-bind (value present-p)
-      (ctrie-get (slots-of object) (slot-definition-name slot))
-    (if present-p value
-        (slot-unbound class object (slot-definition-name slot)))))
+  (dstm:atomic 
+    (multiple-value-bind (value present-p)
+      (ctrie-get (dstm:read-var (slots-of object)) (slot-definition-name slot))
+      (if present-p value
+        (slot-unbound class object (slot-definition-name slot))))))
  
 (defmethod (setf slot-value-using-class) (value (class persistent-class) object
                                            (slot persistent-effective-slot-definition))
-  (setf (ctrie-get (slots-of object) (slot-definition-name slot)) value))
+  (prog1 value
+    (dstm:atomic
+      (dstm:rmw (slots (slots-of object))
+        (aprog1 (ctrie-fork slots)
+          (ctrie-put it (slot-definition-name slot) value))))))
+ 
+
+;;  (setf (ctrie-get (slots-of object) (slot-definition-name slot)) value))
 
 
 (defmethod slot-boundp-using-class ((class ctrie-class) object
@@ -227,12 +262,18 @@
 
 (defmethod slot-boundp-using-class ((class persistent-class) object
                                      (slot persistent-effective-slot-definition))
-  (nth-value 1 (ctrie-get (slots-of object) (slot-definition-name slot))))
+  (nth-value 1 (ctrie-get (dstm:read-var (slots-of object)) (slot-definition-name slot))))
 
 
 (defmethod slot-makunbound-using-class ((class persistent-class) object
                                          (slot persistent-effective-slot-definition))
-  (ctrie-drop (slots-of object) (slot-definition-name slot)))
+  (prog1 nil
+    (dstm:atomic
+      (dstm:rmw (slots (slots-of object))
+        (aprog1 (ctrie-fork slots)
+          (ctrie-drop it (slot-definition-name slot)))))))
+
+;;  (ctrie-drop (slots-of object) (slot-definition-name slot)))
 
 
 (defmethod print-object ((self persistent-object) stream)
@@ -261,24 +302,25 @@
 (defmethod persistent-object-eq ((object1 persistent-object) (object2 persistent-object))
   (and
     (eq (class-of object1) (class-of object2))
-    (eql (id-of object1) (id-of object2))
-    (loop for slot in (class-slots (class-of object1))
-      when (eq (slot-definition-allocation slot) :instance)
-      unless (equal
-               (slot-value object1 (slot-definition-name slot))
-               (slot-value object2 (slot-definition-name slot)))
-      return nil
-      finally (return t))))
-               
-(defgeneric persistent-object-equal (object1 object2))
-
-(defmethod persistent-object-equal ((object1 t) (object2 t))
-  (equal object1 object2))
-
-(defmethod persistent-object-equal ((object1 persistent-object) (object2 persistent-object))
-  (and
-    (eq (class-of object1) (class-of object2))
     (eql (id-of object1) (id-of object2))))
+
+    ;; (loop for slot in (class-slots (class-of object1))
+    ;;   when (eq (slot-definition-allocation slot) :instance)
+    ;;   unless (equal
+    ;;            (slot-value object1 (slot-definition-name slot))
+    ;;            (slot-value object2 (slot-definition-name slot)))
+    ;;   return nil
+    ;;   finally (return t))))
+               
+;; (defgeneric persistent-object-equal (object1 object2))
+
+;; (defmethod persistent-object-equal ((object1 t) (object2 t))
+;;   (equal object1 object2))
+
+;; (defmethod persistent-object-equal ((object1 persistent-object) (object2 persistent-object))
+;;   (and
+;;     (eq (class-of object1) (class-of object2))
+;;     (eql (id-of object1) (id-of object2))))
 
 (mm:defmmclass persistent-proxy ()
   ((class-name :initarg :class-name :accessor class-name-of :type symbol)
@@ -289,7 +331,7 @@
     (when instances
       (let1 object (ctrie-get instances id)
         (when object
-          (funcall #'make-instance class-name :id id))))))
+          (funcall #'make-instance class-name :id id ))))))
             
 (define-layered-method maybe-box :in persistent ((object persistent-object))
   (make-instance 'persistent-proxy
