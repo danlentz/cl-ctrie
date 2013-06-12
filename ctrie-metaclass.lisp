@@ -41,22 +41,16 @@
   ()
   (:default-initargs :hash 'identity :test 'eql :context '(persistent)))
 
-
-;;(define-layered-method compute-ctrie-classname :in-layer instance-index ()
-;;  'persistent-instance-index)
-
 (defmethod slot-unbound (class (object persistent-class) (slot-name (eql 'instances)))
   (setf (instances-of object)
-    (or (ctrie-get (persistent-class-index) (class-name object)) ;(class-of object)))
+    (or (ctrie-get (persistent-class-index) (class-name object))
       (setf (instances-of object)
-        (setf (ctrie-get (persistent-class-index) (class-name object)) ;(class-of object)))
+        (setf (ctrie-get (persistent-class-index) (class-name object)) 
           (with-active-layers (instance-index)
             (make-instance 'persistent-instance-index
-              :name (fully-qualified-symbol-name (class-name object)) ; (class-of object)))
+              :name (fully-qualified-symbol-name (class-name object)) 
               :hash 'identity :test 'eql
               :context '(persistent))))))))
-
-;;          (make-instance 'persistent-instance-index :name (class-name (class-of object))))))))
 
 (defclass ctrie-object (standard-object)
   ((slots :reader slots-of)  
@@ -67,7 +61,7 @@
 
 (defclass persistent-object (standard-object)
   ((slots :reader slots-of)  
-    (id :reader id-of)))
+    (id :reader id-of :initarg :id)))
 
 (defmethod validate-superclass ((class persistent-class) (superclass standard-class))
   t)
@@ -183,9 +177,11 @@
             (make-instance 'transient-ctrie :test 'eq :context '(transient))))))))
 
 (defmethod shared-initialize :before ((object persistent-object) slot-names &rest initargs)
-  (declare (ignore slot-names initargs))
-  (unless (slot-boundp object 'id)
-    (setf (slot-value object 'id) (ctrie-next-id (class-of object))))
+  (declare (ignore slot-names))
+  (if (getf initargs :id)
+    (setf (slot-value object 'id) (getf initargs :id))
+    (unless (slot-boundp object 'id)
+      (setf (slot-value object 'id) (ctrie-next-id (class-of object)))))
   (unless (slot-boundp object 'slots)
     (setf (slot-value object 'slots)
       (or (ctrie-get (instances-of (class-of object)) (id-of object))
@@ -283,4 +279,39 @@
   (and
     (eq (class-of object1) (class-of object2))
     (eql (id-of object1) (id-of object2))))
+
+(mm:defmmclass persistent-proxy ()
+  ((class-name :initarg :class-name :accessor class-name-of :type symbol)
+    (instance-id :initarg :instance-id :accessor instance-id-of :type integer)))
+
+(defun find-persistent-object (class-name id)
+  (let1 instances (ctrie-get (persistent-class-index) class-name)
+    (when instances
+      (let1 object (ctrie-get instances id)
+        (when object
+          (funcall #'make-instance class-name :id id))))))
+            
+(define-layered-method maybe-box :in persistent ((object persistent-object))
+  (make-instance 'persistent-proxy
+    :class-name (class-name (class-of object))
+    :instance-id (id-of object)))
+
+(define-layered-method maybe-unbox :in persistent ((object persistent-proxy))
+  (funcall #'make-instance (class-name-of object) :id (instance-id-of object))) 
+
+(defun persistent-objects-of-class (class-name &optional include-subclasses)
+  (flet ((get-instances (class-name)
+           (let1 instances (ctrie-get (persistent-class-index) class-name)
+             (when instances
+               (mapcar (lambda (id) (unless (zerop id) (funcall #'make-instance class-name :id id)))
+                 (reverse (ctrie-keys instances)))))))
+    (let1 classes (if include-subclasses
+                    (mapcar #'class-name (object:class-subclasses class-name))
+                    (list class-name))
+      (remove-if #'null (loop for class in classes appending (get-instances class))))))
+
+(defmacro define-persistent-class (name supers slots &rest options)
+  (let* ((options (remove :metaclass options :key #'first))
+          (options (push '(:metaclass persistent-class) options)))
+    `(defclass ,name ,supers ,slots ,@options)))
 
