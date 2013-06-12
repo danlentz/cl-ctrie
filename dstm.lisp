@@ -39,7 +39,7 @@
 (defun (setf current-transaction) (trans)
   (setf (gethash sb-thread:*current-thread* *transactions*) trans))
 
-#+()
+
 (defmethod initialize-instance :after ((this-transaction transaction) &key &allow-other-keys)
   (let ((current-transaction (current-transaction)))
     (setf (slot-value this-transaction 'root)
@@ -47,12 +47,6 @@
         (transaction-root current-transaction)
         this-transaction))))
 
-(defmethod initialize-instance :after ((trans transaction) &key &allow-other-keys)
-  (setf (slot-value trans 'root)
-    (let ((curtrans (current-transaction)))
-      (if curtrans
-        (transaction-root curtrans)
-        trans))))
 
 (defun equivalentp (trans1 trans2)
    (eq (transaction-root trans1) (transaction-root trans2)))
