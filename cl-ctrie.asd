@@ -129,6 +129,7 @@
                 (:file "tree-common")
                 (:file "tree-wbalanced")
                 (:file "tree-hbalanced")
+                (:file "dstm")
                 (:file "ctrie-metaclass")
                 ))
 
