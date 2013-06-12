@@ -2269,7 +2269,7 @@
                                   (if (inode-mutate inode cnode new-cnode)
                                     (return-from %insert new-value)
                                     (throw :restart present)))
-                                (throw :does-not-apply value)))
+                                (throw :does-not-apply new-value)))
                             
                             (if (funcall *applicable-when-not-found-p* value)
                               (if (>= level 30)
@@ -2327,14 +2327,14 @@
   mapping in the resulting CTRIE"
   (with-ctrie ctrie
     (let1 *hash-code* (cthash key)
-      (loop  with d = 0 and p = nil and result
+      (loop  with d = 0 and p = nil and result and aux
         for  root =  (root-node-access *ctrie*)
         when (catch-case (%insert root key value d p (inode-gen root))
                (:does-not-apply (prog1 t
                                   (when *debug*
                                     (format *TRACE-OUTPUT* "~8A  does not apply (~A . ~A)~%"
                                       it key value))
-                                  (setf result nil)))
+                                  (setf result nil aux it)))
                (:restart        (prog1 nil
                                   (when *debug*
                                     (format *TRACE-OUTPUT* "~8A  timeout insert (~A . ~A)~%"
@@ -2342,7 +2342,7 @@
                (t               (prog1 (setf result it)
                                   (when *debug*
                                     (format *TRACE-OUTPUT* "~8S  done .~%~S~%" it *ctrie*)))))
-        return (values result ctrie)))))
+        return (values result ctrie aux)))))
 
 ;; TODO: I'm a little troubled by the order of arguments in the
 ;; lambda-lists of the following few functions, as it seems a little
@@ -2366,10 +2366,14 @@
   "Insert a new entry into CTRIE mapping KEY to VALUE if and only if
   there is no entry with key equal to KEY aleady present in CTRIE,
   according to the equality predicate defined by `CTRIE-TEST`. Returns
-  the value inserted in such a case, otherwise returns NIL.  As a
-  second value, returns the CTRIE it was invoked on"
-  (let ((*applicable-when-found-p* (lambda (old new) (declare (ignore new old)) nil)))
-    (ctrie-put ctrie key value)))
+  the value inserted in such a case, otherwise returns the value that
+  was already present (as if by `CTRIE-GET`).  As a second value,
+  returns the CTRIE it was invoked on"
+  (let ((*applicable-when-found-p* (lambda (old new) (declare (ignore new old)) nil))
+         (*compute-updated-value* (lambda (old new) (declare (ignore new)) old)))
+    (multiple-value-bind (r c a) (ctrie-put ctrie key value)
+      (values (or r a) c))))
+
 
 (defun ctrie-put-replace (ctrie key value)
   "Replace the VALUE mapped to KEY in CTRIE if and only if there is an
