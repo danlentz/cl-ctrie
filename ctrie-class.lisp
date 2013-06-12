@@ -11,7 +11,7 @@
                                      (mm:retrieve-all-instances 'special-persistent-ctrie)
                           :key #'ctrie-name))
     (setf *persistent-class-index* (make-instance 'special-persistent-ctrie
-                                     :name  "persistent-class-index"))))
+                                     :name  "persistent-class-index" :test 'eq))))
 
 (defclass ctrie-class (standard-class)
   ((instances :accessor instances-of)))
@@ -48,12 +48,12 @@
 
 (defmethod slot-unbound (class (object persistent-class) (slot-name (eql 'instances)))
   (setf (instances-of object)
-    (or (ctrie-get (persistent-class-index) (class-name (class-of object)))
+    (or (ctrie-get (persistent-class-index) (class-name object)) ;(class-of object)))
       (setf (instances-of object)
-        (setf (ctrie-get (persistent-class-index) (class-name (class-of object)))
+        (setf (ctrie-get (persistent-class-index) (class-name object)) ;(class-of object)))
           (with-active-layers (instance-index)
             (make-instance 'persistent-instance-index
-              :name (fully-qualified-symbol-name (class-name (class-of object)))
+              :name (fully-qualified-symbol-name (class-name object)) ; (class-of object)))
               :hash 'identity :test 'eql
               :context '(persistent))))))))
 
@@ -250,4 +250,38 @@
     (format stream "id: ~D" (id-of self))))
 
 
+(defun all-persistent-classes ()
+  (ctrie-keys (persistent-class-index)))
+
+;; TODO: ok the following obeys the normal semantics of eq being more
+;; stringent than equal, but might be downright confusing to users.
+;; check how other libs handle equality test in presence of transient
+;; slots
+
+(defgeneric persistent-object-eq (object1 object2))
+
+(defmethod persistent-object-eq ((object1 t) (object2 t))
+  (eq object1 object2))
+
+(defmethod persistent-object-eq ((object1 persistent-object) (object2 persistent-object))
+  (and
+    (eq (class-of object1) (class-of object2))
+    (eql (id-of object1) (id-of object2))
+    (loop for slot in (class-slots (class-of object1))
+      when (eq (slot-definition-allocation slot) :instance)
+      unless (equal
+               (slot-value object1 (slot-definition-name slot))
+               (slot-value object2 (slot-definition-name slot)))
+      return nil
+      finally (return t))))
+               
+(defgeneric persistent-object-equal (object1 object2))
+
+(defmethod persistent-object-equal ((object1 t) (object2 t))
+  (equal object1 object2))
+
+(defmethod persistent-object-equal ((object1 persistent-object) (object2 persistent-object))
+  (and
+    (eq (class-of object1) (class-of object2))
+    (eql (id-of object1) (id-of object2))))
 
