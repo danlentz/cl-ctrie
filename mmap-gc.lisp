@@ -148,7 +148,7 @@
   (let ((visited (map 'vector (lambda (x table) 
                                 (or table (when x (make-hash-table :test 'eql)))) 
 	      new-mtagmaps shared-tables)))
-    (declare (dynamic-extent visited))
+;;    (declare (dynamic-extent visited))
     (macrolet ((vref (mptr)
 		 `(gethash (mptr-index ,mptr) 
 			   (aref (the simple-vector visited) (mptr-tag ,mptr)))))    

@@ -35,7 +35,7 @@
   (:documentation "Base class for all memory mapped objects."))
 
 
-(declaim (ftype (function (mm-object) (mptr)) ptr))
+;;(declaim (ftype (function (mm-object) (mptr)) ptr))
 
 (defun ptr (object)
   (declare (type mm-object object))

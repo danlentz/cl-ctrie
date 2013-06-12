@@ -108,7 +108,7 @@
 
 (with-constant-tag-for-class (tag mm-symbol)
   (check-class-slot-layout mm-symbol)
-  (declaim (ftype (function (symbol) (mptr)) uncached-box-symbol box-symbol))
+;;  (declaim (ftype (function (symbol) (mptr)) uncached-box-symbol box-symbol))
 
   (defun box-symbol-miss (object)
     (declare (type symbol object))

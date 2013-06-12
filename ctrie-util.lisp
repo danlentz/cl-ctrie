@@ -179,7 +179,7 @@ START can be a number, a character, a string or a symbol."
 (defvar *break* t
   "special variable used for dynamic control of break loops see {defun :break}")
 
-
+(fmakunbound :break)
 ;;; nikodemus/lisppaste 
 (defun :break (name &rest values)
   "Demark an instrumented break-point that includes a STOP-BREAKING
@@ -341,6 +341,8 @@ START can be a number, a character, a string or a symbol."
       (loop for i from 0 to 15 do (setf (aref bytes i) (random 255)))
       bytes)))
 
+(defgeneric uuid-to-integer (uuid-designator))
+
 #+unicly
 (defmethod uuid-to-integer ((uuid unicly:unique-universal-identifier))
   "Create a universally unique 128-bit integer using unicly when available"
@@ -414,9 +416,10 @@ START can be a number, a character, a string or a symbol."
 
 (defun hlist* (first rest)
   (cond
-    ((atom rest) (hcons first rest))
-    ((null rest) (hcons first nil))
-    (t           (hcons first (hlist* (car rest) (cdr rest))))))
+    ((atom rest)  (hcons first rest))
+    ((null rest)  (hcons first nil))
+    ((consp rest) (hcons first (hlist* (car rest) (cdr rest))))))
+;;    (t (error "invalid list"))
 
 (defun hlist (&rest args)
   (when args

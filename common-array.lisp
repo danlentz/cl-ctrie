@@ -53,6 +53,10 @@
      :writer (lambda (value index) (multiple-value-bind (vec ind) (funcall accessor index)
                                      (setf (aref vec ind) value))))))
 
+(defgeneric cvref (vector-designator index))
+
+(defgeneric (setf cvref) (value vector-designator index))
+
 (defmethod cvref ((vec concatenated-vector) index)
   (funcall (concatenated-vector-reader vec) index))
 
@@ -184,11 +188,6 @@ it of a displaced array."
 ;; nil
 
 
-
-(defun flatten (array)
-  "Return a flat (ie rank 1) displaced version of the array."
-  (displace array (array-total-size array) 0))
-  
 
   
 ;;(defparameter *a* #2A((1 2) (3 4)))

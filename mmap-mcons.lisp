@@ -15,6 +15,19 @@
 (defmethod slot-unbound (class (instance mcons) (slot-name (eql 'mcdr))) 
   (setf (slot-value instance slot-name) (marray-ref instance 1)))
 
+(defgeneric mcar (cell))
+(defgeneric mcdr (cell))
+(defgeneric mcadr (cell))
+(defgeneric mcddr (cell))
+(defgeneric (setf mcar) (value cell))
+(defgeneric (setf mcdr) (value cell))
+(defgeneric mconsp (thing))
+(defgeneric emptyp (thing))
+(defgeneric as-list (thing))
+(defgeneric mpush (element place))
+(defgeneric mpop (element place))
+  
+
 (defmethod mcar ((cell null))
   nil)
 
@@ -69,7 +82,7 @@
 (defmethod emptyp ((cell mcons))
   (null (mcar cell)))
 
-(defmethod mlist (&rest args)
+(defun mlist (&rest args)
   (loop with new = (mcons nil nil)
     for first = (nreverse args) then (cdr first)
     while first do (setf new (mcons (car first) new))
