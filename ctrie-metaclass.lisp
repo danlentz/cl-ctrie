@@ -311,7 +311,40 @@
       (remove-if #'null (loop for class in classes appending (get-instances class))))))
 
 (defmacro define-persistent-class (name supers slots &rest options)
-  (let* ((options (remove :metaclass options :key #'first))
+  (let* ((new-slots nil)
+          (options (remove :metaclass options :key #'first))
           (options (push '(:metaclass persistent-class) options)))
-    `(defclass ,name ,supers ,slots ,@options)))
+    (loop
+      for raw-slot in slots
+      for slot = (ensure-list raw-slot)
+      for transient = (or (getf (rest slot) :transient)
+                        (eq (getf (rest slot) :allocation) :instance))
+      do (if (not transient)
+           (push (list* (car slot)
+                   (append (remove-from-plist (rest slot) :allocation :transient :persistent)
+                     '(:allocation :persistent)))
+             new-slots)
+           (push  (list* (car slot)
+                    (append (remove-from-plist (rest slot) :allocation :transient :persistent)
+                      '(:allocation :instance)))
+             new-slots)))
+    (setf new-slots (nreverse new-slots))
+    `(defclass ,name ,supers ,new-slots ,@options)))
 
+;; ;;; Form: (DEFINE-PERSISTENT-CLASS P6 (P5)
+;;                                    ((W :INITARG :W :INITFORM
+;;                                      (GET-UNIVERSAL-TIME) :TRANSIENT NIL
+;;                                      :ACCESSOR W-OF)
+;;                                     V (U :TRANSIENT T :INITFORM 0)
+;;                                     (S :INITARG :S :INITFORM 5)
+;;                                     (M :ALLOCATION :INSTANCE)
+;;                                     (N :ALLOCATION :PERSISTENT)))
+;; ;;; First step of expansion:
+;;
+;; (DEFCLASS P6 (P5)
+;;           ((W :INITARG :W :INITFORM (GET-UNIVERSAL-TIME) :ACCESSOR W-OF
+;;             :ALLOCATION :PERSISTENT)
+;;            (V :ALLOCATION :PERSISTENT) (U :INITFORM 0 :ALLOCATION :INSTANCE)
+;;            (S :INITARG :S :INITFORM 5 :ALLOCATION :PERSISTENT)
+;;            (M :ALLOCATION :INSTANCE) (N :ALLOCATION :PERSISTENT))
+;;           (:METACLASS PERSISTENT-CLASS))
