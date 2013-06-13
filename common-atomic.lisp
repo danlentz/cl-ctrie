@@ -129,3 +129,50 @@ value and the provided list.  Accepts :KEY, :TEST, and :TEST-NOT."
 
 
 
+
+;; reasonably portable compare-and-swap
+;; MIT Licensed: http://opensource.org/licenses/MIT
+;; Copyright (c) 2012 Josh Marchán
+;; https://github.com/sykopomp/memento-mori/blob/develop/src/utils.lisp
+
+(defmacro portable-compare-and-swap (place old-value new-value)
+  #+sbcl      (let ((old-val-var (gensym “OLD-VALUE-“)))
+                `(let ((,old-val-var ,old-value))
+                   (eq ,old-val-var (sb-ext:compare-and-swap ,place
+                                      ,old-val-var ,new-value))))
+  #+ccl       `(ccl::conditional-store ,place ,old-value ,new-value)
+  #+lispworks `(system:compare-and-swap ,place ,old-value ,new-value)
+  #+allegro   `(excl:atomic-conditional-setf ,place ,new-value ,old-value)
+  #-(or allegro lispworks ccl sbcl) `(error “Not supported.”))
+
+(defmacro memo-thunk (&body body)
+  (with-gensyms (storage thunk)
+    `(let (,thunk ,storage)
+       (setf ,thunk (lambda ()
+                      (portable-compare-and-swap (svref ,storage 0) ,thunk
+                        (let ((value (progn ,@body)))
+                          (lambda () value)))
+                      (funcall (svref ,storage 0))))
+       (setf ,storage (make-array ‘(1) :element-type ‘function :initial-element ,thunk))
+       ,thunk)))
+
+(defmacro lcons (s1 s2)
+  `(cons ,s1 (memo-thunk ,s2)))
+
+(defun lcar (s)
+  (car s))
+
+(defun lcdr (s)
+  (when (cdr s) (funcall (cdr s))))
+
+;; functional i/o streams using memoized SICP streams
+
+(defun istream (stream)
+  (when-let (char (read-char stream nil nil))
+    (lcons char (istream stream))))
+
+(defun i-unread-char (char istream)
+  (cons char istream))
+
+(defun i-read-char (istream)
+  (values (lcar istream) (lcdr istream)))
