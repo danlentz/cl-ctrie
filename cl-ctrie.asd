@@ -17,7 +17,7 @@
   
   :author           "Dan Lentz <danlentz@gmail.com>"
   :license          "MIT"
-  :version          "0.1.5"
+  :version          "0.2.5"
   
   :long-description "This is a common-lisp implementation of the CTrie unordered map
                      data-structure described in the paper 'Concurrent Tries with
@@ -118,7 +118,7 @@
                 (:file "ctrie-layers")
                 (:file "ctrie-protocol")
                 (:file "ctrie")
-              ;;  (:file "ctrie-lambda")
+             ;  (:file "ctrie-lambda")
                 (:file "cvm-package")
                 (:file "cvm-memory")
                 (:file "cvm-host")
@@ -131,6 +131,8 @@
                 (:file "tree-hbalanced")
                 (:file "dstm")
                 (:file "ctrie-metaclass")
+                (:file "collection-packages")
+                (:file "collection-class")
                 ))
 
 

@@ -3,6 +3,32 @@
 
 (in-package :cl-ctrie)
 
+(defclass cacheable-slot-definition (standard-slot-definition)
+  ((cache-p :accessor slot-definition-cache-p :initarg :cache :initform nil)
+    (cached-value :accessor slot-definition-cached-value :initarg :cached-value)))
+
+(defclass computed-slot-definition (cacheable-slot-definition)
+  ((slot-value-function
+     :initarg :slot-value-function
+     :accessor slot-definition-slot-value-function
+     :initform (constantly nil))
+    (setf-slot-value-function
+      :initarg :setf-slot-value-function
+      :accessor slot-definition-setf-slot-value-function
+      :initform (constantly nil)))
+  (:default-initargs :allocation :computed))
+
+(defclass computed-direct-slot-definition (standard-direct-slot-definition
+                                            computed-slot-definition)
+  ())
+
+(defclass computed-effective-slot-definition (standard-effective-slot-definition
+                                               computed-slot-definition)
+  ())
+
+(defun slot-definition-computed-p (slot-definition)
+  (eq (slot-definition-allocation slot-definition) :computed))
+      
 (defvar *persistent-class-index* nil)
 
 (defun persistent-class-index ()
@@ -129,8 +155,14 @@
   (:default-initargs :allocation :persistent))
  
 (defmethod direct-slot-definition-class ((class persistent-class) &rest initargs)
-  (declare (ignore initargs))
-  (find-class 'persistent-direct-slot-definition))
+  (declare (ignorable initargs))
+  (case (getf initargs :allocation)
+    (:persistent  (find-class 'persistent-direct-slot-definition))
+    (:computed    (find-class 'computed-direct-slot-definition))
+    (t  (call-next-method))))
+
+(defun slot-definition-persistent-p (slot-definition)
+  (eq (slot-definition-allocation slot-definition) :persistent))
 
 (defclass ctrie-effective-slot-definition (standard-effective-slot-definition)
   ())
@@ -154,15 +186,25 @@
 
 (defmethod compute-effective-slot-definition ((class persistent-class) (name t)
                                                direct-slot-definitions)
-  (let ((*effective-slot-definition-class*
-          (if (eq (slot-definition-allocation (first direct-slot-definitions)) :persistent)
-            (find-class 'persistent-effective-slot-definition)
-            (find-class 'standard-effective-slot-definition))))
-    (call-next-method)))
- 
+  (aprog1 (call-next-method)
+    (dolist (slot direct-slot-definitions)
+      (typecase slot
+        (computed-slot-definition (setf
+                                    (slot-definition-slot-value-function it)
+                                    (slot-definition-slot-value-function slot)
+                                    (slot-definition-setf-slot-value-function it)
+                                    (slot-definition-setf-slot-value-function slot)
+                                    (slot-definition-cache-p it)
+                                    (slot-definition-cache-p slot))
+          (return))))))
+          
+
 (defmethod effective-slot-definition-class ((class persistent-class) &rest initargs)
-  (declare (ignore initargs))
-  *effective-slot-definition-class*)
+  (declare (ignorable initargs))
+  (case (getf initargs :allocation)
+    (:persistent  (find-class 'persistent-effective-slot-definition))
+    (:computed    (find-class 'computed-effective-slot-definition))
+    (t   (call-next-method))))
 
 
 (defmethod shared-initialize :before ((object ctrie-object) slot-names &rest initargs)
@@ -179,13 +221,13 @@
 (mm:defmmclass persistent-ctrie-object (persistent-ctrie)
   ())
 
-(defvar *persistent-object-cells* (make-instance 'transient-ctrie));; nil)) ;; :test 'eq))
+(defvar *persistent-object-cells* (make-instance 'transient-ctrie))
 
 (defgeneric get-cell (object))
 
 (defmethod get-cell ((object persistent-object))
   (ctrie-put-ensure (ctrie-put-ensure *persistent-object-cells*
-                      (class-name (class-of object)) (make-instance 'transient-ctrie));; nil)) ; :hash 'identity :test 'eql))
+                      (class-name (class-of object)) (make-instance 'transient-ctrie))
     (id-of object) (dstm:create-var
                      (or (ctrie-get (instances-of (class-of object)) (id-of object))
                        (ctrie-put (instances-of (class-of object)) (id-of object)
@@ -209,15 +251,6 @@
     (unless (slot-boundp object 'slots)
       (setf (slot-value object 'slots) (get-cell object)))))
 
-        #+()(or (ctrie-get (instances-of (class-of object)) (id-of object))
-          (ctrie-put (instances-of (class-of object)) (id-of object)
-            (with-active-layers (persistent)
-              (make-instance 'persistent-ctrie-object :name
-                (format nil "<~A/~D>" (class-name (class-of object))
-                  (slot-value object 'id))
-                :test 'eq :context '(persistent)))))
-
-;;      ))))
             
 (defmethod slot-value-using-class ((class ctrie-class) object
                                     (slot ctrie-effective-slot-definition))
@@ -230,7 +263,38 @@
                                            (slot ctrie-effective-slot-definition))
   (setf (ctrie-get (slots-of object) (slot-definition-name slot)) value))
 
-            
+(defmethod slot-value-using-class ((class persistent-class) object
+                                    (slot computed-effective-slot-definition))
+  (cond
+    ((and (slot-definition-cache-p slot) (slot-boundp slot 'cached-value))
+      (slot-definition-cached-value slot))
+    ((slot-definition-cache-p slot)
+      (setf (slot-definition-cached-value slot)
+        (funcall (slot-definition-slot-value-function slot) object)))
+    (t
+      (funcall (slot-definition-slot-value-function slot) object))))
+
+ 
+(defmethod (setf slot-value-using-class) (value (class persistent-class) object
+                                           (slot computed-effective-slot-definition))
+  (cond
+    ((slot-definition-cache-p slot)
+      (setf (slot-definition-cached-value slot)
+        (funcall (slot-definition-setf-slot-value-function slot) value object)))
+    (t
+      (funcall (slot-definition-setf-slot-value-function slot) value object))))
+
+
+(defun recompute-slot (object slot-name)
+  (assert (typep (find slot-name
+                   (class-slots (class-of object)) :key #'slot-definition-name)
+            'computed-effective-slot-definition))
+  (prog1 object
+    (slot-makunbound (find slot-name
+                       (class-slots (class-of object)) :key #'slot-definition-name)
+      'cached-value)))
+    
+
 (defmethod slot-value-using-class ((class persistent-class) object
                                     (slot persistent-effective-slot-definition))
   (dstm:atomic 
@@ -248,9 +312,6 @@
           (ctrie-put it (slot-definition-name slot) value))))))
  
 
-;;  (setf (ctrie-get (slots-of object) (slot-definition-name slot)) value))
-
-
 (defmethod slot-boundp-using-class ((class ctrie-class) object
                                      (slot ctrie-effective-slot-definition))
   (nth-value 1 (ctrie-get (slots-of object) (slot-definition-name slot))))
@@ -265,6 +326,11 @@
   (nth-value 1 (ctrie-get (dstm:read-var (slots-of object)) (slot-definition-name slot))))
 
 
+(defmethod slot-boundp-using-class ((class persistent-class) object
+                                     (slot computed-effective-slot-definition))
+  t)
+
+
 (defmethod slot-makunbound-using-class ((class persistent-class) object
                                          (slot persistent-effective-slot-definition))
   (prog1 nil
@@ -273,8 +339,9 @@
         (aprog1 (ctrie-fork slots)
           (ctrie-drop it (slot-definition-name slot)))))))
 
-;;  (ctrie-drop (slots-of object) (slot-definition-name slot)))
-
+(defmethod slot-makunbound-using-class ((class persistent-class) object
+                                         (slot computed-effective-slot-definition))
+  t)
 
 (defmethod print-object ((self persistent-object) stream)
   (print-unreadable-object (self stream :type t :identity nil)
@@ -289,11 +356,6 @@
 (defun all-persistent-classes ()
   (ctrie-keys (persistent-class-index)))
 
-;; TODO: ok the following obeys the normal semantics of eq being more
-;; stringent than equal, but might be downright confusing to users.
-;; check how other libs handle equality test in presence of transient
-;; slots
-
 (defgeneric persistent-object-eq (object1 object2))
 
 (defmethod persistent-object-eq ((object1 t) (object2 t))
@@ -303,24 +365,6 @@
   (and
     (eq (class-of object1) (class-of object2))
     (eql (id-of object1) (id-of object2))))
-
-    ;; (loop for slot in (class-slots (class-of object1))
-    ;;   when (eq (slot-definition-allocation slot) :instance)
-    ;;   unless (equal
-    ;;            (slot-value object1 (slot-definition-name slot))
-    ;;            (slot-value object2 (slot-definition-name slot)))
-    ;;   return nil
-    ;;   finally (return t))))
-               
-;; (defgeneric persistent-object-equal (object1 object2))
-
-;; (defmethod persistent-object-equal ((object1 t) (object2 t))
-;;   (equal object1 object2))
-
-;; (defmethod persistent-object-equal ((object1 persistent-object) (object2 persistent-object))
-;;   (and
-;;     (eq (class-of object1) (class-of object2))
-;;     (eql (id-of object1) (id-of object2))))
 
 (mm:defmmclass persistent-proxy ()
   ((class-name :initarg :class-name :accessor class-name-of :type symbol)
@@ -360,14 +404,33 @@
       for raw-slot in slots
       for slot = (ensure-list raw-slot)
       for class =  (eq (getf (rest slot) :allocation) :class)
+      for computed =  (or (eq (getf (rest slot) :allocation) :computed)
+                        (getf (rest slot) :slot-value-function)
+                        (getf (rest slot) :compute-as))
       for transient = (or (getf (rest slot) :transient)
                         (eq (getf (rest slot) :allocation) :instance))
       do (cond
            (class (push (list* (car slot)
                           (append (remove-from-plist (rest slot)
-                                    :allocation :transient :persistent)
+                                    :compute-as :allocation :transient :persistent)
                             '(:allocation :class)))
                     new-slots))
+           (computed (let* ((svf (or (getf (rest slot) :slot-value-function)
+                                   (awhen (getf (rest slot) :compute-as)
+                                     (eval `(lambda (-self-) (declare (ignorable -self-)) ,it)))
+                                   (constantly nil)))
+                             (ssvf (or (getf (rest slot) :setf-slot-value-function)
+                                     (awhen (getf (rest slot) :update-as)
+                                       (eval `(lambda (-value- -self-)
+                                                (declare (ignorable -value- -self-)) ,it)))
+                                     (constantly nil))))
+                       (push (list* (car slot)
+                               (append (remove-from-plist (rest slot) :compute-as :update-as
+                                         :slot-value-function :setf-slot-value-function
+                                         :allocation :transient :persistent)
+                                 (list :allocation :computed :slot-value-function (compile nil svf)
+                                   :setf-slot-value-function (compile nil ssvf))))
+                         new-slots)))
            ((not transient)
              (push (list* (car slot)
                      (append (remove-from-plist (rest slot)
@@ -378,12 +441,24 @@
                        (append (remove-from-plist (rest slot)
                                  :allocation :transient :persistent)
                          '(:allocation :instance)))
-                new-slots))))
-    (setf new-slots (nreverse new-slots))
+                new-slots)))
+      finally (setf new-slots (nreverse new-slots)))
     `(defclass ,name ,supers ,new-slots ,@options)))
 
-;; ;;; Form: (DEFINE-PERSISTENT-CLASS P6 (P5)
-;;                                    ((W :INITARG :W :INITFORM
+
+;;; Form: (DEFINE-PERSISTENT-CLASS P6 (P5)
+;;                                    ((D :COMPUTE-AS (LENGTH *FEATURES*))
+;;                                     (E :SLOT-VALUE-FUNCTION
+;;                                      (LAMBDA (X)
+;;                                        (DECLARE (IGNORE X))
+;;                                        (GET-INTERNAL-REAL-TIME)))
+;;                                     (F :SLOT-VALUE-FUNCTION
+;;                                      (LAMBDA (X)
+;;                                        (DECLARE (IGNORE X))
+;;                                        (GET-INTERNAL-REAL-TIME))
+;;                                      :CACHE T)
+;;                                     (G :ALLOCATION :COMPUTED)
+;;                                     (W :INITARG :W :INITFORM
 ;;                                      (GET-UNIVERSAL-TIME) :TRANSIENT NIL
 ;;                                      :ACCESSOR W-OF)
 ;;                                     V (U :TRANSIENT T :INITFORM 0)
@@ -391,13 +466,24 @@
 ;;                                     (S :INITARG :S :INITFORM 5)
 ;;                                     (M :ALLOCATION :INSTANCE)
 ;;                                     (N :ALLOCATION :PERSISTENT)))
-;; ;;; First step of expansion:
+;;; First step of expansion:
 ;;
 ;; (DEFCLASS P6 (P5)
-;;           ((W :INITARG :W :INITFORM (GET-UNIVERSAL-TIME) :ACCESSOR W-OF
+;;           ((D :ALLOCATION :COMPUTED :SLOT-VALUE-FUNCTION #
+;;             :SETF-SLOT-VALUE-FUNCTION #)
+;;            (E :ALLOCATION :COMPUTED :SLOT-VALUE-FUNCTION
+;;             (LAMBDA (X) (DECLARE (IGNORE X)) (GET-INTERNAL-REAL-TIME))
+;;             :SETF-SLOT-VALUE-FUNCTION #)
+;;            (F :CACHE T :ALLOCATION :COMPUTED :SLOT-VALUE-FUNCTION
+;;             (LAMBDA (X) (DECLARE (IGNORE X)) (GET-INTERNAL-REAL-TIME))
+;;             :SETF-SLOT-VALUE-FUNCTION #)
+;;            (G :ALLOCATION :COMPUTED :SLOT-VALUE-FUNCTION #
+;;             :SETF-SLOT-VALUE-FUNCTION #)
+;;            (W :INITARG :W :INITFORM (GET-UNIVERSAL-TIME) :ACCESSOR W-OF
 ;;             :ALLOCATION :PERSISTENT)
 ;;            (V :ALLOCATION :PERSISTENT) (U :INITFORM 0 :ALLOCATION :INSTANCE)
 ;;            (C :INITFORM 44 :ALLOCATION :CLASS)
 ;;            (S :INITARG :S :INITFORM 5 :ALLOCATION :PERSISTENT)
 ;;            (M :ALLOCATION :INSTANCE) (N :ALLOCATION :PERSISTENT))
 ;;   (:METACLASS PERSISTENT-CLASS))
+
