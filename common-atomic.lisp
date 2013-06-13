@@ -11,7 +11,8 @@
   (:export :get-cas-expansion :define-cas-expander :cas
     :compare-and-swap :atomic-incf :atomic-decf :defcas :defglobal
     :compare-and-set! :atomic-updatef :reference :box :deref
-    ))
+    :define-atomic-incf
+    :atomic-incf-index-of))
     
 (in-package :atom)
 
@@ -44,6 +45,27 @@
              finally (return ,new)))))
 
 
+(defmacro define-atomic-incf (name accessor &rest args)
+  `(defun ,name (x)
+     (let* ((old (,accessor x ,@args))
+             (new (1+ old)))
+       (loop until (eq old (sb-ext:cas (,accessor x ,@args) old new)) do
+         (setf old (,accessor x ,@args)
+           new (1+ old)))
+       new)))
+
+(define-atomic-incf atomic-incf-index-of index-of)
+
+;;; 
+;;; Form: (DEFINE-ATOMIC-INCF ATOMIC-INCF-INDEX-OF INDEX-OF)
+;;; First step of expansion:
+;;
+;; (DEFUN ATOMIC-INCF-INDEX-OF (X)
+;;   (LET* ((OLD (INDEX-OF X)) (NEW (1+ OLD)))
+;;     (LOOP UNTIL (EQ OLD (CAS (INDEX-OF X) OLD NEW))
+;;           DO (SETF OLD (INDEX-OF X)
+;;                    NEW (1+ OLD)))
+;;     NEW))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; instrumented boxed reference 
