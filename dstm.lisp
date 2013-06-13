@@ -41,12 +41,11 @@
 
 
 (defmethod initialize-instance :after ((this-transaction transaction) &key &allow-other-keys)
-  (let ((current-transaction (current-transaction)))
-    (setf (slot-value this-transaction 'root)
+  (setf (slot-value this-transaction 'root)
+    (let ((current-transaction (current-transaction)))
       (if current-transaction
         (transaction-root current-transaction)
         this-transaction))))
-
 
 (defun equivalentp (trans1 trans2)
    (eq (transaction-root trans1) (transaction-root trans2)))

@@ -25,7 +25,7 @@
 (defgeneric emptyp (thing))
 (defgeneric as-list (thing))
 (defgeneric mpush (element place))
-(defgeneric mpop (element place))
+(defgeneric mpop (place))
   
 
 (defmethod mcar ((cell null))

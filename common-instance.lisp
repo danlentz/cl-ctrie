@@ -35,7 +35,8 @@
     :copy-instance
     :make-uninitialized-instance
     :unparse-direct-slot-definition
-    :class-add-slot))
+    :class-add-slot
+    :size))
 
 (in-package :object)
 
@@ -122,20 +123,6 @@
        (append (apply fun (mapcar 'car args))
          (mapappend fun (mapcar 'cdr args)))))
 
-
-;;   (let ((result (mapappend #'(lambda (c) (when c (class-direct-subclasses c))) (list (find-class* class))))) result))
-;;     (unless proper? (push (find-class* class) result))
-;;     (remove-duplicates result)))
-
-;; (subclasses 'standard-object)
-
-;; (defun subclasses (class &key (proper? t))
-;;   "Returns all of the subclasses of the class including the class itself."
-;;   (let ((result nil))
-;;     (map-subclasses class (lambda (class)
-;;                             (push class result))
-;;                     :proper? proper?)
-;;     (nreverse result)))
 
 (defun class-subclasses (thing &key proper)
   (labels ((all-subclasses (class)
@@ -431,3 +418,8 @@ REINITIALIZE-INSTANCE is called to update the copy with INITARGS.")
   (loop for super in supers 
     collect (super-layout super)))
 
+(defun size (object)
+  (sb-vm::reconstitute-object
+   (ash (logxor (sb-kernel:get-lisp-obj-address object)
+                sb-vm:lowtag-mask)
+        (- sb-vm:n-fixnum-tag-bits))))
