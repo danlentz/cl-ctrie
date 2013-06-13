@@ -3,6 +3,13 @@
 
 (in-package :cl-ctrie)
 
+
+(defvar *effective-slot-definition-class*)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Computed/Cacheable Metaobjects
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (defclass cacheable-slot-definition (standard-slot-definition)
   ((cache-p :accessor slot-definition-cache-p :initarg :cache :initform nil)
     (cached-value :accessor slot-definition-cached-value :initarg :cached-value)))
@@ -28,7 +35,124 @@
 
 (defun slot-definition-computed-p (slot-definition)
   (eq (slot-definition-allocation slot-definition) :computed))
-      
+
+
+(defmethod shared-initialize :before ((object transactional-object) slot-names &rest initargs)
+  (declare (ignore slot-names initargs))
+  (unless (slot-boundp object 'id)
+    (setf (slot-value object 'id) (ctrie-next-id (class-of object))))
+  (unless (slot-boundp object 'slots)
+    (setf (slot-value object 'slots)
+      (or (ctrie-get (instances-of (class-of object)) (id-of object))
+        (with-active-layers (transient)
+          (ctrie-put (instances-of (class-of object)) (id-of object)
+            (make-instance 'transient-ctrie :test 'eq :context '(transient))))))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Transactional-Class
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defclass transactional-class (standard-class)
+  ((instances :accessor instances-of)))
+
+(defclass transient-instance-index (transient-ctrie)
+  ()
+  (:default-initargs :hash 'identity :test 'eql :context '(transient)))
+
+(defmethod slot-unbound (class (object transactional-class) (slot-name (eql 'instances)))
+  (setf (instances-of object)
+    (make-instance 'transient-instance-index)))
+
+(defmethod ctrie-next-id ((thing transactional-class))
+  (or (ctrie-put-update-if (instances-of thing) 0 1 '+ 'numberp)
+      (ctrie-put-ensure (instances-of thing) 0 1)))
+
+(defclass transactional-object (standard-object)
+  ((slots :reader slots-of :initarg :slots)  
+    (id :reader id-of :initarg :id)))
+ 
+(defmethod validate-superclass ((class transactional-class) (superclass standard-class))
+  t)
+
+(defmethod initialize-instance :around ((class transactional-class) &rest initargs
+                                         &key direct-superclasses)
+  (declare (dynamic-extent initargs))
+  (if (loop for class in direct-superclasses
+        thereis (subtypep class (find-class 'transactional-object)))
+    (call-next-method)
+    (apply #'call-next-method class
+      :direct-superclasses (append direct-superclasses
+                             (list (find-class 'transactional-object)))
+      initargs)))
+
+(defmethod reinitialize-instance :around ((class transactional-class) &rest initargs
+                                           &key (direct-superclasses '()
+                                                  direct-superclasses-p))
+  (declare (dynamic-extent initargs))
+  (if (or (not direct-superclasses-p)
+        (loop for class in direct-superclasses
+          thereis (subtypep class (find-class 'transactional-object))))
+    (call-next-method)
+    (apply #'call-next-method class
+      :direct-superclasses (append direct-superclasses
+                             (list (find-class 'transactional-object)))
+      initargs)))
+
+(defclass transactional-direct-slot-definition (standard-direct-slot-definition)
+  ()
+  (:default-initargs :allocation :transactional))
+ 
+(defmethod direct-slot-definition-class ((class transactional-class) &rest initargs)
+  (declare (ignore initargs))
+  (find-class 'transactional-direct-slot-definition))
+
+(defclass transactional-effective-slot-definition (standard-effective-slot-definition)
+  ())
+
+ 
+(defmethod compute-effective-slot-definition ((class transactional-class) (name t)
+                                               direct-slot-definitions)
+  (let ((*effective-slot-definition-class*
+          (if (eq (slot-definition-allocation (first direct-slot-definitions)) :ctrie)
+            (find-class 'transactional-effective-slot-definition)
+            (find-class 'standard-effective-slot-definition))))
+    (call-next-method)))
+ 
+(defmethod effective-slot-definition-class ((class transactional-class) &rest initargs)
+  (declare (ignore initargs))
+  *effective-slot-definition-class*)
+
+            
+(defmethod slot-value-using-class ((class transactional-class) object
+                                    (slot transactional-effective-slot-definition))
+  (multiple-value-bind (value present-p)
+      (ctrie-get (slots-of object) (slot-definition-name slot))
+    (if present-p value
+      (slot-unbound class object (slot-definition-name slot)))))
+ 
+(defmethod (setf slot-value-using-class) (value (class transactional-class) object
+                                           (slot transactional-effective-slot-definition))
+  (setf (ctrie-get (slots-of object) (slot-definition-name slot)) value))
+
+
+(defmethod slot-boundp-using-class ((class transactional-class) object
+                                     (slot transactional-effective-slot-definition))
+  (nth-value 1 (ctrie-get (slots-of object) (slot-definition-name slot))))
+
+(defmethod slot-makunbound-using-class ((class transactional-class) object
+                                         (slot transactional-effective-slot-definition))
+  (ctrie-drop (slots-of object) (slot-definition-name slot)))
+
+(defmethod print-object ((self transactional-object) stream)
+  (print-unreadable-object (self stream :type t :identity nil)
+    (format stream "id: ~D (transactional)" (id-of self))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Persistent-Class
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (defvar *persistent-class-index* nil)
 
 (defun persistent-class-index ()
@@ -38,21 +162,6 @@
                           :key #'ctrie-name))
     (setf *persistent-class-index* (make-instance 'special-persistent-ctrie
                                      :name  "persistent-class-index" :test 'eq))))
-
-(defclass ctrie-class (standard-class)
-  ((instances :accessor instances-of)))
-
-(defclass transient-instance-index (transient-ctrie)
-  ()
-  (:default-initargs :hash 'identity :test 'eql :context '(transient)))
-
-(defmethod slot-unbound (class (object ctrie-class) (slot-name (eql 'instances)))
-  (setf (instances-of object)
-    (make-instance 'transient-instance-index)))
-
-(defmethod ctrie-next-id ((thing ctrie-class))
-  (or (ctrie-put-update-if (instances-of thing) 0 1 '+ 'numberp)
-      (ctrie-put-ensure (instances-of thing) 0 1)))
 
 (defclass persistent-class (standard-class)
   ((instances :accessor instances-of)))
@@ -78,30 +187,12 @@
               :hash 'identity :test 'eql
               :context '(persistent))))))))
 
-(defclass ctrie-object (standard-object)
-  ((slots :reader slots-of)  
-    (id :reader id-of)))
- 
-(defmethod validate-superclass ((class ctrie-class) (superclass standard-class))
-  t)
-
 (defclass persistent-object (standard-object)
   ((slots :reader slots-of :initarg :slots)  
     (id :reader id-of :initarg :id)))
 
 (defmethod validate-superclass ((class persistent-class) (superclass standard-class))
   t)
-
-(defmethod initialize-instance :around ((class ctrie-class) &rest initargs
-                                         &key direct-superclasses)
-  (declare (dynamic-extent initargs))
-  (if (loop for class in direct-superclasses
-        thereis (subtypep class (find-class 'ctrie-object)))
-    (call-next-method)
-    (apply #'call-next-method class
-      :direct-superclasses (append direct-superclasses
-                             (list (find-class 'ctrie-object)))
-      initargs)))
 
 (defmethod initialize-instance :around ((class persistent-class) &rest initargs
                                          &key direct-superclasses)
@@ -112,19 +203,6 @@
     (apply #'call-next-method class
       :direct-superclasses (append direct-superclasses
                              (list (find-class 'persistent-object)))
-      initargs)))
-
-(defmethod reinitialize-instance :around ((class ctrie-class) &rest initargs
-                                           &key (direct-superclasses '()
-                                                  direct-superclasses-p))
-  (declare (dynamic-extent initargs))
-  (if (or (not direct-superclasses-p)
-        (loop for class in direct-superclasses
-          thereis (subtypep class (find-class 'ctrie-object))))
-    (call-next-method)
-    (apply #'call-next-method class
-      :direct-superclasses (append direct-superclasses
-                             (list (find-class 'ctrie-object)))
       initargs)))
 
 (defmethod reinitialize-instance :around ((class persistent-class) &rest initargs
@@ -140,16 +218,6 @@
                              (list (find-class 'persistent-object)))
       initargs)))
 
-
-(defclass ctrie-direct-slot-definition (standard-direct-slot-definition)
-  ()
-  (:default-initargs :allocation :ctrie))
- 
-(defmethod direct-slot-definition-class ((class ctrie-class) &rest initargs)
-  (declare (ignore initargs))
-  (find-class 'ctrie-direct-slot-definition))
-
-
 (defclass persistent-direct-slot-definition (standard-direct-slot-definition)
   ()
   (:default-initargs :allocation :persistent))
@@ -164,25 +232,9 @@
 (defun slot-definition-persistent-p (slot-definition)
   (eq (slot-definition-allocation slot-definition) :persistent))
 
-(defclass ctrie-effective-slot-definition (standard-effective-slot-definition)
-  ())
 
 (defclass persistent-effective-slot-definition (standard-effective-slot-definition)
   ())
-
-(defvar *effective-slot-definition-class*)
- 
-(defmethod compute-effective-slot-definition ((class ctrie-class) (name t)
-                                               direct-slot-definitions)
-  (let ((*effective-slot-definition-class*
-          (if (eq (slot-definition-allocation (first direct-slot-definitions)) :ctrie)
-            (find-class 'ctrie-effective-slot-definition)
-            (find-class 'standard-effective-slot-definition))))
-    (call-next-method)))
- 
-(defmethod effective-slot-definition-class ((class ctrie-class) &rest initargs)
-  (declare (ignore initargs))
-  *effective-slot-definition-class*)
 
 (defmethod compute-effective-slot-definition ((class persistent-class) (name t)
                                                direct-slot-definitions)
@@ -198,7 +250,6 @@
                                     (slot-definition-cache-p slot))
           (return))))))
           
-
 (defmethod effective-slot-definition-class ((class persistent-class) &rest initargs)
   (declare (ignorable initargs))
   (case (getf initargs :allocation)
@@ -206,19 +257,7 @@
     (:computed    (find-class 'computed-effective-slot-definition))
     (t   (call-next-method))))
 
-
-(defmethod shared-initialize :before ((object ctrie-object) slot-names &rest initargs)
-  (declare (ignore slot-names initargs))
-  (unless (slot-boundp object 'id)
-    (setf (slot-value object 'id) (ctrie-next-id (class-of object))))
-  (unless (slot-boundp object 'slots)
-    (setf (slot-value object 'slots)
-      (or (ctrie-get (instances-of (class-of object)) (id-of object))
-        (with-active-layers (transient)
-          (ctrie-put (instances-of (class-of object)) (id-of object)
-            (make-instance 'transient-ctrie :test 'eq :context '(transient))))))))
-
-(mm:defmmclass persistent-ctrie-object (persistent-ctrie)
+(mm:defmmclass persistent-transactional-object (persistent-ctrie)
   ())
 
 (defvar *persistent-object-cells* (make-instance 'transient-ctrie))
@@ -232,13 +271,12 @@
                      (or (ctrie-get (instances-of (class-of object)) (id-of object))
                        (ctrie-put (instances-of (class-of object)) (id-of object)
                          (with-active-layers (persistent)
-                           (make-instance 'persistent-ctrie-object :name
+                           (make-instance 'persistent-transactional-object :name
                              (format nil "<~A/~D>" (class-name (class-of object))
                                (slot-value object 'id)) :test 'eq :context '(persistent))))))))
 
 (defmethod get-cell ((object dstm:var))
   object)
-
 
 (defmethod shared-initialize :before ((object persistent-object) slot-names &rest initargs)
   (declare (ignore slot-names))
@@ -251,18 +289,6 @@
     (unless (slot-boundp object 'slots)
       (setf (slot-value object 'slots) (get-cell object)))))
 
-            
-(defmethod slot-value-using-class ((class ctrie-class) object
-                                    (slot ctrie-effective-slot-definition))
-  (multiple-value-bind (value present-p)
-      (ctrie-get (slots-of object) (slot-definition-name slot))
-    (if present-p value
-      (slot-unbound class object (slot-definition-name slot)))))
- 
-(defmethod (setf slot-value-using-class) (value (class ctrie-class) object
-                                           (slot ctrie-effective-slot-definition))
-  (setf (ctrie-get (slots-of object) (slot-definition-name slot)) value))
-
 (defmethod slot-value-using-class ((class persistent-class) object
                                     (slot computed-effective-slot-definition))
   (cond
@@ -274,7 +300,6 @@
     (t
       (funcall (slot-definition-slot-value-function slot) object))))
 
- 
 (defmethod (setf slot-value-using-class) (value (class persistent-class) object
                                            (slot computed-effective-slot-definition))
   (cond
@@ -283,7 +308,6 @@
         (funcall (slot-definition-setf-slot-value-function slot) value object)))
     (t
       (funcall (slot-definition-setf-slot-value-function slot) value object))))
-
 
 (defun recompute-slot (object slot-name)
   (assert (typep (find slot-name
@@ -294,7 +318,6 @@
                        (class-slots (class-of object)) :key #'slot-definition-name)
       'cached-value)))
     
-
 (defmethod slot-value-using-class ((class persistent-class) object
                                     (slot persistent-effective-slot-definition))
   (dstm:atomic 
@@ -311,16 +334,6 @@
         (aprog1 (ctrie-fork slots)
           (ctrie-put it (slot-definition-name slot) value))))))
  
-
-(defmethod slot-boundp-using-class ((class ctrie-class) object
-                                     (slot ctrie-effective-slot-definition))
-  (nth-value 1 (ctrie-get (slots-of object) (slot-definition-name slot))))
-
-(defmethod slot-makunbound-using-class ((class ctrie-class) object
-                                         (slot ctrie-effective-slot-definition))
-  (ctrie-drop (slots-of object) (slot-definition-name slot)))
-
-
 (defmethod slot-boundp-using-class ((class persistent-class) object
                                      (slot persistent-effective-slot-definition))
   (nth-value 1 (ctrie-get (dstm:read-var (slots-of object)) (slot-definition-name slot))))
@@ -329,7 +342,6 @@
 (defmethod slot-boundp-using-class ((class persistent-class) object
                                      (slot computed-effective-slot-definition))
   t)
-
 
 (defmethod slot-makunbound-using-class ((class persistent-class) object
                                          (slot persistent-effective-slot-definition))
@@ -346,12 +358,6 @@
 (defmethod print-object ((self persistent-object) stream)
   (print-unreadable-object (self stream :type t :identity nil)
     (format stream "id: ~D (persistent)" (id-of self))))
-
-
-(defmethod print-object ((self ctrie-object) stream)
-  (print-unreadable-object (self stream :type t :identity nil)
-    (format stream "id: ~D" (id-of self))))
-
 
 (defun all-persistent-classes ()
   (ctrie-keys (persistent-class-index)))
