@@ -394,7 +394,7 @@
                   (set-difference result (mapcar #'princ-to-string list)
                     :test #'equalp))))
       (loop for key in list
-        do (is equal (princ-to-string symbol) (ctrie-drop c symbol)))
+        do  (ctrie-drop c key))
       (is (ctrie-empty-p c)))))
 
 (deftest check-medium-put-get-drop/fundamental ()
