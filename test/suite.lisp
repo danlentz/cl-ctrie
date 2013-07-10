@@ -1,76 +1,12 @@
 ;;;;; -*- mode: common-lisp;   common-lisp-style: modern;    coding: utf-8; -*-
 ;;;;;
 
-(in-package :cl-user)
+(in-package :cl/user)
 
 (defpackage :cl-ctrie-test
-  (:shadow :once-only)
-  (:use :closer-common-lisp :closer-mop :alexandria :cl-ctrie :mm :iterate :hu.dwim.stefil)
-;;  (:shadowing-import-from :lisp-unit :set-equal)
-  (:import-from :sb-ext :get-cas-expansion :define-cas-expander :cas
-    :compare-and-swap :atomic-incf :atomic-decf :defcas :defglobal)
-  (:shadowing-import-from :mm :with-transaction :emptyp)
-  (:import-from :cl-ctrie
-    :let1 :flag :flag-arc-position :catch-case
-    :create-unique-id-byte-vector
-    :hex-string-to-byte-vector
-    :byte-vector-to-hex-string
-    :random-string
-    :gensym-list
-    :printv
-    :printv-enable
-    :printv-disable
-    :defmacro/once
-    :defun/inline
-    :deflex
-    :ppmx
-    :multiple-setf
-    :nilf
-    :conc1f
-    :aconsf
-    :?
-    :?^
-    :^
-    :internal-symbols
-    :external-symbols
-    :home-symbols
-    :home-functions
-    :atomic-update     
-    :enlist
-    :snode
-    :lnode-search
-    :lnode-length
-    :lnode-inserted
-    :lnode-removed
-    :fbind
-    :awhen
-    :atypecase
-    :alet
-    :it
-    :*debug*
-    :*ctrie*
-    :with-ctrie
-    :*hash-code*
-    :alet-fsm
-    :state
-    :ppmx)
-  (:export
- ;;   :fixture
- ;;   :define-fixture
-    ;; :$
-    :run-all-tests
-    ;;:run-ctrie-tests
-    ;;:run-ctrie-benchmarks
-    ;;:run-ctrie-deterministic-profile
-    ;;:run-ctrie-statistical-profile
-    ))
-
-
-;; (defpackage :manardb-test
-;;   (:export #:test-all-manardb)
-;;   (:use :cl :mm :hu.dwim.stefil :iterate)
-;;   (:import-from :mm :with-transaction))
-  
+  (:use :closer-common-lisp :macro :mm :hu.dwim.stefil :iterate :alexandria)
+  (:clones :cl-ctrie))
+   
 
 (in-package :cl-ctrie-test)
 
@@ -114,12 +50,14 @@
     (-run-child-tests-)))
 
 (defsuite (cl-ctrie/mmap :in cl-ctrie) ()
-  (with-fixture temp-mmap-workspace
-    (-run-child-tests-)))
+;;  (with-fixture temp-mmap-workspace
+  (-run-child-tests-))
+;;)
 
 (defsuite (cl-ctrie/ctrie :in cl-ctrie) ()
-  (with-fixture temp-mmap-workspace
-    (-run-child-tests-)))
+;;  (with-fixture temp-mmap-workspace
+  (-run-child-tests-))
+;;)
   
 (defun run-all-tests ()
   (funcall-test-with-feedback-message 'cl-ctrie))

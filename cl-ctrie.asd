@@ -127,12 +127,16 @@
                 (:file "tree-package")
                 (:file "tree-node")
                 (:file "tree-common")
-                (:file "tree-wbalanced")
-                (:file "tree-hbalanced")
+                (:file "tree-balanced")
                 (:file "dstm")
+                (:file "index-package")
+                (:file "index-protocol")
+                (:file "index-metaclass")
+                (:file "index-object")
+                (:file "index-root")
                 (:file "ctrie-metaclass")
                 (:file "collection-packages")
-                (:file "collection-class")
+           ;;     (:file "collection-class")
                 ))
 
 
@@ -199,6 +203,8 @@
                                (:test-file "mmap-gc")
                                (:test-file "ctrie-util")
                                (:test-file "ctrie-layers")
+                               (:test-file "ctrie-primatives")
+                               (:test-file "ctrie-smokecheck")
                                (:test-file "tree-node")
                                ))))
 
