@@ -705,7 +705,6 @@
                                                    :prev prev))
                  ref)))))
 
-  
 (defmethod gcas-compare-and-set ((obj transient-inode)
                                   expected new expected-stamp new-stamp prev)
   (declare (ignore expected-stamp))
@@ -731,28 +730,7 @@
                  (mm:mptr (make-ref :value new :stamp new-stamp :prev prev)))
             ref-ptr))))))
 
-
-#+()
-(define-test check-simple-gcas-cas ()
-  (assert-false
-    (with-active-layers (persistent)
-      (gcas-compare-and-set 
-        #1=#.(with-active-layers (persistent) (make-inode (make-inode t))) 
-        (ref-value (inode-ref (make-inode (make-inode t)))) :x nil nil nil)))
-  (assert-true
-    (with-active-layers (persistent)
-      (gcas-compare-and-set 
-        #2=#.(with-active-layers (persistent) (make-inode (make-inode t))) 
-        (ref-value (inode-ref #2#)) :x nil nil nil)))
-  (assert-false
-    (gcas-compare-and-set
-      (make-inode (make-ctrie))
-      (ref-value (inode-ref (make-inode (make-ctrie)))) :x nil nil nil))
-  (assert-true
-    (gcas-compare-and-set
-      #3=#.(make-inode (make-ctrie)) (ref-value (inode-ref #3#)) :x nil nil nil))) 
-  
-;; (fmakunbound 'inode-read)
+ 
 ;; (defun/inline
 (defun INODE-READ (inode)
   "INODE-READ provides the top-level interface to the inode _GCAS ACCESS_
@@ -764,9 +742,11 @@
   (check-type inode inode)
   (let (ref)
     (setf ref (inode-ref inode))
-    (multiple-value-bind (val stamp prev)
-(:printv      (values (ref-value ref) (ref-stamp ref) (ref-prev ref)))
- (:printv     (if  (null prev)
+    (multiple-value-bind (val stamp prev) (values
+                                            (ref-value ref)
+                                            (ref-stamp ref)
+                                            (ref-prev ref))
+      (if (null prev)
         (return-from inode-read (values val stamp prev ref))
         (let1 result (inode-commit inode ref)
           (return-from inode-read (values
@@ -774,7 +754,6 @@
                                     (ref-stamp result)
                                     (ref-prev result)
                                     result)))))))
-)
 
 
 (defun INODE-MUTATE (inode old-value new-value)
@@ -790,14 +769,13 @@
   (when (ctrie-readonly-p *ctrie*)
     (ctrie-modification-failed "This CTRIE is READ-ONLY"
       :op 'inode-mutate :place (describe-object inode nil)))
-  (:printv "INODE-MUTATION" :op 'inode-mutate :place (describe-object inode nil))
-  (multiple-value-bind (val stamp prev ref) (:printv (inode-read inode))
+  (multiple-value-bind (val stamp prev ref) (inode-read inode)
     (declare (ignorable val stamp prev ref))
-    (if (:printv (gcas-compare-and-set inode old-value
-                   new-value stamp (ctstamp stamp) old-value))
-      (:printv (return-from inode-mutate
-                 (null (ref-prev (inode-commit inode (inode-ref inode))))))
-      (:printv (return-from inode-mutate nil)))))
+    (if (gcas-compare-and-set inode old-value
+          new-value stamp (ctstamp stamp) old-value)
+      (return-from inode-mutate
+        (null (ref-prev (inode-commit inode (inode-ref inode)))))
+      (return-from inode-mutate nil))))
 
 
 
@@ -856,34 +834,27 @@
      (when (ctrie-readonly-p *ctrie*)
        (ctrie-modification-failed "This CTRIE is READ-ONLY"
          :op 'inode-commit :place (describe-object inode nil)))
-   (:printv :inode-commit  inode ref (ref-prev ref))
      (flet ((ABORTABLE-READ (ctrie)
               (root-node-access ctrie t)))
        (let1 prev  (ref-prev ref)
          (typecase prev
-           (null (:printv prev)
-             (:printv (return-from inode-commit ref)))
-           (failed-ref (:printv prev) 
-             (if (:printv inode ref (cas-failed-ref inode ref))
-               (return-from inode-commit (:printv "cas-failed-ref ok" prev
-                                           (failed-ref-prev prev)))
-               (return-from inode-commit (:printv "cas-failed-ref retry"
-                                           (inode-commit inode (inode-ref inode))))))
-           (t (:printv "Generational CAS/COMMIT")
-             (if (:printv (gen-eq  (inode-gen (ABORTABLE-READ *ctrie*))
-                            (inode-gen inode)))
-               (let1 committed (:printv (cas-ref-prev ref prev (constantly nil)))
-                 (if (null committed) ;;(zerop committed))
-                   (:printv (return-from inode-commit  (inode-commit inode ref)))
-                   (:printv (return-from inode-commit ref))))
-               (progn (:printv (cas-ref-prev ref prev   
-                        (lambda ()
-                          (make-failed-ref
-                            :value (ref-value prev)
-                            :stamp (ref-stamp prev)
-                            :prev  (ref-prev  prev)))) )
-                 (return-from inode-commit 
-                   (inode-commit inode (inode-ref inode))))))))))
+           (null       (return-from inode-commit ref))
+           (failed-ref (if  (cas-failed-ref inode ref)
+                         (return-from inode-commit (failed-ref-prev prev))
+                         (return-from inode-commit (inode-commit inode (inode-ref inode)))))
+           (t          (if (gen-eq (inode-gen (ABORTABLE-READ *ctrie*)) (inode-gen inode))
+                         (let1 committed (cas-ref-prev ref prev (constantly nil))
+                           (if (null committed) 
+                             (return-from inode-commit  (inode-commit inode ref))
+                             (return-from inode-commit ref)))
+                         (progn
+                           (cas-ref-prev ref prev (lambda ()
+                                                    (make-failed-ref
+                                                      :value (ref-value prev)
+                                                      :stamp (ref-stamp prev)
+                                                      :prev  (ref-prev  prev))))
+                           (return-from inode-commit 
+                             (inode-commit inode (inode-ref inode))))))))))
 
 
 
@@ -903,16 +874,8 @@
   thing)
 
 (define-layered-method maybe-box :in persistent ((thing t))
-  ;; (if (ctrie-pooling-enabled-p)
-  ;;   (let ((byte-vector (hu.dwim.serializer:serialize thing))
-  ;;          (result (sb-concurrency:make-mailbox)))
-  ;;     (request-dynamic-action! (lambda (x) (sb-concurrency:send-message result
-  ;;                                       (make-instance 'serial-box
-  ;;                                         :contents (mm:lisp-object-to-mptr x))))
-  ;;       byte-vector)
-  ;;     (return-from maybe-box (sb-concurrency:receive-message result)))
-    (let ((byte-vector (hu.dwim.serializer:serialize thing)))
-      (make-instance 'serial-box :contents (mm:lisp-object-to-mptr byte-vector))))
+  (let ((byte-vector (hu.dwim.serializer:serialize thing)))
+    (make-instance 'serial-box :contents (mm:lisp-object-to-mptr byte-vector))))
  
 
 (define-layered-method maybe-box :in persistent ((thing mm:mm-object))
@@ -1375,13 +1338,6 @@
     (setf (aref contents position) replacement-arc)
     (make-cnode :bitmap bitmap
       :initial-contents (coerce contents 'list))))
-    
-  
-  ;; (let ((new-cnode (make-cnode (cnode-bitmap cnode))))
-  ;;   (prog1 new-cnode
-  ;;     (loop for i from 0 to (1- (arcs-len cnode))
-  ;;       do (setf (arc-aref new-cnode i) (arc-aref cnode i)))
-  ;;     (setf (arc-aref new-cnode position) replacement-arc))))
 
 (defun cnode-truncated (cnode flag pos)
   "Construct a new cnode structure that is exactly like CNODE, but
@@ -1404,17 +1360,6 @@
     (make-cnode :bitmap new-bitmap
       :initial-contents (coerce contents 'list))))
 
-  
-  ;; (let* ((new-bitmap (logxor flag (cnode-bitmap cnode)))
-  ;;         (new-cnode (make-cnode new-bitmap)))
-  ;;   (prog1 new-cnode
-  ;;     (loop  with src-index = 0
-  ;;       for  dest-index from 0 to (1- (arcs-len new-cnode))
-  ;;       for  dest = (arc-aref new-cnode dest-index) 
-  ;;       when (= src-index pos) do (incf src-index)
-  ;;       do   (setf (arc-aref new-cnode dest-index)
-  ;;              (arc-aref cnode (post-incf src-index)))))))
-
 (defun map-cnode (fn cnode)
   "Construct a new cnode structure that is exactly like CNODE, but
   with each arc (BRANCH-NODE) present in CNODE replaced by the result
@@ -1431,12 +1376,6 @@
       do (setf (aref contents i) (funcall fn (arc-aref cnode i))))
     (make-cnode :bitmap bitmap
       :initial-contents (coerce contents 'list))))
-
-    
-  ;; (aprog1 (make-cnode (cnode-bitmap cnode))
-  ;;   (loop for i from 0 to (1- (arcs-len cnode))
-  ;;     do (setf (arc-aref it i) (funcall fn (arc-aref cnode i))))))
-
 
 ;; CNODE
 
@@ -1853,11 +1792,6 @@
                   (ctrie-test it) (ctrie-test ctrie)
                   (ctrie-hash it) (ctrie-hash ctrie)))))))))
 
-              ;; (funcall #'make-instance (class-of x)
-              ;;   :root (make-inode main (make-generational-descriptor))
-              ;;   :context (ctrie-context ctrie) :stamp (ctrie-stamp ctrie)
-              ;;   :test (ctrie-test ctrie) :hash (ctrie-hash ctrie)))))))))
-
 
 (defun ctrie-fork (ctrie)
   "Atomically create a READABLE and WRITABLE clone of CTRIE that may
@@ -2200,26 +2134,24 @@
     ;;;;;;;;;;;;;;;;;;;;;;;;
     (LNODE
       (multiple-value-bind (val found) (lnode-search it key #'ctequal)
-        (:printv val found)
-          (if found
-            (let1 newvalue (funcall *compute-updated-value* val value)
-              (if (funcall *applicable-when-found-p* val value)
-                (:printv 
-                (if (ctequal val newvalue)
-                  (return-from %insert (values val nil))
-                  (with-delta 0
+        (if found
+          (let1 newvalue (funcall *compute-updated-value* val value)
+            (if (funcall *applicable-when-found-p* val value)              
+              (if (ctequal val newvalue)
+                (return-from %insert (values val nil))
+                (with-delta 0
                   (unless (inode-mutate inode it
                             (lnode-inserted (lnode-removed it key #'ctequal)
                               key newvalue #'ctequal))
-                    (throw :restart it)))))
-                (:printv             (throw :does-not-apply newvalue))))
-            (:printv
-              (if (funcall *applicable-when-not-found-p* value)
-                (with-delta 1
+                    (throw :restart it))))
+              (throw :does-not-apply newvalue)))
+          
+          (if (funcall *applicable-when-not-found-p* value)
+            (with-delta 1
               (if (inode-mutate inode it (lnode-inserted it key value #'ctequal))
                 (return-from %insert (values val nil))
                 (throw :restart it)))
-              (throw :does-not-apply value))))))
+            (throw :does-not-apply value)))))
 
     ;;;;;;;;;;;;;;;;;;;;;;;;
     ;; 5.  INODE -> CNODE ;;
@@ -2261,14 +2193,14 @@
                    ;; 8.  CNODE -> SNODE ;; 
                    ;;;;;;;;;;;;;;;;;;;;;;;;
                    
-                   (SNODE (if (:printv (ctequal key (snode-key present)))
+                   (SNODE (if (ctequal key (snode-key present))
                             (let1 new-value (funcall *compute-updated-value*
                                               (snode-value present) value)
                               (if (funcall *applicable-when-found-p* (snode-value present) value)
                                 (let1 new-cnode (cnode-updated cnode pos (snode key new-value))
 
                             ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-                                ;; 9.  SNODE -> SNODE / REPLACE (updated range value) ;;
+                                  ;; 9.  SNODE -> SNODE / REPLACE (updated range value) ;;
                             ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
                                   (if (inode-mutate inode cnode new-cnode)
@@ -2296,8 +2228,7 @@
                                         (contents (make-array (logcount new-bitmap)))
                                         new-cnode new-inode)
 
-;;                                       (new-cnode (make-cnode new-bitmap))
-;;                                       (new-inode (make-inode new-cnode startgen)))
+
 
                                 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
                                   ;; 11.  SNODE-> SNODE / new INODE->CNODE (ctrie growth) ;;
@@ -2309,11 +2240,6 @@
                                   (setf new-cnode (make-cnode :bitmap new-bitmap
                                                     :initial-contents (coerce contents 'list)))
                                   (setf new-inode (make-inode new-cnode startgen))
-
-                                  ;; (setf (arc-aref (cnode-arcs new-cnode) (flag-arc-position
-                                  ;;                                          new-flag-other
-                                  ;;                                          new-bitmap))
-                                  ;;   present)
                                   
                                   (%insert new-inode key value (+ level 5) inode startgen)
                                   (with-delta 1
@@ -2344,12 +2270,13 @@
                                   (when *debug*
                                     (format *TRACE-OUTPUT* "~8A  timeout insert (~A . ~A)~%"
                                       it key value))))
-               (t               (prog1 (setf result it)
+               (t               (prog1 t
+                                  (setf result it)
                                   (when *debug*
                                     (format *TRACE-OUTPUT* "~8S  done .~%~S~%" it *ctrie*)))))
         return (values result ctrie aux)))))
 
-;; TODO: I'm a little troubled by the order of arguments in the
+;; TODO: I'm not sure if i'm little troubled by the order of arguments in the
 ;; lambda-lists of the following few functions, as it seems a little
 ;; awkward and unnatural and possibly not convenently curried and so
 ;; forth.  But, as implemented, this way provides the most consistent
