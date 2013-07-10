@@ -77,7 +77,7 @@
   (test       'equal)
   (hash       'sxhash)
   (stamp       *timestamp-factory*)
-  (context    '(fundamental map unordered))
+  (context    '(fundamental))
   (env        nil))
 
 (defmethod index-incf ((ctrie fundamental-ctrie) &optional (amount 1))
@@ -95,7 +95,7 @@
      :initarg :root)
     (name
       :initform (byte-vector-to-hex-string (create-unique-id-byte-vector))
-      :initarg name
+      :initarg :name
       :reader ctrie-name
       :type string)
     (index
@@ -775,8 +775,8 @@
                                     (ref-prev result)
                                     result)))))))
 )
-;; (fmakunbound 'inode-mutate)
-;;(defun/inline 
+
+
 (defun INODE-MUTATE (inode old-value new-value)
   "INODE-MUTATE provides the top-level interface to the inode _GCAS
   MODIFICATION_ api, which is the mechanism which must be used to
@@ -785,8 +785,8 @@
   PROTOCOL_ Returns a boolean value which indicates the success or
   failure of the modification attempt."
   (check-type inode inode)
-  (check-type old-value (or snode tnode cnode))
-  (check-type new-value (or snode tnode cnode))
+  (check-type old-value (or lnode snode tnode cnode))
+  (check-type new-value (or lnode snode tnode cnode))
   (when (ctrie-readonly-p *ctrie*)
     (ctrie-modification-failed "This CTRIE is READ-ONLY"
       :op 'inode-mutate :place (describe-object inode nil)))
@@ -1186,6 +1186,11 @@
 (defmethod entomb ((snode vector))
   "Entomb an SNODE in a newly created TNODE"
   (make-fundamental-tnode :cell snode))
+
+(defmethod entomb ((snode fundamental-snode))
+  "Entomb an SNODE in a newly created TNODE"
+  (with-active-layers (fundamental)
+    (make-tnode :cell snode)))
 
 (defmethod entomb ((snode transient-snode))
   "Entomb an SNODE in a newly created TNODE"
@@ -2643,7 +2648,8 @@
     (lnode 0)
     (ctrie (ctrie-max-depth (inode-read (root-node-access thing))))
     (inode (ctrie-max-depth (inode-read thing)))
-    (cnode (1+ (loop for arc across (cnode-arcs thing)
+    (cnode (1+ (loop for index from 0 to (1- (arcs-len (cnode-arcs thing)))
+                 for arc = (arc-aref (cnode-arcs thing) index)
                  maximizing (ctrie-max-depth arc))))))
 
 
@@ -2655,8 +2661,9 @@
     (lnode 0)
     (ctrie (ctrie-min-depth (inode-read (root-node-access thing))))
     (inode (ctrie-min-depth (inode-read thing)))
-    (cnode (1+ (loop for arc across (cnode-arcs thing)
-                 minimizing (ctrie-min-depth arc))))))
+    (cnode (1+ (loop for index from 0 to (1- (arcs-len (cnode-arcs thing)))
+                 for arc = (arc-aref (cnode-arcs thing) index)
+                 minimizing (ctrie-max-depth arc))))))
 
 
 
