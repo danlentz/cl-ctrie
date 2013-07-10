@@ -72,9 +72,8 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; ATOMICS
+;; RAW ATOMICS
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 
 (deftest check-atomic-update/1-million ()
   ;; Guaranteed to be (:COUNT . 1000000) -- if you replace
@@ -92,27 +91,47 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; GCAS
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(deftest (check-simple-gcas-cas/in-layer :auto-call nil) (layer-name)
+  (funcall-with-layer-context (adjoin-layer layer-name contextl::*root-context*)
+    (lambda ()
+      (is (null (gcas-compare-and-set (make-inode (snode t t))
+                  (ref-value (inode-ref (make-inode (snode t t)))) (snode :x :x) nil nil nil)))
+      (is (gcas-compare-and-set #1=#.(make-inode (snode t t))
+            (ref-value (inode-ref #1#)) (snode :x :x) nil nil nil)))))
+
+(deftest check-simple-gcas-cas/fundamental ()
+  (check-simple-gcas-cas/in-layer 'fundamental))
+
+(deftest check-simple-gcas-cas/transient ()
+  (check-simple-gcas-cas/in-layer 'transient))
+
+(deftest check-simple-gcas-cas/persistent ()
+  (check-simple-gcas-cas/in-layer 'persistent))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; INODES
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-
 #+()
-(define-test check-atomic-inode-mutation
-  (with-ctrie (make-ctrie)
-    (dotimes (rep 8)
-      (let ((x (make-inode 0)))
-        (mapc #'sb-thread:join-thread
-          (loop repeat 256
-            collect (sb-thread:make-thread
-                      (lambda ()
-                        (loop repeat 1024
-                          do (loop until (inode-mutate x (inode-read x) (1+ (inode-read x))))
-                          (sleep 0.00001))))))
-        (multiple-value-bind (val stamp) (inode-read x)
-          (assert-eql (* 256 1024) val)
-          (assert-eql val stamp))))))
-
-
+(deftest check-atomic-inode-mutation ()
+  (with-active-layers (fundamental)
+    (with-ctrie (make-fundamental-ctrie)
+      (dotimes (rep 8)
+        (let ((x (make-inode (snode 0 0))))
+          (mapc #'sb-thread:join-thread
+            (loop repeat 2
+              collect (sb-thread:make-thread
+                        (lambda ()
+                          (loop repeat 1024
+                            do (loop until (inode-mutate x (inode-read x)
+                                             (snode (1+ (snode-key (inode-read x))) 0)))
+                            (sleep 0.00001))))))))
+      (multiple-value-bind (val stamp) (inode-read x)
+        (is (eql (* 256 1024) (snode-key val)))
+        (is (eql (snode-key val) stamp))))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
