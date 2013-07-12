@@ -118,5 +118,9 @@
   (:use))
 
 
-
   
+(defpackage "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+  (:use )
+  (:nicknames "rdf")
+  (:export "Alt" "Bag" "first" "List" "nil" "object" "predicate" "Property" "rest" "li"
+           "Seq" "Statement" "subject" "type" "value" "XMLLiteral"))

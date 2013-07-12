@@ -893,10 +893,16 @@
 (define-layered-method maybe-box :in persistent ((thing string))
   thing)
 
+(define-layered-method maybe-box :in persistent ((thing list))
+  (mapcar #'maybe-box thing))
+
 
 (define-layered-method maybe-unbox :in t (thing)
   thing)
 
+(define-layered-method maybe-unbox :in t ((thing list))
+  (mapcar #'maybe-unbox thing))
+  
 (define-layered-method maybe-unbox :in t ((box serial-box))
   (hu.dwim.serializer:deserialize (first (mm:mptr-to-lisp-object
                                            (serial-box-contents box)))))
@@ -1786,11 +1792,12 @@
               (aprog1 (funcall #'make-instance (class-of ctrie))
                 (setf
                   (ctrie-readonly-p it) (or read-only (ctrie-readonly-p ctrie))
-                  (ctrie-root it) root
-                  (ctrie-context it) (copy-list (ctrie-context ctrie))
-                  (ctrie-stamp it) (ctrie-stamp ctrie)
-                  (ctrie-test it) (ctrie-test ctrie)
-                  (ctrie-hash it) (ctrie-hash ctrie)))))))))
+                  (ctrie-root it)       root
+                  (ctrie-index it)      (ctrie-index ctrie) 
+                  (ctrie-context it)    (copy-list (ctrie-context ctrie))
+                  (ctrie-stamp it)      (ctrie-stamp ctrie)
+                  (ctrie-test it)       (ctrie-test ctrie)
+                  (ctrie-hash it)       (ctrie-hash ctrie)))))))))
 
 
 (defun ctrie-fork (ctrie)

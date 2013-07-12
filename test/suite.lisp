@@ -50,15 +50,20 @@
     (-run-child-tests-)))
 
 (defsuite (cl-ctrie/mmap :in cl-ctrie) ()
-;;  (with-fixture temp-mmap-workspace
   (-run-child-tests-))
-;;)
 
 (defsuite (cl-ctrie/ctrie :in cl-ctrie) ()
-;;  (with-fixture temp-mmap-workspace
   (-run-child-tests-))
-;;)
-  
+
+(defsuite (cl-ctrie/tree :in cl-ctrie) ()
+  (-run-child-tests-))
+
+(defsuite (cl-ctrie/stm :in cl-ctrie) ()
+  (-run-child-tests-))
+
+(defsuite (cl-ctrie/collections :in cl-ctrie) ()
+  (-run-child-tests-))
+
 (defun run-all-tests ()
   (funcall-test-with-feedback-message 'cl-ctrie))
 
