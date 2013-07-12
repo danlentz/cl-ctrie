@@ -70,14 +70,14 @@
   (with-ring-locked (ring)
     (let* ((first (ring-first ring))
            (vec (ring-vector ring))
-           (new (if (= first (1- (length vec))) 0 (1+ first)))
+           (new (if (= first (1- (cl:length vec))) 0 (1+ first)))
            (bound (ring-bound ring)))
       (declare (fixnum first new bound) (simple-vector vec))
       (cond
         ((minusp bound)
          (error "Cannot pop from an empty ring."))
         ((= new bound)
-         (setf (ring-first ring) -1  (ring-bound ring) (1- (- (length vec)))))
+         (setf (ring-first ring) -1  (ring-bound ring) (1- (- (cl:length vec)))))
         (t
          (setf (ring-first ring) new)))
       (shiftf (aref vec first) nil))))
@@ -87,7 +87,7 @@
   "Return as values the current and maximum size of a ring."
   (with-ring-locked (ring)
     (let ((diff (- (ring-bound ring) (ring-first ring)))
-          (max (length (ring-vector ring))))
+          (max (cl:length (ring-vector ring))))
       (declare (fixnum diff max))
       (values (if (plusp diff) diff (+ max diff)) max))))
 
