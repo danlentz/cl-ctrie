@@ -6,7 +6,7 @@
 (defpackage :tree
   (:documentation "")
   (:use :closer-common-lisp :contextl :macro)
-  (:import-from :cl-ctrie :transient :persistent :cvm)
+  (:import-from :cl-ctrie :transient :persistent :cvm :weight-balanced :height-balanced)
   (:export
     :balanced
     :height-balanced

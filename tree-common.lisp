@@ -306,9 +306,9 @@
                        (cond
                          ((zerop  c) (return-from node/split 
                                        (list l (cons k v) r)))
-                         ((minusp c) (destructuring-bind (ll pres rl) (node/split k l)
+                         ((minusp c) (destructuring-bind (ll pres rl) (node/split l k)
                                        (list ll pres (node/concat3 ak v rl r))))
-                         ((plusp  c) (destructuring-bind (lr pres rr) (node/split k r)
+                         ((plusp  c) (destructuring-bind (lr pres rr) (node/split r k)
                                        (list (node/concat3 ak v l lr) pres rr)))))))))
 
 

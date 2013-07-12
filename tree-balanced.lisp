@@ -33,10 +33,10 @@
    decided based on {defvar wb::+delta+} that a rotation is indeed required.")
 
 
-(deflayer weight-balanced (balanced)
-  ((delta :initarg :delta :initform +delta+ :reader weight-balanced-delta)
-    (gamma :initarg :gamma :initform +gamma+ :reader weight-balanced-gamma))
-  (:documentation ""))
+;; (deflayer weight-balanced (balanced)
+;;   ((delta :initarg :delta :initform +delta+ :reader weight-balanced-delta)
+;;     (gamma :initarg :gamma :initform +gamma+ :reader weight-balanced-gamma))
+;;   (:documentation ""))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -320,9 +320,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-(deflayer height-balanced (balanced)
-  ()
-  (:documentation ""))
+;; (deflayer height-balanced (balanced)
+;;   ()
+;;   (:documentation ""))
 
 (defun invalid-argument (fn-name)
   (error "Invalid argument in: ~A" fn-name))

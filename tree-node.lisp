@@ -66,9 +66,14 @@
 (deftype node ()
   '(satisfies node-p))
 
-(defmethod node-p ((thing vector))
-  (typep thing `(and (simple-vector 6) (satisfies looks-bnodish-to-me))))
+(defmethod node-p (thing)
+  nil)
 
+(defmethod node-p ((thing vector))
+  (typep thing `(and (simple-vector 6) (satisfies looks-nodish-to-me))))
+
+(deftype transient-node ()
+  'node)
 
 (defmethod pointer:deref ((thing simple-vector) &optional (type 'transient-node) &rest args)
   (declare (ignore args))
