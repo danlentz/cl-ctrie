@@ -344,6 +344,11 @@
       (finalize-inheritance class))))
 
 
+;;    (finalize-inheritance class)))
+;; Note: ALWAYS refinalize, even when redundant to prevent a specific
+;; class of error that occurred when this became out-of-sync
+
+
 (defun assert-class-slot-layout (class layout &key (finalize t))
   (when finalize  (ensure-finalize-inheritance class))
   (cassert (layout-compatible-p layout (mm-metaclass-slot-layout class)) ()
