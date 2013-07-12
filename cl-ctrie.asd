@@ -8,6 +8,23 @@
   (asdf:operate 'asdf:load-op :cffi-grovel)
   (asdf:operate 'asdf:load-op :cffi-objects))
   
+(defclass load-only-file (asdf:cl-source-file)
+  ((last-loaded :accessor load-date :initform nil)))
+
+(defmethod operation-done-p ((op compile-op) (component load-only-file))
+  t)
+
+(defmethod perform :around ((op compile-op) (component load-only-file))
+  nil)
+
+(defmethod operation-done-p ((op load-op) (component load-only-file))
+  (and (load-date component)
+       (>= (load-date component) (file-write-date (component-pathname component)))))
+
+(defmethod perform ((op load-op) (component load-only-file))
+  (prog1 (load (component-pathname component))
+    (setf (load-date component)
+          (file-write-date (component-pathname component)))))
 
 (asdf:defsystem :cl-ctrie
   :serial t
@@ -91,6 +108,7 @@
              ;  (:file "common-tty")
              ;  (:file "common-diff")
              ;  (:file "common-stream")
+                (:file "common-ring")
                 (:file "common-array")
                 (:file "common-instance")
                 (:file "common-vm")
@@ -137,7 +155,7 @@
                 (:file "index-root")
                 (:load-only-file "ctrie-metaclass")
                 (:file "collection-packages")
-                (:file "collection-class")
+                (:load-only-file "collection-class")
                 (:file "collection-set")
                 ))
 
