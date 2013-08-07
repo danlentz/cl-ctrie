@@ -6,6 +6,8 @@
 ;;;;; implementation based on hdstm-lockfree STM by Dr. David McClain
 ;;;;; portions Copyright (C) 2008-2010 by SpectroDynamics, LLC
 ;;;;;
+;;;;; Thanks also to pkhuong for assistance debugging :)
+;;;;;
 
 (defpackage :dstm
    (:use #:common-lisp)
