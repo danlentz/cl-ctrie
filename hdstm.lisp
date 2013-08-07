@@ -52,18 +52,22 @@
 (defun set-state (trans new-state)
   (tagbody :iter
     (let ((old-state (volatile (transaction-state trans))))
-      (unless (or (eq old-state new-state)
-                (flush-volatile (eq (sb-ext:compare-and-swap (slot-value trans 'state)
-                                  old-state new-state) old-state)))
+      (unless (or
+                (eq old-state new-state)
+                (eq old-state :committed)
+                ;;(flush-volatile
+                  (eq (sb-ext:compare-and-swap (slot-value trans 'state)
+                        old-state new-state) old-state))
+                ;;)
         (go :iter)))))
 
 (defun abort-transaction (trans)
   (set-state trans :ABORTED)
   (setf (transaction-reads trans) nil))
 
-(defparameter *nrolls* (make-array '(1) :element-type 'sb-ext:word :initial-element #x0))
-(defparameter *ntrans* (make-array '(1) :element-type 'sb-ext:word :initial-element #x0))
-(defparameter *nfails* (make-array '(1) :element-type 'sb-ext:word :initial-element #x0))
+(sb-ext:defglobal *nrolls* (make-array '(1) :element-type 'sb-ext:word :initial-element #x0))
+(sb-ext:defglobal *ntrans* (make-array '(1) :element-type 'sb-ext:word :initial-element #x0))
+(sb-ext:defglobal *nfails* (make-array '(1) :element-type 'sb-ext:word :initial-element #x0))
 
 (defun rollback (trans)
   (when trans
@@ -146,9 +150,10 @@
           (conflict-manager-for-write trans vtrans)
           (go :iter))          
         (let ((oldv (current-value vref)))
-          (unless (flush-volatile
-                    (volatile (eq (sb-ext:compare-and-swap (slot-value var 'cell) vref
-                                (make-instance 'dstm-val :old oldv :new val :trans trans)) vref)))
+          (unless ;;(flush-volatile (volatile
+              (eq (sb-ext:compare-and-swap (slot-value var 'cell) vref
+                    (make-instance 'dstm-val :old oldv :new val :trans trans)) vref)
+            ;;))
             (go :iter)))))))
 
 
@@ -249,8 +254,8 @@
 (defun check-invariant (&aux x y)
   (atomic
     (setf
-      x (:printv (read-var *a*))
-      y (:printv (read-var *b*))))
+      x (read-var *a*)
+      y (read-var *b*)))
   (unless (= y (* 2 x))
     (sb-ext:atomic-incf (aref *nfails* 0))
     ;; (describe *a*)
