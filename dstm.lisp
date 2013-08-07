@@ -23,7 +23,11 @@
 
 (in-package :dstm)
 
-(defparameter *transactions* (make-hash-table :test #'eq))
+(defparameter *transactions* (make-hash-table :test #'eq :synchronized t))
+
+
+(defvar *transaction* nil)
+
 
 (defclass transaction ()
   ((state   :accessor transaction-state  :initform :active  :initarg :state)
@@ -32,6 +36,15 @@
     (subs   :accessor transaction-subs   :initform nil)
     (parent :accessor transaction-parent :initform (current-transaction))))
 
+
+;; (defun current-transaction ()
+;;   (sb-thread:symbol-value-in-thread 'dstm:*transaction* sb-thread:*current-thread* nil))
+
+
+;; (defun (setf current-transaction) (trans)
+;;   (setf
+;;     #+sbcl (sb-thread:symbol-value-in-thread 'dstm:*transaction* sb-thread:*current-thread* nil)
+;;     trans))
 
 (defun current-transaction ()
   (gethash sb-thread:*current-thread* *transactions*))
@@ -99,13 +112,12 @@
 
 
 (defun check-reads (trans)
-  (sb-thread:barrier (:memory)
-    (dolist (pair (transaction-reads trans))
-      (destructuring-bind (var . vtrans) pair
-        (let ((vnow (dstm-var-trans var)))
-          (unless (or (eq vnow vtrans)          ;; unchanged?
-                    (equivalentp trans vnow))   ;; ...or changed by us...
-            (rollback)))))))
+  (dolist (pair (transaction-reads trans))
+    (destructuring-bind (var . vtrans) pair
+      (let ((vnow (dstm-var-trans var)))
+        (unless (or (eq vnow vtrans)          ;; unchanged?
+                  (equivalentp trans vnow))   ;; ...or changed by us...
+          (rollback))))))
 
 
 (defun commit (final)
@@ -129,16 +141,15 @@
 (defun read-var (var)
   (let ((trans (current-transaction)))
     (loop
-      (sb-thread:barrier (:memory)
-        (let* ((vtrans (dstm-var-trans var))
-                (vstate (transaction-state vtrans)))
-          (when (or
-                  (not (eq :ACTIVE vstate))
-                  (and trans (equivalentp trans vtrans)))
-            (when trans (push (cons var vtrans) (transaction-reads trans)))
-            (return (if (eq :ABORTED vstate)
-                      (dstm-var-old var)
-                      (dstm-var-new var)))))))))
+      (let* ((vtrans (dstm-var-trans var))
+              (vstate (transaction-state vtrans)))
+        (when (or
+                (not (eq :ACTIVE vstate))
+                (and trans (equivalentp trans vtrans)))
+          (when trans (push (cons var vtrans) (transaction-reads trans)))
+          (return (if (eq :ABORTED vstate)
+                    (dstm-var-old var)
+                    (dstm-var-new var))))))))
 
 
 (defun write-var (var val)
@@ -157,15 +168,15 @@
 (defun write-var-with-transaction (trans var val)
   "trans is the current transaction for a thread"
   (loop
-    (sb-thread:barrier (:memory)
-      (let* ((vtrans (dstm-var-trans var))
-              (vstate (transaction-state vtrans)))
-        (cond
-          ((not (eq :ACTIVE vstate))  (when (sb-ext:cas (slot-value var 'trans) vtrans trans)
-                                        (when (eq :COMMITTED vstate)
-                                          (setf (dstm-var-old var) (dstm-var-new var)))
-                                        (return (setf (dstm-var-new var) val))))
-          ((equivalentp trans vtrans) (return (setf (dstm-var-new var) val))))))))
+    (let* ((vtrans (dstm-var-trans var))
+            (vstate (transaction-state vtrans)))
+      (cond
+        ((not (eq :ACTIVE vstate))  (when (eq (sb-ext:cas (slot-value var 'trans) vtrans trans)
+                                            vtrans)
+                                      (when (eq :COMMITTED vstate)
+                                        (setf (dstm-var-old var) (dstm-var-new var)))
+                                      (return (setf (dstm-var-new var) val))))
+        ((equivalentp trans vtrans) (return (setf (dstm-var-new var) val)))))))
 
 
 (defun do-orelse (&rest fns)
@@ -232,7 +243,6 @@
       :trans-per-sec  rate)))
 
 (defun reset ()
-  (clrhash *transactions*)
   (setf (aref  *nrolls* 0) 0)
   (setf (aref  *ntrans* 0) 0))
 
@@ -257,7 +267,6 @@
       (write-var *b* (* 2 a)))))
 
 (defun test-dstm (&optional (iterations 1000000))
-  (or (find-package :local-time)      (ql:quickload :local-time))
   (flet ((count-up ()
            (loop for i from iterations downto 0
              do (setf *up-remaining* i)
@@ -266,7 +275,7 @@
             (loop for i from iterations downto 0
               do (setf *down-remaining* i)
               do (common-code -1)))
-          (check ()
+          (checker ()
             (loop until (and (eql *up-remaining* 0) (eql *down-remaining* 0))
               do (check-invariant))))
     (format *trace-output* "~&Start DSTM Test...~%")
@@ -279,7 +288,7 @@
            (procs (list
                     (sb-thread:make-thread #'count-down :name "down")
                     (sb-thread:make-thread #'count-up   :name "up")
-                    (sb-thread:make-thread #'check      :name "check"))))
+                    (sb-thread:make-thread #'checker    :name "check"))))
       (loop while (some #'sb-thread:thread-alive-p procs))
       (let ((stop (get-internal-real-time)))
         (princ (show-rolls  (/ (- stop start) internal-time-units-per-second))
