@@ -50,6 +50,7 @@
     :node/remove-greatest
     :node/concat2
     :node/inorder-fold
+    :node/reverse-fold
     :node/iter
     :node/at-index
     :node/find

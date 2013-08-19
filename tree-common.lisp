@@ -176,7 +176,16 @@
                 (kvlr (k v l r)  node
                   (fold (the-fn k v (fold base r)) l)))))     
     (fold base node)))
-   
+
+(defun node/reverse-fold (fn base node)
+  (labels ((the-fn (k &optional v a)
+             (funcall (alexandria:ensure-function fn) k v a))             
+            (fold (base node)
+              (if (empty? node) base
+                (kvlr (k v l r)  node
+                  (fold (the-fn k v (fold base l)) r)))))     
+    (fold base node)))
+
 
 (defun node/iter (node fn)
   "For the side-effect, apply FN to each node of the tree rooted at NODE"
