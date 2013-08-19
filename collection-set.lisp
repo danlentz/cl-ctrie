@@ -3,6 +3,26 @@
 
 (in-package :cl-ctrie)
 
+
+(defmacro -> (x &optional (form nil form-supplied-p) &rest more)
+  " * EXAMPLE
+  ```;;; (-> (empty-map)
+     ;;;   (with :a 100)
+     ;;;   (with :b 200)
+     ;;;   (less :a))
+     ;;;
+     ;;; #{| (:B 200) |}
+ ```"
+  (if form-supplied-p
+    (if more
+      `(-> (-> ,x ,form) ,@more)
+      (if (listp form)
+        `(,(car form) ,x ,@(cdr form))
+        (list form x)))
+    x))
+
+(setf (macro-function ':->) (macro-function '->))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; set:type
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -22,6 +42,9 @@
 ;; set api
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defun set:name (collection)
+  (collection-name-of collection))
+
 (defun set:add (collection &rest elements)
   (let1 s (or collection (make-collection 'set))
     (with-update-to-collection (r s)
@@ -30,17 +53,28 @@
         then (tree:node/add root-node e t)
         finally (return root-node)))))
 
+(defun set:add* (collection elements)
+  (apply #'set:add collection (ensure-list elements)))
+
 (defgeneric set:min (collection)
   (:documentation "return the smallest element present in the collection")
   (:method ((collection null)) nil)
   (:method ((collection set))
     (tree:node/k (tree:node/least (root-node-of collection)))))
 
+(defun set::min-node (collection)
+  (when collection
+    (tree:node/least (root-node-of collection))))
+
 (defgeneric set:max (collection)
   (:documentation "return the greatest element present in the collection")
   (:method ((collection null)) nil)
   (:method ((collection set))
     (tree:node/k (tree:node/greatest (root-node-of collection)))))
+
+(defun set::max-node (collection)
+  (when collection
+    (tree:node/greatest (root-node-of collection))))
 
 (defgeneric set:remove-min (collection)
   (:documentation  "return a collection with the smallest element removed")
@@ -158,19 +192,30 @@
     (let* ((r1 (root-node-of s1))
             (r2 (root-node-of s2)))
       (tree:node/subset? r2 r1))))
- 
+
+(defun applied-to-keys-and-accum (fn)
+  (lambda (k v a)
+    (declare (ignore v))
+    (funcall fn k a)))
+
+(defun set:foldl (s fn base)
+  (with-collection (s)
+    (tree:node/inorder-fold (applied-to-keys-and-accum fn) base (root-node-of s))))
+
+(defun set:foldr (s fn base)
+  (with-collection (s)
+    (tree:node/reverse-fold (applied-to-keys-and-accum fn) base (root-node-of s))))
+
+(defun applied-to-keys (fn)
+  (lambda (k v a)
+    (declare (ignore v a))
+    (funcall fn k)))
+
 (defun set:each (s fn)
   "funcall fn on each element of set s"
   (with-collection (s)
-    (labels ((recur (r fn)
-               (if (tree:node/empty? r)
-                 (return-from recur nil)
-                 (tree:kvlr (k v l.0 r.0) r
-                   (declare (ignore v))
-                   (recur L.0 fn)
-                   (funcall fn k)
-                   (recur R.0 fn)))))
-      (recur (root-node-of s) fn))))
+    (tree:node/reverse-fold (applied-to-keys fn) nil (root-node-of s)))
+  (values))
       
 (defmacro/once set:do ((element &once set) &body body)
   "Iterate over elements of SET in the manner of the dolist and dotimes macros"
@@ -212,13 +257,9 @@
 
 (defun set:enum (s)
   "return a list containing all elements of s"
-  (let (result)
-    (with-collection (s)
-      (set:do (e s)
-        (push e result)))
-    result))
+  (set:foldl s #'cons nil))
 
-(defun set:dup (s)
+(defun set:dup (s &optional name)
   "return a new set which is set:equal the original s"
   (let* ((s0 (make-instance 'set
                :context (copy-list (collection-context-of s))
@@ -238,12 +279,7 @@
     
 #|
 
-(defun set:foldl (s fn accu)
-  "similar to reduce, takes three argument function f as in: (f key value accumulator)"
-  (let ((s (value s)))
-    (cond ((null s) accu)
-      (t       (lvr (l v r) s
-                 (fold fn r (funcall fn v (fold fn l accu))))))))
+
 
 (defun set:make (&optional (from (set:empty)))
   "end-user api for construction of a new set optionally initialized to contain
