@@ -3,64 +3,2329 @@
   <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="chrome=1">
-    <title>Cl-ctrie by danlentz</title>
-
+    <title>cl-ctrie by danlentz</title>
     <link rel="stylesheet" href="stylesheets/styles.css">
     <link rel="stylesheet" href="stylesheets/pygment_trac.css">
-    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
+    <script src="javascripts/respond.js"></script>
     <!--[if lt IE 9]>
-    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
     <![endif]-->
+    <!--[if lt IE 8]>
+    <link rel="stylesheet" href="stylesheets/ie.css">
+    <![endif]-->
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+
   </head>
   <body>
+      <div id="header">
+        <nav>
+          <li class="fork"><a href="https://github.com/danlentz/cl-ctrie">View On GitHub</a></li>
+          <li class="downloads"><a href="https://github.com/danlentz/cl-ctrie/zipball/master">ZIP</a></li>
+          <li class="downloads"><a href="https://github.com/danlentz/cl-ctrie/tarball/master">TAR</a></li>
+          <li class="title">DOWNLOADS</li>
+        </nav>
+      </div><!-- end header -->
+
     <div class="wrapper">
-      <header>
-        <h1>Cl-ctrie</h1>
-        <p>lock-free, concurrent, key/value index with efficient memory-mapped persistence and fast transient storage models</p>
 
-        <p class="view"><a href="https://github.com/danlentz/cl-ctrie">View the Project on GitHub <small>danlentz/cl-ctrie</small></a></p>
-
-
-        <ul>
-          <li><a href="https://github.com/danlentz/cl-ctrie/zipball/master">Download <strong>ZIP File</strong></a></li>
-          <li><a href="https://github.com/danlentz/cl-ctrie/tarball/master">Download <strong>TAR Ball</strong></a></li>
-          <li><a href="https://github.com/danlentz/cl-ctrie">View On <strong>GitHub</strong></a></li>
-        </ul>
-      </header>
       <section>
-        <h3>Welcome to GitHub Pages.</h3>
+        <div id="title">
+          <h1>cl-ctrie</h1>
+          <p>lock-free, concurrent, key/value index with efficient memory-mapped persistence and fast transient storage models</p>
+          <hr>
+          <span class="credits left">Project maintained by <a href="https://github.com/danlentz">danlentz</a></span>
+          <span class="credits right">Hosted on GitHub Pages &mdash; Theme by <a href="https://twitter.com/michigangraham">mattgraham</a></span>
+        </div>
 
-<p>This automatic page generator is the easiest way to create beautiful pages for all of your projects. Author your page content here using GitHub Flavored Markdown, select a template crafted by a designer, and publish. After your page is generated, you can check out the new branch:</p>
+        <h1>
+<a name="cl-ctrie" class="anchor" href="#cl-ctrie"><span class="octicon octicon-link"></span></a>CL-CTRIE</h1>
 
-<pre><code>$ cd your_repo_root/repo_name
-$ git fetch origin
-$ git checkout gh-pages
+<p><strong>CL-CTRIE</strong> is a common-lisp implementation of the CTrie unordered map
+data-structure described in the paper '<em>Concurrent Tries with
+Efficient Non-Blocking Snapshots</em>, (c) ACM 2-25-2012' by Prokopec,
+Bronson, Bagwell, and Odersky.</p>
+
+<h3>
+<a name="overview" class="anchor" href="#overview"><span class="octicon octicon-link"></span></a>Overview</h3>
+
+<p>A brief overview of general ctrie
+concepts and existing implementations is available through its 
+<a href="http://en.wikipedia.org/wiki/Ctrie">page on wikipedia</a>, of which the
+following is a brief excerpt:</p>
+
+<blockquote>
+<p>The Ctrie data structure is a non-blocking
+concurrent hash array mapped trie based on
+single-word compare-and-swap instructions in a
+shared-memory system. It supports concurrent
+LOOKUP, INSERT and REMOVE operations. Just like
+the hash array mapped trie, it uses the entire
+32-bit space for hash values thus having low
+risk of hashcode collisions... Ctries have been
+shown to be comparable in performance with
+concurrent skip lists, concurrent hash tables
+and similar data structures in terms of the
+lookup operation...  However, they are far more
+scalable than most concurrent hash tables where
+the insertions are concerned. Most concurrent
+hash tables are bad at conserving memory - when
+the keys are removed from the hash table, the
+underlying array is not [reduced in size]. Ctries
+have the property that the allocated memory is
+always a function of only the current number of
+keys in the data-structure.  Ctries have logarithmic
+complexity bounds of the basic operations...
+with a low constant factor due to [large dispersal
+ratio, (32^n arcs at level n)]. Ctries support a
+lock-free, linearizable, constant-time SNAPSHOT
+operation... This is a breakthrough in concurrent
+data-structure design, since other existing concurrent
+data-structures do not support snapshots. [This provides
+the means to support features such as] lock-free,
+linearizable iterator, size and clear operations. [This
+is superior to other] existing concurrent data-structures
+[which require the use of global locks [for exclusive,
+blocking semantics for update access] permitting...
+[no concurrent readers or writers] during any [update,
+insert, remove or other modifications]. In particular,
+Ctries have an O(1) ITERATOR creation operation, O(1)
+CLEAR operation, O(1) DUPLICATE operation and an
+amortized O(log n) operation for SIZE-RETRIEVAL.</p>
+</blockquote>
+
+<h3>
+<a name="platform" class="anchor" href="#platform"><span class="octicon octicon-link"></span></a>Platform</h3>
+
+<p>Currently the lisp platform supported by cl-ctrie is SBCL version
+1.0.55 or greater hosted on x86/x86-64 architecture. Support could
+easily be entended to include other common-lisp implementations that
+offer atomic compare-and-swap functionality, notably LispWorks
+5.x/6.x, which is also well instrumented with lock-free, atomic
+primitives, although this is not necessarily a high priority for the
+initial development cycle.</p>
+
+<h3>
+<a name="status" class="anchor" href="#status"><span class="octicon octicon-link"></span></a>Status</h3>
+
+<p>All tests should succeed; parallelism has been tested for 1,
+2, 4, and 8 threads on an 8-core system (Dual Intel(R) Xeon(R) CPU
+E5462 @ 2.80GHz), SBCL version 1.0.57.56-2273f3a, and Mac OS X Server
+version 10.6.8.</p>
+
+<pre><code>Starting test run on Wednesday, September 5, 2012 09:07:32 AM EDT
+-----------------------------------------------------------------
+
+CHECK-ALET-FSM: 7 assertions passed, 0 failed.
+CHECK-ATOMIC-CLEAR: 6 assertions passed, 0 failed.
+CHECK-ATOMIC-UPDATE: 1 assertions passed, 0 failed.
+CHECK-BULK-INSERT/DROP: 1048579 assertions passed, 0 failed.
+CHECK-BULK-INSERT/LOOKUP: 1048578 assertions passed, 0 failed.
+CHECK-BYTE-VECTOR-HEX-STRING-ROUNDRIP: 10 assertions passed, 0 failed.
+CHECK-CATCH-CASE: 128 assertions passed, 0 failed.
+CHECK-CTRIE-SMOKE-TEST: 31 assertions passed, 0 failed.
+CHECK-DEPTH-AND-SIMPLE-EXTENSION: 8 assertions passed, 0 failed.
+CHECK-EXTENSION/RETRACTION/LNODE-CHAINING: 14 assertions passed, 0 failed.
+CHECK-FBIND: 3 assertions passed, 0 failed.
+CHECK-FLAG-ARC-POSITION: 165 assertions passed, 0 failed.
+CHECK-FLAG-COMPUTATION: 12 assertions passed, 0 failed.
+CHECK-LNODE-INSERTED/REMOVED: 174 assertions passed, 0 failed.
+CHECK-LNODE-LENGTH/ENLIST: 8 assertions passed, 0 failed.
+CHECK-LNODE-SEARCH: 4 assertions passed, 0 failed.
+CHECK-PARALLEL-INSERT-PARALLEL-DROP: 4194316 assertions passed, 0 failed.
+CHECK-PARALLEL-INSERT-PARALLEL-LOOKUP: 4194312 assertions passed, 0 failed.
+CHECK-SIMPLE-INSERT/LOOKUP: 170 assertions passed, 0 failed.
+CHECK-SIMPLE-INSERT/LOOKUP/DROP: 255 assertions passed, 0 failed.
+CHECK-TABLE-ABSTRACTION-FIXTURES: 18 assertions passed, 0 failed.
+CHECK-TIMING-COLLECTION-FIXTURES: 18 assertions passed, 0 failed.
+
+TOTAL: 10,486,817 assertions passed, 0 failed, 0 execution errors.
 </code></pre>
 
-<p>If you're using the GitHub for Mac, simply sync your repository and you'll see the new branch.</p>
+<h3>
+<a name="ideosyncrasies" class="anchor" href="#ideosyncrasies"><span class="octicon octicon-link"></span></a>Ideosyncrasies</h3>
 
-<h3>Designer Templates</h3>
+<p>Perhaps most ideosyncrasies of this common-lisp ctrie implementation
+as compared with the <a href="http://github.com/axel22/Ctries">original</a>,
+written in Scala, result from the efforts I have taken to, where
+feasible, adopt an approach emphasizing a more functional oriented
+decomposition of the algortithm, written in a manner that is more
+closely representative of ideomatic, common-lisp coding style.  For
+example, rather than expose a general purpose GCAS and RDCSS api,
+these protocols are incorporated into ctrie-specific abstractions. For
+<strong>GCAS</strong> the exposed api includes: <code>INODE-READ</code> <code>INODE-MUTATE</code> and
+<code>INODE-COMMIT</code> and for <strong>RDCSS:</strong> <code>ROOT-NODE-ACCESS</code>
+<code>ROOT-NODE-REPLACE</code> and <code>ROOT-NODE-COMMIT.</code> The liberties I have taken
+have the intended benefit of providing an interface that is much
+easier to digest, understand, remember, and work with (at least for
+me) than direct exposure in imperative style of the intricate
+mechanations that underlie the ctrie algorithm.  On the other hand,
+the further one strays from a direct translation of the original
+(verified) ctrie implementation, the greater the likelihood of
+introducing bugs into an environment (lock-free concurrent data
+structure development) in which bugs can be extremely subtle and
+notoriously difficult to detect.  I have attempted to strike an
+appropriate balance between these conflicting concerns, and I intend
+to mitigate the risk, at least in part, through continued development
+of an extensive arsenal of regression tests and benchmarking
+facilities.</p>
 
-<p>We've crafted some handsome templates for you to use. Go ahead and continue to layouts to browse through them. You can easily go back to edit your page before publishing. After publishing your page, you can revisit the page generator and switch to another theme. Your Page content will be preserved if it remained markdown format.</p>
+<p>In addition, there are a few differences in the feature set that
+is provided -- such as a suite of mapping operators in leiu of a
+Java-style Iterator.  For the most part I expect that these
+changes will be preferable to developers accustomed to a more
+'lispy' coding style.</p>
 
-<h3>Rather Drive Stick?</h3>
+<p>For additional insight into the specifics unique to this ctrie
+implementation, an abbreviated reference to a number of internal
+details may be found in the section <a href="Internal%0AReference">Internal Reference</a> of this document, or, of course, by referring to
+the <a href="doc/api/index.html">comprehensive documentation</a> that is
+provided as part of this distribution.</p>
 
-<p>If you prefer to not use the automatic generator, push a branch named <code>gh-pages</code> to your repository to create a page manually. In addition to supporting regular HTML content, GitHub Pages support Jekyll, a simple, blog aware static site generator written by our own Tom Preston-Werner. Jekyll makes it easy to create site-wide headers and footers without having to copy them across every page. It also offers intelligent blog support and other advanced templating features.</p>
+<h3>
+<a name="source-files" class="anchor" href="#source-files"><span class="octicon octicon-link"></span></a>Source Files</h3>
 
-<h3>Authors and Contributors</h3>
+<p>The following outline provides a general description of the
+constituent source files of the cl-ctrie repository and their
+respective purpose.</p>
 
-<p>You can <a href="https://github.com/blog/821" class="user-mention">@mention</a> a GitHub username to generate a link to their profile. The resulting <code>&lt;a&gt;</code> element will link to the contributor's GitHub Profile. For example: In 2007, Chris Wanstrath (<a href="https://github.com/defunkt" class="user-mention">@defunkt</a>), PJ Hyett (<a href="https://github.com/pjhyett" class="user-mention">@pjhyett</a>), and Tom Preston-Werner (<a href="https://github.com/mojombo" class="user-mention">@mojombo</a>) founded GitHub.</p>
+<h4>
+<a name="required" class="anchor" href="#required"><span class="octicon octicon-link"></span></a>Required</h4>
 
-<h3>Support or Contact</h3>
+<p>The following files are the core sources currently necessary
+for correct ctrie operation. </p>
 
-<p>Having trouble with Pages? Check out the documentation at <a href="http://help.github.com/pages">http://help.github.com/pages</a> or contact <a href="mailto:support@github.com">support@github.com</a> and we’ll help you sort it out.</p>
+<ul>
+<li>
+<strong><code>ctrie-package.lisp:</code></strong>  Package Definition</li>
+<li>
+<strong><code>ctrie.lisp:</code></strong>          Structural Implementation</li>
+<li>
+<strong><code>ctrie-util.lisp:</code></strong>     Supporting Utilities</li>
+</ul><h4>
+<a name="supplemental" class="anchor" href="#supplemental"><span class="octicon octicon-link"></span></a>Supplemental</h4>
+
+<p>The following files define extended functionality, management,
+and analysis facilities supporting the development of CL-CTRIE.</p>
+
+<ul>
+<li>
+<code>ctrie-cas.lisp:</code>   SBCL CAS extensions</li>
+<li>
+<code>ctrie-lambda.lisp:</code> Experiments with Stateful Protocols</li>
+<li>
+<code>ctrie-doc.lisp:</code>   Automated Documentation Support</li>
+<li>
+<code>ctrie-test.lisp:</code>  Test and Performance Measurement</li>
+</ul><h3>
+<a name="performance" class="anchor" href="#performance"><span class="octicon octicon-link"></span></a>Performance</h3>
+
+<p>To date, the principal concern has been to fully achieve a working
+and robust implementation of the CTRIE algorithm, with only the
+occaisional profiling run from time to time in order to at least
+get a general sense of where the hot-spots are and peace of mind
+that there are at least no glaring bottlenecks that seem out of
+hand.  A basic profiling exercise of the following activities is
+reported below.</p>
+
+<pre><code>1. construct a new ctrie instance
+2. perform one-million insertions of (fixnum) key/value pairs
+3. perform one-million lookups verifying retrieval of every value
+4. perform one-million removals verifying proper contraction of the structure
+5. verify the resulting ctrie is identical to when initially created.
+</code></pre>
+
+<pre><code>  seconds  |     gc     |    consed   |    calls   |  sec/call  |  name  
+--------------------------------------------------------------
+     1.331 |      1.001 | 332,691,664 |  2,198,622 |   0.000001 | MAKE-CNODE
+     1.123 |      0.000 |       1,904 |  3,179,578 |   0.000000 | CTHASH
+     0.871 |      0.000 |      44,608 |  5,344,350 |   0.000000 | ROOT-NODE-ACCESS
+     0.847 |      0.182 |  69,549,200 |  2,198,622 |   0.000000 | %MAKE-CNODE
+     0.820 |      0.000 |         576 | 12,582,934 |   0.000000 | FLAG
+     0.796 |      0.000 |         352 | 12,582,934 |   0.000000 | FLAG-ARC-POSITION
+     0.611 |      0.000 |         832 |  2,130,976 |   0.000000 | CTEQUAL
+     0.551 |      0.000 |      33,600 | 12,549,110 |   0.000000 | FLAG-PRESENT-P
+     0.529 |      0.000 |         720 |  5,344,350 |   0.000000 | FIND-CTRIE-ROOT
+     0.496 |      0.044 | 108,904,336 |  2,198,622 |   0.000000 | MAKE-REF
+     0.295 |      0.102 |  33,284,592 |  1,048,576 |   0.000000 | MAKE-SNODE
+     0.243 |      0.000 |         144 |  2,198,622 |   0.000000 | CTSTAMP
+     0.225 |      0.000 |         256 |  2,097,152 |   0.000000 | LEAF-NODE-KEY
+     0.216 |      0.118 |  32,803,552 |  1,048,576 |   0.000000 | CNODE-EXTENDED
+     0.189 |      0.000 |      32,848 |  2,097,152 |   0.000000 | LEAF-NODE-VALUE
+     0.146 |      0.000 |       1,872 |  1,048,576 |   0.000000 | SNODE
+     0.018 |      0.000 |           0 |     33,824 |   0.000001 | MAKE-INODE
+     0.016 |      0.000 |           0 |     34,257 |   0.000000 | RESURRECT
+     0.007 |      0.000 |   1,048,304 |     33,824 |   0.000000 | MAKE-TNODE
+     0.000 |      0.127 |  50,427,456 |  1,048,576 |   0.000000 | CTRIE-GET
+     0.000 |      0.000 |           0 |          1 |   0.000000 | CTRIE-SIZE
+     0.000 |      0.000 |       5,104 |  1,048,576 |   0.000000 | CTRIE-PUT
+     0.000 |      0.000 |           0 |          1 |   0.000000 | CTRIE-EMPTY-P
+     0.000 |      0.000 |           0 |          1 |   0.000000 | CTRIE-MAP
+     0.000 |      0.000 |      42,544 |  1,048,602 |   0.000000 | CTRIE-DROP
+     0.000 |      0.000 |           0 |          1 |   0.000000 | CTRIE-MAP-KEYS
+     0.000 |      0.000 |           0 |  1,116,226 |   0.000000 | MAP-NODE
+     0.000 |      0.000 |           0 |     33,824 |   0.000000 | ENTOMB
+     0.000 |      0.000 |           0 |     67,620 |   0.000000 | CNODE-UPDATED
+     0.000 |      0.000 |     268,496 |  4,160,480 |   0.000000 | %INSERT
+     0.000 |      0.000 |      39,024 |  2,164,798 |   0.000000 | INODE-COMMIT
+     0.000 |      0.000 |     342,688 |  4,160,556 |   0.000000 | %REMOVE
+     0.000 |      0.000 |         544 |     33,796 |   0.000000 | CLEAN-PARENT
+     0.000 |      0.000 |   1,375,952 |     33,824 |   0.000000 | %MAKE-INODE
+     0.000 |      0.000 |     262,352 |  4,194,304 |   0.000000 | %LOOKUP
+     0.000 |      0.000 |       3,504 |  1,048,576 |   0.000000 | CNODE-TRUNCATED
+     0.000 |      0.000 |           0 |         26 |   0.000000 | MAP-CNODE
+--------------------------------------------------------------
+     9.328 |      1.574 | 631,167,024 | 90,110,445 |            | Total
+</code></pre>
+
+<h3>
+<a name="documentation" class="anchor" href="#documentation"><span class="octicon octicon-link"></span></a>Documentation</h3>
+
+<p>Comprehensive, HTML based <a href="doc/api/index.html">documentation</a> may be
+found at the project relative pathname <code>doc/api/index.html</code>.  In order
+to enable support for supplemental documentation related features, such
+as the ability to dynamically regenerate the provided documentation
+files incorporating all updates and changes as may be present in the
+source code, a (lightly) enhanced distribution of CLDOC is required
+and may be obtained on <a href="http://github.com/danlentz/cldoc">github</a>.</p>
+
+<p>The following sections provide a compact overview of the user api
+and a reference to some internal definitions of interest.</p>
+
+<h4>
+<a name="user-api-reference" class="anchor" href="#user-api-reference"><span class="octicon octicon-link"></span></a>User API Reference</h4>
+
+<p>The user api of cl-ctrie should be largely familiar to the average
+common-lisp programmer.  Nearly all exported symbols of the CL-CTRIE 
+package begin with the prefix "ctrie" and thus can be convenientely
+incorporated via USE-PACKAGE or equivalent package definition.  The
+following definitions comprise a quick reference to the the public
+user api:</p>
+
+<hr><p><em>[structure]</em>        <code>CTRIE ()</code></p>
+
+<blockquote>
+<p>A CTRIE structure is the root container that uniquely identifies a CTRIE
+  instance, and  contains the following perameters which specify the
+  definable aspects of each CTRIE:</p>
+</blockquote>
+
+<ul>
+<li>
+<code>READONLY-P</code> if not <code>NIL</code> prohibits any future modification or
+cloning of this instance.</li>
+<li>
+<code>TEST</code> is a designator for an equality predicate that will be
+applied to disambiguate and determine the equality of any two
+keys. It is recommened that this value be a symbol that is fboundp,
+to retain capability of externalization (save/restore). At present,
+though, this is not enforced and a function object or lambda
+expression will also be accepted, albeit without the ability of
+save/restore.</li>
+<li>
+<code>HASH</code> is a designator for a hash function, which may be
+desirable to customize when one has specific knowledge about the set
+of keys which will populate the table.  At this time, a 32-bit hash
+is recommended as this is what has been used for development and
+testing and has been shown to provide good performance in
+practice. As with <code>TEST</code> it is recommended that <code>HASH</code> be specified
+by a symbol that is fboundp.</li>
+<li>
+<code>ROOT</code> is the slot used internally for storage of the root inode
+structure that maintains the reference to the contents of the ctrie
+proper.  The ctrie-root must only be accessed using the <em>RDCSS ROOT
+NODE PROTOCOL</em> defined by the top-level entry-points <code>ROOT-NODE-ACCESS</code>
+and <code>ROOT-NODE-REPLACE</code>
+</li>
+</ul><p><em>[function]</em>         <code>MAKE-CTRIE  (&amp;REST ARGS &amp;KEY NAME ROOT (READONLY-P NIL)
+                                   (TEST 'EQUAL) (HASH 'SXHASH)
+                                   &amp;ALLOW-OTHER-KEYS)</code></p>
+
+<blockquote>
+<p>CREATE a new CTRIE instance. This is the entry-point constructor 
+  intended for use by the end-user.</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTRIE-P  (OBJECT)</code></p>
+
+<blockquote>
+<p>Returns T if the specified object is of type ctrie.</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTRIE-TEST  (CTRIE)</code></p>
+
+<blockquote>
+<p>Returns the test of the specified ctrie</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTRIE-HASH  (CTRIE)</code></p>
+
+<blockquote>
+<p>Returns the hash of the specified ctrie</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTRIE-READONLY-P  (CTRIE)</code></p>
+
+<blockquote>
+<p>Returns and (with setf) changes the readonly-p of the specified ctrie</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTRIE-PUT  (CTRIE KEY VALUE)</code></p>
+
+<blockquote>
+<p>Insert a new entry into CTRIE mapping KEY to VALUE.  If an entry
+  with key equal to KEY aleady exists in CTRIE, according to the
+  equality predicate defined by <code>CTRIE-TEST</code> then the priorbmapping
+  will be replaced by VALUE. Returns <code>VALUE</code> representing the
+  mapping in the resulting CTRIE</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTRIE-GET  (CTRIE KEY)</code></p>
+
+<blockquote>
+<p>Find the entry in CTRIE whose key is KEY and returns the
+  associated value and T as multiple values, or returns NIL and NIL
+  if there is no such entry. Entries can be added using SETF.</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTRIE-DROP  (CTRIE KEY)</code></p>
+
+<blockquote>
+<p>Remove KEY and it's associated value from CTRIE. Returns as multiple
+  values the value associated with KEY and T if there was such an entry,
+  otherewise NIL and NIL</p>
+</blockquote>
+
+<p><em>[macro]</em>            <code>CTRIE-DO  ((KEY VALUE CTRIE &amp;KEY ATOMIC) &amp;BODY BODY)</code></p>
+
+<blockquote>
+<p>Iterate over the contents of CTRIE in the manner of dolist. For each
+  (key . value) pair present in CTRIE, BODY (implicit PROGN) will be
+  evaluated with the symbols specified for KEY and VALUE will be bound
+  to the respective entry constituents.  A special variable
+  ACCUM (initially NIL) is available for accumulation of a result
+  value which will be returned after the completion of the CTRIE-DO
+  call.  If ATOMIC is non-NIL, the operation will be performed on a
+  read-only atomic snapshot of CTRIE, which guarantees a consistent,
+  point-in-time representation of the entries present in CTRIE.</p>
+
+<pre><code>  ;;;  EXAMPLE: (ctrie-do (k v ctrie)
+  ;;;             (format t "~&amp;~8S =&gt; ~10S~%" k v))
+</code></pre>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTRIE-MAP  (CTRIE FN &amp;KEY ATOMIC &amp;AUX ACCUM)</code></p>
+
+<blockquote>
+<p>Applies a function two arguments, FN, to each (key . value) pair present in
+  CTRIE.  During the extent of CTRIE-MAP, a special variable ACCUM (initially NIL)
+  is available for accumulation of a result value which will be returned after
+  the completion of the CTRIE-MAP call.  If ATOMIC is non-NIL, the operation will
+  be performed on a read-only atomic snapshot of CTRIE, which guarantees a
+  consistent, point-in-time representation of the entries present in CTRIE</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTRIE-MAP-KEYS  (CTRIE FN &amp;KEY ATOMIC)</code></p>
+
+<blockquote>
+<p>Applies a function one argument, FN, to each key present in CTRIE.
+  During the extent of CTRIE-MAP-KEYS, a special variable
+  ACCUM (initially NIL) is available for accumulation of a result
+  value which will be returned after the completion of the
+  CTRIE-MAP-KEYS call.  If ATOMIC is non-NIL, the operation will be
+  performed on a read-only atomic snapshot of CTRIE, which guarantees
+  a consistent, point-in-time representation of the keys present in
+  CTRIE</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTRIE-MAP-VALUES  (CTRIE FN &amp;KEY ATOMIC)</code></p>
+
+<blockquote>
+<p>Applies a function one argument, FN, to each value present in CTRIE.
+  During the extent of CTRIE-MAP-VALUES, a special variable
+  ACCUM (initially NIL) is available for accumulation of a result
+  value which will be returned after the completion of the
+  CTRIE-MAP-VALUES call.  If ATOMIC is non-NIL, the operation will be
+  performed on a read-only atomic snapshot of CTRIE, which guarantees
+  a consistent, point-in-time representation of the values present in
+  CTRIE</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTRIE-KEYS  (CTRIE &amp;KEY ATOMIC)</code></p>
+
+<blockquote>
+<p>Construct and return a list containing all keys present in CTRIE.
+  If ATOMIC is non-NIL, the operation will be performed on a read-only
+  atomic snapshot of CTRIE, which guarantees a consistent,
+  point-in-time representation of the keys present in CTRIE</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTRIE-VALUES  (CTRIE &amp;KEY ATOMIC)</code></p>
+
+<blockquote>
+<p>Construct and return a list containing all values present in CTRIE.
+  If ATOMIC is non-NIL, the operation will be performed on a read-only
+  atomic snapshot of CTRIE, which guarantees a consistent,
+  point-in-time representation of the values present in CTRIE</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTRIE-SIZE  (CTRIE &amp;KEY ATOMIC &amp;AUX (ACCUM 0))</code></p>
+
+<blockquote>
+<p>Return the number of entries present in CTRIE.  If ATOMIC is non-NIL,
+  the operation will be performed on a read-only atomic snapshot of CTRIE,
+  which guarantees a consistent, point-in-time representation of CTRIE</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTRIE-CLEAR  (CTRIE)</code></p>
+
+<blockquote>
+<p>Atomically clear all entries stored in CTRIE, returning it to a condition
+  which returns <code>T</code> when tested with predicate <code>CTRIE-EMPTY-P</code></p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTRIE-PPRINT  (CTRIE &amp;OPTIONAL (STREAM T))</code></p>
+
+<blockquote>
+<p>Pretty-print a representation of CTRIE as an alist containing
+  all (key . value) pairs found in it.  Atomicity is not guaranteed</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTRIE-TO-ALIST  (CTRIE &amp;KEY ATOMIC)</code></p>
+
+<blockquote>
+<p>Return an alist containing all (key . value) pairs found in CTRIE.
+  If ATOMIC is non-NIL, the operation will be performed on a read-only
+  atomic snapshot of CTRIE, which guarantees a consistent,
+  point-in-time representation of the entries in CTRIE</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTRIE-TO-HASHTABLE  (CTRIE &amp;KEY ATOMIC HASH-TABLE &amp;AUX
+                                           (ACCUM
+                                            (OR HASH-TABLE
+                                                (MAKE-HASH-TABLE :TEST
+                                                                 (CTRIE-TEST
+                                                                  CTRIE)
+                                                                 :HASH-FUNCTION
+                                                                 (CTRIE-HASH
+                                                                  CTRIE)
+                                                                 :SYNCHRONIZED
+                                                                 ATOMIC))))</code></p>
+
+<blockquote>
+<p>Return a hash-table containing all (key . value) pairs found in CTRIE.
+  If ATOMIC is non-NIL, the operation will be performed on a read-only
+  atomic snapshot of CTRIE, which guarantees a consistent,
+  point-in-time representation of the entries in CTRIE. If HASH-TABLE
+  is specified, it will be used as the destination hash-table.
+  Otherwise, a new hash-table will be created with hash-function and
+  test identical to that of CTRIE.  It will be created as synchronized
+  if ATOMIC is not NIL</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTRIE-FROM-HASHTABLE  (HASH-TABLE &amp;KEY CTRIE)</code></p>
+
+<blockquote>
+<p>Return a CTRIE containing all (key . value) pairs found in HASH-TABLE.
+  If CTRIE is specified, it will be used as the destination ctrie.
+  Otherwise, a new ctrie will be created with test identical to that
+  of HASH-TABLE. The hash-function will NOT be preserved, as that
+  information does not appear to be recoverable from a hash-table once
+  created</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTRIE-FROM-ALIST  (ALIST &amp;KEY CTRIE)</code></p>
+
+<blockquote>
+<p>Return a CTRIE containing all (key . value) pairs found in ALIST.
+  If CTRIE is specified, it will be used as the destination ctrie.
+  Otherwise, a new ctrie will be created. Atomicity is not guaranteed</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTRIE-EMPTY-P  (CTRIE)</code></p>
+
+<blockquote>
+<p>Return T if CTRIE contains no entries, otherwise NIL. This function is
+  O(1) and is much more efficient than testing for <code>CTRIE-SIZE</code> of 0</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTRIE-MAX-DEPTH  (THING)</code></p>
+
+<blockquote>
+<p>Compute the maximum length of any arc. Useful as a diagnostic</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTRIE-MIN-DEPTH  (THING)</code></p>
+
+<blockquote>
+<p>Compute the minimum length of any arc. Useful as a diagnostic</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTRIE-SNAPSHOT  (CTRIE &amp;KEY READ-ONLY)</code></p>
+
+<blockquote>
+<p>Atomically create a clone of CTRIE that may be operated upon
+  independently without affecting or being affected by operations or
+  content of the original CTRIE.  If READ-ONLY is NIL (the default),
+  the new CTRIE will be a READABLE/WRITABLE 'fork' of CTRIE (see
+  <code>CTRIE-FORK</code>) otherwise, the clone will be READABLE only, which has
+  considerable performance benefits in some circumstances, as the arcs
+  will not require <code>REFRESH</code> and should be the preferred mode when
+  updates (writability) of the clone are not required</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTRIE-FORK  (CTRIE)</code></p>
+
+<blockquote>
+<p>Atomically create a READABLE and WRITABLE clone of CTRIE that may
+  be operated upon independently without affecting or being affected
+  by the original CTRIE.</p>
+</blockquote>
+
+<p><em>[macro]</em>            <code>CTRIE-LAMBDA  (&amp;ONCE CTRIE &amp;REST REST)</code></p>
+
+<blockquote>
+<p>Pandoric Object and Inter-Lexical Communication Protocol
+  this macro builds the most unencumbered and widely applicable
+  'purist edition' Of our PLAMBDA based form.  Even as such,
+  a lot of care has been given to many subtle ways it has been
+  refined to offer the most convenient and natural tool possible.</p>
+
+<pre lang=";;;"><code>     ;;; (plambda (#&lt;CLOSURE (LAMBDA (&amp;REST ARGS)) {100929EB1B}&gt; )
+     ;;;
+     ;;; DISPATCHING to FUNCTIONAL MAPPING:
+     ;;;   (IF (REST ARGS)
+     ;;;          (APPLY ARG (REST ARGS))
+     ;;;          (FUNCALL ARG #'IDENTITY)) =&gt;
+     ;;; ------------------------------------------------------------
+     ;;; INITIALIZING PLAMBDA
+     ;;; ------------------------------------------------------------
+     ;;;   IT =&gt; #S(CTRIE
+     ;;;               :READONLY-P NIL
+     ;;;               :TEST EQUAL
+     ;;;               :HASH SXHASH
+     ;;;               :STAMP #&lt;CLOSURE (LAMBDA # :IN CONSTANTLY) {10092B516B}&gt;
+     ;;;               :ROOT #S(INODE
+     ;;;                        :GEN #:|ctrie2196|
+     ;;;                        :REF #S(REF
+     ;;;                                :STAMP @2012-08-19T13:34:58.314457-04:00
+     ;;;                                :VALUE #S(CNODE :BITMAP 0 :ARCS #())
+     ;;;                                :PREV NIL)))
+     ;;;   PLIST =&gt; (:CONTAINER #&lt;CLOSURE (LAMBDA #) {100929EACB}&gt; 
+     ;;;             :TIMESTAMP @2012-08-19T13:34:58.314464-04:00)
+     ;;;   STACK =&gt; (#&lt;CLOSURE (LAMBDA #) {100929EACB}&gt;)
+     ;;; 
+     ;;; ------------------------------------------------------------
+     ;;;  #&lt;CLOSURE (LAMBDA (&amp;REST #:ARGS55)) {100929EACB}&gt;
+     ;;;```
+
+</code></pre>
+</blockquote>
+
+<p><em>[generic-function]</em> <code>CTRIE-LAMBDA-CTRIE  (CTRIE-LAMBDA-OBJECT)</code></p>
+
+<blockquote>
+<p>Returns and (with setf) changes the ctrie of the specified ctrie-lambda-object</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTRIE-LAMBDA-SPAWN  (SELF &amp;KEY READ-ONLY)</code></p>
+
+<blockquote>
+<p>Causes the atomic clone of enclosed ctrie structure and builds a new
+  lexical closure to operate on it.  Does not bother to reproduce fancy
+  (expensive) object, class, bindings, but provides almost identical
+  functionality.  May be used to more efficintly distribute workload
+  in parallel</p>
+</blockquote>
+
+<p><em>[macro]</em>            <code>DEFINE-CTRIE  (NAME CTRIE &amp;REST ARGS &amp;KEY (OBJECT T) SPEC)</code></p>
+
+<blockquote>
+<p>Define a 'functional' <strong>CTRIE-LAMBDA</strong> that combines all the the
+  capabilities of the raw data structure with behavior and semantics
+  one would expect of any other ordinary common-lisp function.  The
+  resulting symbol defined as 'name will be bound in three distinct
+  namespaces: the <code>SYMBOL-VALUE</code> will be bound to the LAMBDA CLOSURE
+  object, <code>SYMBOL-FUNCTION</code> (fdefinition) will be FBOUND to the
+  compiled function, and the corresponding '(SETF NAME) form will be
+  SETF-BOUND.  the syntax for invoking NAME is as in a LISP1; i.e., no
+  'funcall' is required (but still works if you prefer).
+  Calling <code>(NAME key)</code> returns the value mapped to key, or <code>NIL</code> just
+  as if by <code>(CTRIE-GET ctrie-name key).</code> Analogously when used as a
+  setf-able place such as by <code>(setf (NAME key) value)</code> it has the
+  equivalent behavior to the operation <code>(CTRIE-PUT ctrie-name key
+  value).</code> Use of this type of binding technique has some really
+  convenient effects that I've quickly started to become quite fond
+  of.  One such idiom, for example, <code>(mapcar MY-CTRIE '(key1 key2 key3
+  key4 ...))</code> returns a list containing all the mapped values
+  corresponding to the respective keys.  One additional feature that
+  I've found extremely useful is included <em>under the hood:</em> Invoking
+  MY-CTRIE on an object of type FUNCTION will not search the ctrie for
+  an entry having that function ast its key, but will instead APPLY
+  that function to the actual CTRIE structure wrapped within the
+  closure.  Thus, <code>(MY-CTRIE #'identity)</code> will return the underlying
+  ctrie as just an ordinary instance of a CTRIE STRUCTURE.<br>
+  There are many other functions this is handy with, like
+  <code>(MY-CTRIE #'ctrie-size)</code> <code>(MY-CTRIE #'ctrie-to-hashtable)</code>
+  etc.  Some additional examples are provided below.</p>
+
+<pre><code>  ;;;  (define-ctrie my-ctrie)
+  ;;;    =&gt;  MY-CTRIE
+  ;;;
+  ;;;  (describe 'my-ctrie)
+  ;;;
+  ;;;     CL-CTRIE::MY-CTRIE
+  ;;;       [symbol]
+  ;;;    
+  ;;;     MY-CTRIE names a special variable:
+  ;;;       Value: #&lt;CLOSURE (LAMBDA # :IN MAKE-CTRIE-LAMBDA) {100F73261B}&gt;
+  ;;;    
+  ;;;     MY-CTRIE names a compiled function:
+  ;;;       Lambda-list: (&amp;REST ARGS1)
+  ;;;       Derived type: FUNCTION
+  ;;;    
+  ;;;     (SETF MY-CTRIE) names a compiled function:
+  ;;;       Lambda-list: (VALUE KEY)
+  ;;;       Derived type: (FUNCTION (T T) *)
+  ;;;
+  ;;;
+  ;;;   (my-ctrie :HONG-KONG :FOOY)
+  ;;;     =&gt;  :FOOY
+  ;;;
+  ;;;   (my-ctrie :HONG-KONG)
+  ;;;     =&gt;  :FOOY ; T
+  ;;;
+  ;;;   (map 'list #'eval (mapcar #`(my-ctrie ,a1 ,a1) (iota 12)))
+  ;;;     =&gt;  (0 1 2 3 4 5 6 7 8 9 10 11)
+  ;;;
+  ;;;   (mapcar my-ctrie (iota 12))
+  ;;;     =&gt;  (0 1 2 3 4 5 6 7 8 9 10 11)
+</code></pre>
+</blockquote>
+
+<p><em>[macro]</em>            <code>CTRIE-ERROR  (CONDITION &amp;REST ARGS)</code></p>
+
+<blockquote>
+<p>Signal a CTRIE related condition.</p>
+</blockquote>
+
+<p><em>[condition]</em>        <code>CTRIE-ERROR (ERROR)</code></p>
+
+<blockquote>
+<p>Abstract superclass of CTRIE related conditions.</p>
+</blockquote>
+
+<p><em>[condition]</em>        <code>CTRIE-STRUCTURAL-ERROR (CTRIE-ERROR)</code></p>
+
+<blockquote>
+<p>Condition designating that the CTRIE data structure
+   has been determined to be invalid.</p>
+</blockquote>
+
+<p><em>[condition]</em>        <code>CTRIE-OPERATIONAL-ERROR (CTRIE-ERROR)</code></p>
+
+<blockquote>
+<p>Condition for when an operational failure or
+  inconsistency has occurred.</p>
+</blockquote>
+
+<p><em>[condition]</em>        <code>CTRIE-OPERATION-RETRIES-EXCEEDED (CTRIE-OPERATIONAL-ERROR)</code></p>
+
+<blockquote>
+<p>Condition indicating an operation has failed the
+   maximum number of times specified by the special-variable
+   <em>retries</em></p>
+</blockquote>
+
+<p><em>[condition]</em>        <code>CTRIE-NOT-IMPLEMENTED (CTRIE-ERROR)</code></p>
+
+<blockquote>
+<p>Condition designating functionality for which the
+   implementation has not been written, but has not been deliberately
+   excluded.</p>
+</blockquote>
+
+<p><em>[condition]</em>        <code>CTRIE-NOT-SUPPORTED (CTRIE-ERROR)</code></p>
+
+<blockquote>
+<p>Condition designating functionality that is
+  deliberately not supported.</p>
+</blockquote>
+
+<p><em>[condition]</em>        <code>CTRIE-INVALID-DYNAMIC-CONTEXT (CTRIE-OPERATIONAL-ERROR)</code></p>
+
+<blockquote>
+<p>Condition indicating an operation was attempted
+   outside the dynamic extent of a valid enclosing WITH-CTRIE form</p>
+</blockquote>
+
+<p><em>[condition]</em>        <code>CTRIE-GENERATIONAL-MISMATCH (CTRIE-STRUCTURAL-ERROR)</code></p>
+
+<blockquote>
+<p>Condition indicating an operation encountered an
+   outdated or inconsistent node during its attempted traversal</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTRIE-MODIFICATION-FAILED  (REASON &amp;KEY OP PLACE)</code></p>
+
+<blockquote>
+<p>Signal a modification failure with the appropriate attendant metadata.</p>
+</blockquote>
+
+<p><em>[condition]</em>        <code>CTRIE-MODIFICATION-FAILED (CTRIE-OPERATIONAL-ERROR)</code></p>
+
+<blockquote>
+<p>This condition indicates an unhandled failure of an attempt to
+         perform stateful modification to CTRIE.  The most common case in
+         which this might occur is when such an attempt is mode on a CTRIE
+         designated as READONLY-P.  In any case, this condition represents an
+         exception from which processing cannot continue and requires
+         interactive user intervention in order to recover.</p>
+</blockquote>
+
+<hr><h4>
+<a name="internal-reference-abridged" class="anchor" href="#internal-reference-abridged"><span class="octicon octicon-link"></span></a>Internal Reference (abridged)</h4>
+
+<p>The following reference describes some selected internal
+implementation details of interest.  Under normal circumstances it
+should not be necessary to interact with these unexported symbols
+unless developing an extension to cl-ctrie, but are presented here for
+the sake of convenience, in order to provide better insight into the ctrie
+structure in general, and to help illuminate significant aspects of this
+implementation in particular.  As mentioned above, <a href="doc/api/index.html">comprehensive
+documentation</a> of all symbols is also provided,
+and should be considered the authoratative reference to the CL-CTRIE
+implementation.</p>
+
+<hr><p><em>[special-variable]</em> <code>*CTRIE*  (NIL)</code></p>
+
+<blockquote>
+<p>Within the dynamic extent of a CTRIE operation this variable will
+  be bound to the root-container CTRIE operand.  It is an error if an
+  operation is defined that attempts access to a CTRIE without this
+  binding, which is properly established by wrapping the operation in
+  an appropriate WITH-CTRIE form.</p>
+</blockquote>
+
+<p><em>[special-variable]</em> <code>*RETRIES*  (16)</code></p>
+
+<blockquote>
+<p>Establishes the number of restarts permitted to a CTRIE operation
+  established by a WITH-CTRIE form before a condition of type
+  CTRIE-OPERATION-RETRIES-EXCEEDED will be signaled, aborting the
+  operatation, and requiring operator intervention to resume
+  processing.</p>
+</blockquote>
+
+<p><em>[special-variable]</em> <code>*TIMEOUT*  (2)</code></p>
+
+<blockquote>
+<p>Establishes the duration (in seconds) allotted to a CTRIE operation
+  established by a WITH-CTRIE form before a condition of type
+  CTRIE-OPERATION-TIMEOUT-EXCEEDED will be signaled, aborting the
+  operatation, and requiring operator intervention to resume
+  processing.</p>
+</blockquote>
+
+<p><em>[special-variable]</em> <code>*HASH-CODE*  (NIL)</code></p>
+
+<blockquote>
+<p>Special variable used to store the hash-code that corresponds to the
+  current operation.  Used as a means of improving efficiency by eliminating
+  needless recomputation of the hash function, which is the most expensive
+  part of most user-level ctrie operations.  If this value is not set, then
+  the hash will simply be computed on demand and processing will continue
+  unaffected.  Use of this variable is simply an optional performace
+  optimization techniqie.</p>
+</blockquote>
+
+<p><em>[macro]</em>            <code>MULTI-CATCH  (TAG-LIST &amp;BODY FORMS)</code></p>
+
+<blockquote>
+<p>Macro allowing catch of multiple tags at once and
+    finding out which tag was thrown.
+    * RETURNS: (values RESULT TAG)
+       -  RESULT is either the result of evaluationg FORMS or the value
+          thrown by the throw form.
+       -  TAG is NIl if evaluation of the FORMS completed normally
+          or the tag thrown and cought.
+    * EXAMPLE:
+    <code>
+        ;;; (multiple-value-bind (result tag)
+        ;;;            (multi-catch (:a :b)
+        ;;;                 ...FORMS...)
+        ;;;              (case tag 
+        ;;;                 (:a ...)
+        ;;;                 (:b ...)
+        ;;;                 (t ...)))
+</code></p>
+</blockquote>
+
+<p><em>[macro]</em>            <code>CATCH-CASE  (FORM &amp;REST CASES)</code></p>
+
+<blockquote>
+<p>User api encapsulating the MULTI-CATCH control-structure in a
+    syntactic format that is identical to that of the familiar CASE
+    statement, with the addition that within the scope of each CASE
+    clause, a lexical binding is established between the symbol IT and
+    the value caught from the throw form.</p>
+</blockquote>
+
+<p><em>[structure]</em>        <code>CTRIE ()</code></p>
+
+<blockquote>
+<p>A CTRIE structure is the root container that uniquely identifies a CTRIE
+  instance, and  contains the following perameters which specify the
+  definable aspects of each CTRIE:</p>
+</blockquote>
+
+<ul>
+<li>
+<code>READONLY-P</code> if not <code>NIL</code> prohibits any future modification or
+cloning of this instance.</li>
+<li>
+<code>TEST</code> is a designator for an equality predicate that will be
+applied to disambiguate and determine the equality of any two
+keys. It is recommened that this value be a symbol that is fboundp,
+to retain capability of externalization (save/restore). At present,
+though, this is not enforced and a function object or lambda
+expression will also be accepted, albeit without the ability of
+save/restore.</li>
+<li>
+<code>HASH</code> is a designator for a hash function, which may be
+desirable to customize when one has specific knowledge about the set
+of keys which will populate the table.  At this time, a 32-bit hash
+is recommended as this is what has been used for development and
+testing and has been shown to provide good performance in
+practice. As with <code>TEST</code> it is recommended that <code>HASH</code> be specified
+by a symbol that is fboundp.</li>
+<li>
+<code>ROOT</code> is the slot used internally for storage of the root inode
+structure that maintains the reference to the contents of the ctrie
+proper.  The ctrie-root must only be accessed using the <em>RDCSS ROOT
+NODE PROTOCOL</em> defined by the top-level entry-points <code>ROOT-NODE-ACCESS</code>
+and <code>ROOT-NODE-REPLACE</code>
+</li>
+</ul><p><em>[function]</em>         <code>CTRIE-P  (OBJECT)</code></p>
+
+<blockquote>
+<p>Returns T if the specified object is of type ctrie.</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTRIE-HASH  (CTRIE)</code></p>
+
+<blockquote>
+<p>Returns the hash of the specified ctrie</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTRIE-TEST  (CTRIE)</code></p>
+
+<blockquote>
+<p>Returns the test of the specified ctrie</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTRIE-READONLY-P  (CTRIE)</code></p>
+
+<blockquote>
+<p>Returns and (with setf) changes the readonly-p of the specified ctrie</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTHASH  (KEY)</code></p>
+
+<blockquote>
+<p>Compute the hash value of KEY using the hash function defined by
+  the CTRIE designated by the innermost enclosing WITH-CTRIE form.</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTEQUAL  (X Y)</code></p>
+
+<blockquote>
+<p>Test the equality of X and Y using the equality predicate defined
+  by the CTRIE designated by the innermost enclosing WITH-CTRIE form.</p>
+</blockquote>
+
+<p><em>[macro]</em>            <code>WITH-CTRIE  (&amp;ONCE CTRIE &amp;BODY BODY)</code></p>
+
+<blockquote>
+<p>Configure the dynamic environment with the appropriate condition
+  handlers, control fixtures, and instrumentation necessary to execute
+  the operations in BODY on the specified CTRIE. Unless specifically
+  documented, the particular configuration of this dynamic environment
+  should be considered an implementation detail and not relied upon. A
+  particular exception, however, is that within the dynamic extent of
+  a WITH-CTRIE form, the code implementing a CTRIE operation may
+  expect that the special variable <code>*CTRIE*</code> will be bound to the root
+  container of subject CTRIE.  See also the documentation for
+  <code>*CTRIE*</code></p>
+</blockquote>
+
+<p><em>[function]</em>         <code>FLAG  (KEY LEVEL &amp;OPTIONAL USE-CACHED-P)</code></p>
+
+<blockquote>
+<p>For a given depth, LEVEL, within a CTRIE, extract the correspondant
+  sequence of bits from the computed hash of KEY that indicate the
+  logical index of the arc on the path to which that key may be found.
+  If USE-CACHED-P is non-NIL and the special-variable <code>*HASH-CODE*</code> is
+  non-NIL as well, the hash will not be recomputed, but instead the
+  value bound to <code>*HASH-CODE*</code> will be used as an optimization to
+  reduce unnecessary recomputation of hash function -- an expensive
+  operation.  This value is NOT checked and assumed to be valid and
+  appropriate to the given situation -- care must be taken to use this
+  cached value correctly.  When in doubt, recomputing hash may be a
+  performance penalty, but is guaranteed to always work in any
+  situation.  Note that the logical index of the arc is most likely
+  not the same as the physical index where it is actually located --
+  for that see <code>FLAG-ARC-POSITION</code></p>
+</blockquote>
+
+<p><em>[function]</em>         <code>FLAG-PRESENT-P  (FLAG BITMAP)</code></p>
+
+<blockquote>
+<p>Tests the (fixnum) BITMAP representing the logical index of all
+  arcs present in a CNODE for the presence of a particular arc whose
+  logical index is represented by FLAG.</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>FLAG-ARC-POSITION  (FLAG BITMAP)</code></p>
+
+<blockquote>
+<p>Given FLAG representing the logical index of an arc, and BITMAP
+  representing all arcs present, compute a physical index for FLAG in
+  such a manner as to always ensure all arcs map uniquely and
+  contiguously to the smallest vector that can contain the given
+  arcs.</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>FLAG-VECTOR  (&amp;OPTIONAL (CONTENT 0))</code></p>
+
+<blockquote>
+<p>FLAG-VECTOR is a bit-vector representation of the (fixnum)
+  BITMAP. It is currently not used for any calculation, however it is
+  included within each CNODE as a convenience because it makes it
+  immediately clear from visual inspection which logical arc indexes
+  are represented in the node. For example, from the bit-vector
+  <code>#*10010000000000000000000000000000</code> one can easily see that the first
+  and fourth positions are occupied, and the rest empty.</p>
+</blockquote>
+
+<p><em>[structure]</em>        <code>REF ()</code></p>
+
+<blockquote>
+<p>Atomically Stamped Reference structure <em>[Herlithy, TAOMP]</em> that
+  encapsulates the mutable slots within an inode. Any specific <code>REF</code>
+  structure is, itself, never mutated.  Using the <code>REF</code> structure
+  as basis of inode implementation provides the capability to 'bundle'
+  additional metadata in an inode while still providing atomic compare
+  and swap using a single comparison of the aggregate <code>REF</code> instance.</p>
+
+<ul>
+<li>
+<code>STAMP</code> defines a slot containing implementation-specific metadata
+ that may be maintained internally as a means of tracking inode
+ modification and update behavior.  It should not be referenced by
+ user code, and the format of its contents should not be relied apon.</li>
+<li>
+<code>VALUE</code> defines a slot that contains a reference to the MAIN-NODE
+ that the enclosing inode should be interpreted as 'pointing to'</li>
+<li>
+<code>PREV</code> defines a slot which, during the <code>INODE-COMMIT</code> phase of the
+ <em>GCAS INODE PROTOCOL</em> maintains a reference to the last valid
+ inode state, which may be restored, if necessary, during the
+ course of the <code>INODE-READ</code> / <code>INODE-COMMIT</code> arbitration process</li>
+</ul>
+</blockquote>
+
+<p><em>[function]</em>         <code>REF-P  (OBJECT)</code></p>
+
+<blockquote>
+<p>Returns T if the specified object is of type ref.</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>REF-STAMP  (REF)</code></p>
+
+<blockquote>
+<p>Returns the stamp of the specified ref</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>REF-VALUE  (REF)</code></p>
+
+<blockquote>
+<p>Returns the value of the specified ref</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>REF-PREV  (REF)</code></p>
+
+<blockquote>
+<p>Returns and (with setf) changes the prev of the specified ref</p>
+</blockquote>
+
+<p><em>[structure]</em>        <code>FAILED-REF (REF)</code></p>
+
+<blockquote>
+<p>A <code>FAILED-REF</code> is a structure that is used to preserve the linkage to
+  prior inode state following a failed GCAS.  Any inode access that
+  detects a <code>FAILED-REF</code> will immediately invoke a commit to restore the
+  inode to the state recorded in <code>FAILED-REF-PREV</code></p>
+</blockquote>
+
+<p><em>[function]</em>         <code>FAILED-REF-P  (OBJECT)</code></p>
+
+<blockquote>
+<p>Returns T if the specified object is of type failed-ref.</p>
+</blockquote>
+
+<p><em>[type]</em>             <code>LEAF-NODE  NIL</code></p>
+
+<blockquote>
+<p>A LEAF-NODE represents a terminal value in a CTRIE arc.
+  LEAF-NODEs always contain a unit-payload of CTRIE data
+  storage; For example, an SNODE contains a key/value pair.</p>
+</blockquote>
+
+<p><em>[type]</em>             <code>BRANCH-NODE  NIL</code></p>
+
+<blockquote>
+<p>a BRANCH-NODE represents a single arc typically contained
+  within A CNODE.</p>
+</blockquote>
+
+<p><em>[type]</em>             <code>MAIN-NODE  NIL</code></p>
+
+<blockquote>
+<p>A MAIN-NODE is a node that typically represents a specific
+  depth or level within the ctrie and is referenced
+  by its own unique inode.</p>
+</blockquote>
+
+<p><em>[structure]</em>        <code>INODE ()</code></p>
+
+<blockquote>
+<p>An INODE, or 'Indirection Node' is the mutable structure
+  representing the link between other 'main-node' structures found in
+  a ctrie.  An inode is the only type of node that may change the
+  value of its content during its lifetime.  In this implementation,
+  all such values as may change are encapsulated within a <code>REF</code>
+  substructure.  Each inode also contains a generational descriptor
+  object, comparible by identity only, which is used to identify the
+  state of synchronization between the inode and the current
+  'generation' indicated by the root inode at the base of the
+  CTRIE. As an inode may not change its 'gen identity' during its
+  lifetime, this disparity with the generation of the root node will
+  immediately result in the replacement of the inode with a new one
+  properly synchronized with the root's <code>GEN</code> object. In this
+  implementation, <code>GEN</code> objects are implemented by GENSYMS -- unique,
+  uninterned symbols which inherently provide very similar symantics
+  to those required of the generational descriptor.</p>
+
+<ul>
+<li>
+<code>GEN</code> defines a slot containing a generational descriptor object</li>
+<li>
+<code>REF</code> defines a slot containing a <code>REF</code> struct that encapsulates
+the mutable content within an INODE</li>
+</ul>
+</blockquote>
+
+<p><em>[function]</em>         <code>INODE-P  (OBJECT)</code></p>
+
+<blockquote>
+<p>Returns T if the specified object is of type inode.</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>INODE-GEN  (INODE)</code></p>
+
+<blockquote>
+<p>Returns the gen of the specified inode</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>INODE-REF  (INODE)</code></p>
+
+<blockquote>
+<p>Returns and (with setf) changes the ref of the specified inode</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>MAKE-INODE  (LINK-TO &amp;OPTIONAL GEN STAMP PREV)</code></p>
+
+<blockquote>
+<p>Construct a new INODE that represents a reference to the value
+  provided by argument LINK-TO, optionally augmented with a specified
+  generational descriptor, timestamp, and/or previous state</p>
+</blockquote>
+
+<p><em>[macro]</em>            <code>GCAS-COMPARE-AND-SET  (OBJ EXPECTED NEW EXPECTED-STAMP
+                                             NEW-STAMP PREV)</code></p>
+
+<blockquote>
+<p>A thin, macro layer abstraction over the basic compare-and-swap
+  primitive which provides a consistent interface to the underlying
+  inode structure and manages additional metadata, providing
+  reasonable defaults when they are not specified.</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>INODE-READ  (INODE)</code></p>
+
+<blockquote>
+<p>INODE-READ provides the top-level interface to the inode <em>GCAS ACCESS</em>
+  api, which is the mechanism which must be used to gain access to the
+  content of any NON-ROOT inode. For access to the root inode, refer
+  to the RDCSS inode api <code>ROOT-NODE-ACCESS</code>. Returns as four values,
+  the MAIN-NODE, the STAMP, the PREVIOUS STATE (if any), and the REF
+  structure encapsulated by the inode.</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>INODE-MUTATE  (INODE OLD-VALUE NEW-VALUE)</code></p>
+
+<blockquote>
+<p>INODE-MUTATE provides the top-level interface to the inode <em>GCAS
+  MODIFICATION</em> api, which is the mechanism which must be used to
+  effect any change in a NON-ROOT inode.  For modification of the
+  root-inode, refer to the <code>ROOT-NODE-REPLACE</code> <em>RDCSS ROOT NODE
+  PROTOCOL</em> Returns a boolean value which indicates the success or
+  failure of the modification attempt.</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>INODE-COMMIT  (INODE REF)</code></p>
+
+<blockquote>
+<p>INODE-COMMIT implements the <em>GCAS COMMIT</em> protocol which is invoked
+  as necessary by the <code>INODE-READ</code> and <code>INODE-MUTATE</code> entry-points.  It is
+  not meant to be invoked directly, as this would most likely result
+  in corruption. Returns the <code>REF</code> structure representing the content of
+  whatever root inode wound up successfully committed -- either the
+  one requested, or one represented by a previous valid state.  In order
+  to coexist with the <em>RDCSS ROOT NODE PROTOCOL</em> this GCAS COMMIT
+  implementation is augmented with RDCSS ABORTABLE READ semantics
+  by a forward reference to a RDCSS-aware <code>ROOT-NODE-ACCESS</code> in order
+  to safely compare INODE's generational descriptor with the one found
+  in the root inode of the subject CTRIE.</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>SNODE  (KEY VALUE)</code></p>
+
+<blockquote>
+<p>Construct a new SNODE which represents the mapping from
+  domain-element KEY to range-element VALUE.</p>
+</blockquote>
+
+<p><em>[structure]</em>        <code>SNODE ()</code></p>
+
+<blockquote>
+<p>SNODE, i.e., 'Storage Node', is the LEAF-NODE structure ultimately
+  used for the storage of each key/value pair contained in the CTRIE.
+  An SNODE is considered to be immutable during its lifetime.</p>
+
+<ul>
+<li>
+<code>KEY</code> defines the slot containing an element of the map's domain.</li>
+<li>
+<code>VALUE</code> defines the slot containing the range-element mapped to <code>KEY</code>
+</li>
+</ul>
+</blockquote>
+
+<p><em>[function]</em>         <code>SNODE-P  (OBJECT)</code></p>
+
+<blockquote>
+<p>Returns T if the specified object is of type snode.</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>SNODE-KEY  (SNODE)</code></p>
+
+<blockquote>
+<p>Returns the key of the specified snode</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>SNODE-VALUE  (SNODE)</code></p>
+
+<blockquote>
+<p>Returns the value of the specified snode</p>
+</blockquote>
+
+<p><em>[structure]</em>        <code>LNODE ()</code></p>
+
+<blockquote>
+<p>LNODE, i.e., 'List Node', is a special structure used to enclose
+  SNODES in a singly-linked chain when the hash-codes of the
+  respective SNODE-KEYS collide, but those keys are determined to be
+  unique by the <code>CTRIE-TEST</code> function defined for that ctrie.  An
+  LNODE (and therefore a chain of LNODEs) is considered to be
+  immutable during its lifetime.  The order of the list is
+  implemented (arbitrarily) as most recently added first, analogous to
+  <code>CL:PUSH</code></p>
+
+<ul>
+<li>
+<code>ELT</code> defines the slot containing an enclosed SNODE</li>
+<li>
+<code>NEXT</code> defines a slot referencing the next LNODE in the chain, or
+ <code>NIL</code> if no further LNODES remain.</li>
+</ul>
+</blockquote>
+
+<p><em>[function]</em>         <code>LNODE-P  (OBJECT)</code></p>
+
+<blockquote>
+<p>Returns T if the specified object is of type lnode.</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>LNODE-ELT  (LNODE)</code></p>
+
+<blockquote>
+<p>Returns the elt of the specified lnode</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>LNODE-NEXT  (LNODE)</code></p>
+
+<blockquote>
+<p>Returns the next of the specified lnode</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>ENLIST  (&amp;REST REST)</code></p>
+
+<blockquote>
+<p>Construct a chain of LNODE structures enclosing the values supplied.
+  It is assumed (elsewhere) that each of these values is a valid SNODE
+  structure.</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>LNODE-REMOVED  (ORIG-LNODE KEY TEST)</code></p>
+
+<blockquote>
+<p>Construct a chain of LNODE structures identical to the chain starting
+  with ORIG-LNODE, but with any LNODE containing an SNODE equal to KEY
+  removed.  Equality is tested as by the predicate function passed as
+  the argument TEST. The order of nodes in the resulting list will
+  remain unchanged.</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>LNODE-INSERTED  (ORIG-LNODE KEY VALUE TEST)</code></p>
+
+<blockquote>
+<p>Construct a chain of LNODE structures identical to the chain starting
+  with ORIG-LNODE, but ensured to contain an LNODE enclosing an SNODE mapping
+  KEY to VALUE.  If the given KEY equal to a key already present somewhere
+  in the chain (as compared with equality predicate TEST) it will be
+  replaced.  Otherwise a new LNODE will be added. In either case, the LNODE
+  containing <code>(SNODE KEY VAlUE)</code> will be the first node in the resulting
+  list</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>LNODE-SEARCH  (LNODE KEY TEST)</code></p>
+
+<blockquote>
+<p>Within the list of lnodes beginning with LNODE, return the range value
+  mapped by the first SNODE containing a key equal to KEY as determined
+  by equality predicate TEST, or <code>NIL</code> if no such key is found.  As a
+  second value, in order to support storage of <code>NIL</code> as a key, return <code>T</code> to
+  indicate that the KEY was indeed found during search, or <code>NIL</code> to indicate
+  that no such key was present in the list</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>LNODE-LENGTH  (LNODE)</code></p>
+
+<blockquote>
+<p>Return the number of LNODES present in the chain beginning at LNODE</p>
+</blockquote>
+
+<p><em>[structure]</em>        <code>TNODE ()</code></p>
+
+<blockquote>
+<p>A TNODE, or 'Tomb Node', is a special node structure used to preserve
+  ordering during <code>CTRIE-DROP</code> (<code>%remove</code>) operations.
+  Any time a TNODE is encountered during the course of a <code>CTRIE-GET</code> (<code>%lookup</code>)
+  operation, the operative thread is required to invoke a <code>CLEAN</code> operation
+  on the TNODE it has encountered and throw to <code>:RESTART</code> its lookup activity
+  over again.  A TNODE is considered to be immutable and may not change its
+  value during its lifetime.</p>
+
+<ul>
+<li>
+<code>CELL</code> defines a slot which contains the entombed node structure.
+  Only LNODE and SNODE type nodes are ever entombed</li>
+</ul>
+</blockquote>
+
+<p><em>[function]</em>         <code>TNODE-P  (OBJECT)</code></p>
+
+<blockquote>
+<p>Returns T if the specified object is of type tnode.</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>TNODE-CELL  (TNODE)</code></p>
+
+<blockquote>
+<p>Returns the cell of the specified tnode</p>
+</blockquote>
+
+<p><em>[structure]</em>        <code>CNODE ()</code></p>
+
+<blockquote>
+<p>A CNODE, or 'Ctrie Node' is a MAIN-NODE containing a vector of up
+  to <code>2^W</code> 'arcs' -- i.e., references to either an SNODE or INODE
+  structure, collectively referred to as <code>BRANCH-NODES.</code> Each CNODE
+  also contains a (fixnum) bitmap that describes the layout of which
+  logical indices within the total capacity of <code>2^W</code> arcs are actually
+  allocated within that node with BRANCH-NODES physically present.
+  For more specific details on these BITMAP and ARC-VECTOR
+  constituents, refer to the following related functions: <code>FLAG</code>
+  <code>FLAG-PRESENT-P</code> <code>FLAG-VECTOR</code> and `FLAG-ARC-POSITION. The CNODE
+  structure is considered to be immutable and arcs may not be added or
+  removed during its lifetime.  The storage allocated within a CNODE
+  is fixed and specified at the time of its creation based on the
+  value of BITMAP during initialization</p>
+
+<ul>
+<li><code>BITMAP</code></li>
+<li>
+<code>ARCS</code> </li>
+</ul>
+</blockquote>
+
+<p><em>[function]</em>         <code>CNODE-P  (OBJECT)</code></p>
+
+<blockquote>
+<p>Returns T if the specified object is of type cnode.</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>MAKE-CNODE  (&amp;OPTIONAL (BITMAP 0))</code></p>
+
+<blockquote>
+<p>Construct a CNODE with internal storage allocated for the number of
+  arcs equal to the Hamming-Weight of the supplied BITMAP parameter.
+  If no BITMAP is provided, the CNODE created will be empty -- a state
+  which is only valid for the level 0 node referenced by the root of
+  the CTRIE.  This constructor is otherwise never called directly, but
+  is invoked during the course of higher-level operations such as
+  <code>CNODE-EXTENDED</code> <code>CNODE-UPDATED</code> <code>CNODE-TRUNCATED</code> and <code>MAP-CNODE</code></p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CNODE-EXTENDED  (CNODE FLAG POSITION NEW-ARC)</code></p>
+
+<blockquote>
+<p>Construct a new cnode structure that is exactly like CNODE, but
+  additionally contains the BRANCH-NODE specified by parameter NEW-ARC
+  and logical index FLAG at the physical index POSITION within its
+  vector of allocated arcs.  The BITMAP of this new CNODE will be
+  calculated as an adjustment of the prior CNODE's BITMAP to reflect
+  the presence of this additional arc.  In addition, the physical
+  index within the extended storage vector for the other arcs present
+  may also change with respect to where they were located in the prior
+  CNODE.  In other words, the physical index of a given arc within the
+  compressed CNODE storage vector should never be relied upon
+  directly, it should always be accessed by calculation based on its
+  LOGICAL index and the current CNODE BITMAP as described in more
+  detail by the documentation for the functions <code>FLAG</code> <code>FLAG-VECTOR</code> and
+  <code>FLAG-ARC-POSITION</code></p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CNODE-UPDATED  (CNODE POSITION REPLACEMENT-ARC)</code></p>
+
+<blockquote>
+<p>Construct a new cnode structure identical to CNODE, but having the
+  BRANCH-NODE physically located at POSITION within the storage
+  vector replaced by the one specified by REPLACEMENT-ARC.  Unlike
+  <code>CNODE-EXTENDED</code> and <code>CNODE-TRUNCATED</code> the allocated storage and
+  existing BITMAP of this CNODE will remain unchanged (as this is
+  simply a one-for-one replacement) and correspondingly, no reordering
+  of other nodes within the storage vector will occur</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CNODE-TRUNCATED  (CNODE FLAG POS)</code></p>
+
+<blockquote>
+<p>Construct a new cnode structure that is exactly like CNODE, but
+ with the arc at logical index FLAG and physical storage vector
+ location POS removed.  The new CNODE will have an updated bitmap
+ value that is adusted to reflect the removal of this arc, and the
+ position of other arcs within the storage vector of the new CNODE
+ will be adjusted in a manner analogous to that of <code>CNODE-EXTENDED</code>
+ More details on this process may be found by referring to the
+ documentation for the functions <code>FLAG</code> <code>FLAG-VECTOR</code> and
+ <code>FLAG-ARC-POSITION</code></p>
+</blockquote>
+
+<p><em>[function]</em>         <code>MAP-CNODE  (FN CNODE)</code></p>
+
+<blockquote>
+<p>Construct a new cnode structure that is exactly like CNODE, but
+  with each arc (BRANCH-NODE) present in CNODE replaced by the result
+  of applying FN to that arc.  I.e., a simple functional mapping from
+  the old CNODE by FN.  As with <code>CNODE-UPDATED</code> the allocated storage and
+  BITMAP of the resulting CNODE will remain unchanged from the
+  original, and no physical reordering of nodes within the storage
+  vector will occur</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CNODE-CONTRACTED  (CNODE LEVEL)</code></p>
+
+<blockquote>
+<p>The <em>CONTRACTION</em> of a CNODE is an ajustment performed when a CNODE
+  at depth other than level 0 contains only a single SNODE arc.  In
+  such a case, that SNODE is entombed in a new TNODE, which is
+  returned as the result of the CNODE contraction. In all other cases
+  the CNODE is simply returned as-is.  A CONTRACTION represents the
+  first of the two-step <em>ARC RETRACTION PROTOCOL</em> that effects the reclaimation
+  of allocated storage no longer used and the optimization of of lookup
+  efficiency by compacting CTRIE depth and thereby the number of levels
+  which must be traversed.  For further information, refer to the function
+  <code>CNODE-COMPRESSED</code> which implements the second stage of this protocol,
+  completing the process.</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CNODE-COMPRESSED  (CNODE LEVEL)</code></p>
+
+<blockquote>
+<p>The <em>COMPRESSION</em> of a CNODE is the second step of the <em>ARC
+  RETRACTION PROTOCOL</em> completing a retraction that has been initiated
+  by <code>CNODE-CONTRACTED</code>.  The CNODE compression is computed by
+  generating a replacement cnode structure that is similar to CNODE,
+  but with any entombed inode arcs created during contraction simply
+  replaced by the SNODE that had been entombed. This is called the
+  <em>RESURRECTION</em> of that SNODE. After all entombed inode arcs of a
+  cnode have been collapsed into simple SNODE leaves, if the resulting
+  CNODE has been compressed so far as to contain only a single SNODE
+  leaf, it is subjected to another CONTRACTION before it is returned
+  as the result of the compression. Otherwise it is simply returned
+  and represents a complete iteration of the <em>ARC RETRACTION PROTOCOL</em></p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CLEAN  (INODE LEVEL)</code></p>
+
+<blockquote>
+<p>CLEAN is the basic entry-point into the arc retraction protocol. Given an
+  arbitrary, non-root inode referencing a CNODE that can be compressed,
+  update that inode to reference the result of that compression.  Otherwise
+  INODE will remain unaffected.</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CLEAN-PARENT  (PARENT-INODE TARGET-INODE KEY LEVEL)</code></p>
+
+<blockquote>
+<p>During a <code>CTRIE-DROP</code> (<code>%remove</code>) operation, if the result of a KEY/VALUE
+  removal is an arc consisting of an <code>ENTOMBED</code> inode (one referencing a TNODE), then,
+  if that arc remains accessible from the parent of a CNODE containing it, generate
+  the compression of that CNODE and update its parent INODE with the result.</p>
+</blockquote>
+
+<p><em>[structure]</em>        <code>RDCSS-DESCRIPTOR ()</code></p>
+
+<blockquote>
+<p>An RDCSS-DESCRIPTOR object represents a 'plan' for a proposed RDCSS
+  (restricted double compare single swap) operation. The use of this
+  descriptor object provides the means to effect an atomic RDCSS in
+  software, requiring only hardware support for single-word CAS, which is
+  preferable because it is commonly available on curent consumer hardware.</p>
+
+<ul>
+<li>
+<code>OV</code>        designates a slot containing the OLD (current) root inode.
+             If the swap is unsuccessful, the resulting ctrie will revert
+             to this structure as the root inode. </li>
+<li>
+<code>OVMAIN</code>    designates a slot containing the CNODE that is referenced
+             by the OLD (current) root inode.</li>
+<li>
+<code>NV</code>        designates a slot containing a fully assembled replacement
+             root inode referencing a valid CNODE. This pair will become
+             the root inode and level 0 MAIN-NODE of the ctrie if the
+             swap is successful.</li>
+<li>
+<code>COMMITTED</code> designates a flag which, when not NIL, indicates that the
+             RDCSS plan defined by this descriptor has completed
+             successfully</li>
+</ul>
+</blockquote>
+
+<p><em>[function]</em>         <code>RDCSS-DESCRIPTOR-P  (OBJECT)</code></p>
+
+<blockquote>
+<p>Returns T if the specified object is of type rdcss-descriptor.</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>RDCSS-DESCRIPTOR-OV  (RDCSS-DESCRIPTOR)</code></p>
+
+<blockquote>
+<p>Returns the ov of the specified rdcss-descriptor</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>RDCSS-DESCRIPTOR-OVMAIN  (RDCSS-DESCRIPTOR)</code></p>
+
+<blockquote>
+<p>Returns the ovmain of the specified rdcss-descriptor</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>RDCSS-DESCRIPTOR-NV  (RDCSS-DESCRIPTOR)</code></p>
+
+<blockquote>
+<p>Returns the nv of the specified rdcss-descriptor</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>RDCSS-DESCRIPTOR-COMMITTED  (RDCSS-DESCRIPTOR)</code></p>
+
+<blockquote>
+<p>Returns and (with setf) changes the committed of the specified rdcss-descriptor</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>ROOT-NODE-ACCESS  (CTRIE &amp;OPTIONAL ABORT)</code></p>
+
+<blockquote>
+<p>ROOT-NODE-ACCESS extends <code>FIND-CTRIE-ROOT</code>,
+  implementing the <em>RDCSS ROOT NODE PROTOCOL</em> for access to root inode of
+  CTRIE.  In particular, it ensures that if, instead of an inode, the
+  root of CTRIE contains an RDCSS descriptor of a proposed root-node
+  update, that it will immediately invoke <code>ROOT-NODE-COMMIT</code> to act
+  on that descriptor and return an INODE struct that is the result of
+  the completed commit process. <code>ROOT-NODE-ACCESS</code> only provides access
+  to the root inode <em>STRUCTURE</em> and in particular it does not provide
+  safe access to the <em>CONTENT</em> of that inode. In order to access those
+  contents, the root inode returned by <code>ROOT-NODE-ACCESS</code> must be further
+  processed by <code>INODE-READ</code> in order to still properly comply with the
+  underlying GCAS protocol implementation requirements common to all
+  inodes</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>ROOT-NODE-REPLACE  (CTRIE OV OVMAIN NV)</code></p>
+
+<blockquote>
+<p>ROOT-NODE-REPLACE implements the <em>RDCSS ROOT NODE PROTOCOL</em> for
+  replacement of the ROOT INODE of a CTRIE structure with another one
+  that contains new or alternative values, achieving the end-result
+  effectively the same as if by mutation.  The replacement of the root
+  inode is accomplished in two, basic conceptual stages. First, an
+  <code>RDCSS-DESCRIPTOR</code> object which specifies in full the current state
+  and all desired changes in the proposed resulting state.  Thus,
+  whether any individual replacement attempt succeeds or fails, either
+  result is guarenteed to represent a valid state. An attempt is then
+  made to atomically swap this RDCSS-DESCRIPTOR with the current CTRIE
+  root inode.  Note that, although it contains all of the information
+  representing two, distinct, root inode states, the RDCSS-DESCRIPTOR
+  is not, itself, a valid root inode.  That is the reason why all
+  access to the root inode must be accomplished using this specialized
+  <em>RDCSS ROOT NODE PROTOCOL</em> rather than just the <em>GCAS INODE
+  PROTOCOL</em> alone, as is done with all other non-root inodes.  Once an
+  atomic compare-and-swap of an RDCSS-DESCRIPTOR object with the root
+  inode completes successfully, <code>ROOT-NODE-COMMIT</code> is invoked which
+  will attempt to complete the second step of this protocol.  The
+  result of that commit will be one or the other of the two valid
+  states defined in the RDCSS-DESCRIPTOR object.  If another thread
+  concurrently attempts access to a root node holding an
+  RDCSS-DESCRIPTOR object rather than an INODE, it will invoke
+  <code>ROOT-NODE-COMMIT</code> itself, possibly prempting our own attempt, but
+  guaranteeing nonblocking access to a valid root node by any concurrent
+  thread</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>ROOT-NODE-COMMIT  (CTRIE &amp;OPTIONAL ABORT)</code></p>
+
+<blockquote>
+<p>rdcss api to complete a root-node transaction</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTRIE-SNAPSHOT  (CTRIE &amp;KEY READ-ONLY)</code></p>
+
+<blockquote>
+<p>Atomically create a clone of CTRIE that may be operated upon
+  independently without affecting or being affected by operations or
+  content of the original CTRIE.  If READ-ONLY is NIL (the default),
+  the new CTRIE will be a READABLE/WRITABLE 'fork' of CTRIE (see
+  <code>CTRIE-FORK</code>) otherwise, the clone will be READABLE only, which has
+  considerable performance benefits in some circumstances, as the arcs
+  will not require <code>REFRESH</code> and should be the preferred mode when
+  updates (writability) of the clone are not required</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTRIE-CLEAR  (CTRIE)</code></p>
+
+<blockquote>
+<p>Atomically clear all entries stored in CTRIE, returning it to a condition
+  which returns <code>T</code> when tested with predicate <code>CTRIE-EMPTY-P</code></p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTRIE-PUT  (CTRIE KEY VALUE)</code></p>
+
+<blockquote>
+<p>Insert a new entry into CTRIE mapping KEY to VALUE.  If an entry
+  with key equal to KEY aleady exists in CTRIE, according to the
+  equality predicate defined by <code>CTRIE-TEST</code> then the priorbmapping
+  will be replaced by VALUE. Returns <code>VALUE</code> representing the
+  mapping in the resulting CTRIE</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>%INSERT  (INODE KEY VALUE LEVEL PARENT STARTGEN)</code></p>
+
+<blockquote>
+<ul>
+<li> The detailed specifics required to perform an insertion into a
+CTRIE map are defined by and contained within the <code>%INSERT</code> function,
+which is not part of the USER API and should never be invoked
+directly.  The procedures required for interaction with <code>%INSERT</code> are
+managed entirely by the upper layer entry-points and should be
+entirely invisible to the developer using CL-CTRIE.  The alogorithm is
+intricate and requires quite some effort to figure out based on the
+papers and documentation. For that reason this attempt is made to
+properly document the process -- not to encourage anyone to fiddle
+with it...</li>
+</ul>
+<ol>
+<li><p>A given call to %insert carries with it no guarantee that it will
+actually succeed.  Further, there is no guarantee it will do anything
+at all -- including ever returning to the caller having invoked it.
+This is because there are a number of circumstances that may possibly
+interfere with insertion in a lock-free concurrent data-structure and
+in order to minimize the cost incurred by aborted attempts and
+restarts, there is no effort wasted on careful condition handling or
+recovery.  Instead, as soon as it is recognised that a particular
+attempt will not succeed, Control is thrown via non-local exit
+unceremoneously the entire call stack and restarting each time from
+the very beginning. There are quite a few places within the process
+where you will find these nonlocal exits. Originally I had in mind to
+incorporate some additional insrumentation to track and gather
+statistics the log the specifics of all this, and there are a number
+of extension points provided.  For more details refer to the
+<code>MULTI-CATCH</code> and <code>CATCH-CASE</code> control structure documentation.</p></li>
+<li><p>%insert ALWAYS begins at an INODE.  This is not surprising, of
+course, since the root of the tree (where all inserts begin) is an
+INODE, and because INODES are the only nodes that provide
+mutability. When we which to effect change to the CTRIE regardless of
+where or what type, It may only be accomplished by mutating the parent
+INODE immediately above it to reference content that must be freshly
+regenerated each time changes are required.  Once it is established
+that the %insert always begins at an inode, we can reason further
+about the sequence of events that follow by considering some of the
+node oriented invariants for CTRIEs specified variously in the
+academic literature.  First, it has been clearly defined that an INODE
+structure may only reference three kinds of structure that we
+collectively refer to as MAIN-NODES.  These are the three potential
+cases which we will consider next.</p></li>
+<li><p>Consider first the TNODE. If indeed we follow an INODE and
+discover it directly leads us to a TNODE, or 'Tomb Node'. This tells
+us, first, that we have arrived at a dead-end, second that we must
+assist with the 'compression' of this arc by invoking the <code>CLEAN</code>
+operation on the tombed INODE's parent.  Finally, there is nothing
+further we can do so we THROW to :RESTART.</p></li>
+<li><p>If traverse the INODE and arrive at an LNODE, we are also at the
+end of the ARC, but if it is due to hash collision then the algorithm
+then indeed it may be correct.  In this case we attempt to 'insert'
+ourself in te LNODE chain and then invoke INODE mutate to atomic
+commit and then THROW to :RESTART</p></li>
+<li><p>As a simple instance of the general case, we may arrive at a CNODE
+with vacant arc that represents the index specified by the bits of our
+KEY's hash code that are active for this level within the ctrie.  When
+this is the case, we construct a replacement CNODE augmented with our
+key/value pair as an SNODE LEAF at the physical position within the
+CNODES storage vector appropriately translated from the logical arc
+index as described by the documentation of the functions
+<code>FLAG-ARC-POSITION</code> and <code>FLAG-VECTOR</code> If we successfully mutate the
+parent inode by completing an atomic replacement of the old cnode with
+the one we constructed, then our insertion has succeeded and we return
+the range value now successfully mapped by KEY in order to indicate
+our success.  Otherwise we THROW to :RESTART.</p></li>
+<li><p>If we find the logical index of our 'arc' in this CNODE is not
+empty and available as we did above, there are exactly two other
+possibly find there; we know this because it is required to be a
+BRANCH-NODE -- either an snode leaf storage or an inode referencing a
+MAIN-NODE that represents the next layer of the CTRIE.  We describe
+various posible cases and the define a procedure specified for each
+below.</p></li>
+<li><p>If we find that the node PRESENT at this index is an INODE, then
+this is the simplest of the possible cases.  Conceptually, what we
+intend to do is continue to follow our arc, descending to the next
+level of the CTRIE structure that is referenced by that inode.  In
+practice, however, we are required to consider the possibility that
+the generational descriptor object the inode contains may not be
+consistent with STARTGEN, which is the one current in the root INODE
+of this CTRIE.  This may be the case, for example, as the result of
+some past cloning/snapshot operation if we are the first since then to
+traverse this inode. (Remember that the refresh of generational
+descriptor occurs lazily on an as-needed basis in order to avoid
+overhead incurred by eager traversals which often turn out to have
+been unnecessary).  In consideration of this we proceeed as follows: -
+If the inode generational descriptor is consistent with STARTGEN, we
+simply continue along our arc by recursively invoking <code>%insert</code> on
+that INODE.  If that function call returns successfully with a VALUE,
+then the insertion was successful, and we also then return, passing
+along that value.  Thus the result is communicated back through the
+caller chain, eventually arriving back as the result of the original
+CTRIE-PUT entry-point.  - Otherwise if the generational descriptor is
+not consistent with STARTGEN we attempt an atomic <code>INODE-MUTATE</code> on
+the PARENT INODE of this CNODE that effects the replacement of that
+inode within it by one FRESHLY CREATED by <code>REFRESH</code> and ensured to be
+consistent with STARTGEN.  If this succeeds, we invoke %insert
+recusively and proceed in the same manner, since, effectively, we are
+now in a state equivalent to the one described above.  - If the
+INODE-MUTATE of the prior step did NOT succeed, then we are out of
+options and throw to :RESTART the insertion process from the beginning
+all over again.</p></li>
+<li><p>If we find that the node PRESENT at this index is an SNODE,
+then our situation becomes a little bit more complex and
+there are a few more contingencies we must be prepared to
+address.</p></li>
+<li><p>Once again, looking at the simplest first, when an insert
+operation encounters a leaf-node somewhere along the descent of it's
+'own' arc, one potential case is that it found the node it was
+looking for -- one that contains a key that satisfies the test
+predicate defined for the dynamic extent of the current operation,
+<code>CTEQUAL,</code> when compared to the <code>KEY</code> currently being <code>%INSERTED.</code>
+If the equality test is satisfied then the VALUE that node maps
+should be updated with the one of the present insertion.  The steps
+to effect the update are very similar to those of step 5, however We
+construct a replacement CNODE augmented with our key/value pair as a
+replacement SNODE in the SAME physical position as the one we have
+found -- refer to the documentation for the function <code>CNODE-UPDATED</code>
+for additional specifics on the internal details that describe this
+operation.  If we successfully mutate the parent inode by completing
+an atomic replacement of the old cnode with the one we constructed,
+then our update has succeeded and we return the range value now
+successfully mapped by KEY in order to indicate our success.
+Otherwise we THROW to :RESTART.</p></li>
+<li><p>In some circumstances, we encounter a node on our arc whose
+hash code bits have matched that of the current key of this
+insertion for all of the lower order bits that have been consumed so
+far, up to the current depth, but that (as opposed to step 9) does
+not satisfy <code>CTEQUAL.</code> and so is NOT a candidiate for update
+replacement.  Except in very vare circumstances, there will be some
+depth at which the active bits of its hash code will indeed be
+distinct from our own, and at that point a CNODE can be constructed
+that will proprerly contain both it and an snode mapping the
+key/value of the current insertion.  This means we must ENTEND the
+ctrie as many layers as needed to get to that depth, inserting
+CNODES and INODES at each step along the way.  Now, we will first
+describe the 'edge' case where we have encounted the 'rare
+circumstance.' If we perform this process and arrive at a depth
+where all 32 hash code bits have been consumed and, indeed, these
+two unequal keys are the result of a 'hash code collision' In order
+that we preserve correct operation, we respond in this case by
+chaining these key/value SNODES into a linked list of LNODES.
+Therefore, they can share the same arc index and when we encounter
+such a thing during future traversals, we can accomodate the
+collision using simple linear search and a few basic LNODE utility
+functions such as <code>LNODE-INSERTED</code> <code>LNODE-REMOVED</code> <code>LNODE-SEARCH</code>
+<code>LNODE-LENGTH</code> and the list constructor <code>ENLIST.</code> Once we have
+<code>ENLIST</code>ed the colliding SNODES, we create a new INODE pointing to
+that list, and then attempt atomic replacement of the CNODE above
+with one we extend to contain that INODE.  If we do successfully
+mutate the prior CNODES parent INODE resulting in its replacement
+with the CNODE we constructed, then our insert has succeeded and we
+return the range value now successfully mapped by KEY in order to
+indicate our success.  Otherwise we THROW to :RESTART.</p></li>
+<li><p>Finally, let us return to those intermediate steps, mentioned
+above, to specify the means by which we perform the level-by-level
+extension of a given arc to accommodate both the above case of hash
+collision as well as the more common one when the reason for
+extension is simply to accomodate normal growth capacity and
+allocation.  In both cases, though, the extensions are performed for
+the same initiating cause -- to accomodate the collision of leaf
+node keys resident at lower levels of the structure.  Depending on
+the similarity of two colliding hash keys, the extension process may
+not be resolved with a single iteration.  In the case of full
+collisiion, described above, the extension process will recur, up to
+a maximum depth of <code>(32/W)</code> levels, at which point an L-NODE chain
+will be created.  At each iteration, a new INODE is created,
+pointing to a new CNODE containing one of our conflictung pairs.
+Then, <code>%INSERT</code> is attempted on that INODE and this process recurs.
+Once this cycle of insert/extend completes, each INODE/CNODE pair is
+returned to the parent -- the entire newly created structure
+eventually returning to the point of original conflicts whre the
+extension cycle began.  If we successfully mutate the parent inode
+by completing an atomic replacement of the old cnode with the one
+that begins this newly built structue, then our update has succeeded
+and we return the range value now successfully mapped by KEY in
+order to indicate our success.  Otherwise we THROW to :RESTART</p></li>
+</ol>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTRIE-GET  (CTRIE KEY)</code></p>
+
+<blockquote>
+<p>Find the entry in CTRIE whose key is KEY and returns the
+  associated value and T as multiple values, or returns NIL and NIL
+  if there is no such entry. Entries can be added using SETF.</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>%LOOKUP  (INODE KEY LEVEL PARENT STARTGEN)</code></p>
+
+<blockquote>
+<p>The general concept of the procedure for finding a given key within
+  a simplified SEQUENTIAL model of a CTRIE can be summarized as
+  follows: If the internal node is at level <code>L</code> then the W bits of the
+  hashcode starting from position <code>W * L</code> are used as a logical index
+  into the vector of <code>2^W</code> arcs that can possibly be represented
+  within that node (see <code>FLAG</code> and <code>FLAG-VECTOR</code>). This logical index
+  is then transformed into a physical index that denotes a specific
+  position locating this arc relative to all other arcs currently
+  present in the node (see <code>FLAG-ARC-POSITION</code>.  In this way, storage
+  within the node need not be allocated for representation of empty
+  arc positions. At all times the invariant is maintained that the
+  number of arcs allocated within a given CNODE is equal to the
+  Hamming-Weight of its BITMAP -- i.e., the number of nonzero bits
+  present (see <code>CL:LOGCOUNT</code>). The arc at this calculated relative
+  position is then followed, and the process repeated until arrival at
+  a leaf-node or empty arc position.  Locating a given key becomes
+  substantially more complicated in the actual lock-free concurrent
+  ctrie algorithm</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTRIE-DROP  (CTRIE KEY)</code></p>
+
+<blockquote>
+<p>Remove KEY and it's associated value from CTRIE. Returns as multiple
+  values the value associated with KEY and T if there was such an entry,
+  otherewise NIL and NIL</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>%REMOVE  (INODE KEY LEVEL PARENT STARTGEN)</code></p>
+
+<p><em>[function]</em>         <code>CTRIE-MAP  (CTRIE FN &amp;KEY ATOMIC &amp;AUX ACCUM)</code></p>
+
+<blockquote>
+<p>Applies a function two arguments, FN, to each (key . value) pair present in
+  CTRIE.  During the extent of CTRIE-MAP, a special variable ACCUM (initially NIL)
+  is available for accumulation of a result value which will be returned after
+  the completion of the CTRIE-MAP call.  If ATOMIC is non-NIL, the operation will
+  be performed on a read-only atomic snapshot of CTRIE, which guarantees a
+  consistent, point-in-time representation of the entries present in CTRIE</p>
+</blockquote>
+
+<p><em>[macro]</em>            <code>CTRIE-DO  ((KEY VALUE CTRIE &amp;KEY ATOMIC) &amp;BODY BODY)</code></p>
+
+<blockquote>
+<p>Iterate over the contents of CTRIE in the manner of dolist. For each
+  (key . value) pair present in CTRIE, BODY (implicit PROGN) will be
+  evaluated with the symbols specified for KEY and VALUE will be bound
+  to the respective entry constituents.  A special variable
+  ACCUM (initially NIL) is available for accumulation of a result
+  value which will be returned after the completion of the CTRIE-DO
+  call.  If ATOMIC is non-NIL, the operation will be performed on a
+  read-only atomic snapshot of CTRIE, which guarantees a consistent,
+  point-in-time representation of the entries present in CTRIE.</p>
+
+<pre><code>  ;;;  EXAMPLE: (ctrie-do (k v ctrie)
+  ;;;             (format t "~&amp;~8S =&gt; ~10S~%" k v))
+</code></pre>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTRIE-MAP-KEYS  (CTRIE FN &amp;KEY ATOMIC)</code></p>
+
+<blockquote>
+<p>Applies a function one argument, FN, to each key present in CTRIE.
+  During the extent of CTRIE-MAP-KEYS, a special variable
+  ACCUM (initially NIL) is available for accumulation of a result
+  value which will be returned after the completion of the
+  CTRIE-MAP-KEYS call.  If ATOMIC is non-NIL, the operation will be
+  performed on a read-only atomic snapshot of CTRIE, which guarantees
+  a consistent, point-in-time representation of the keys present in
+  CTRIE</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTRIE-MAP-VALUES  (CTRIE FN &amp;KEY ATOMIC)</code></p>
+
+<blockquote>
+<p>Applies a function one argument, FN, to each value present in CTRIE.
+  During the extent of CTRIE-MAP-VALUES, a special variable
+  ACCUM (initially NIL) is available for accumulation of a result
+  value which will be returned after the completion of the
+  CTRIE-MAP-VALUES call.  If ATOMIC is non-NIL, the operation will be
+  performed on a read-only atomic snapshot of CTRIE, which guarantees
+  a consistent, point-in-time representation of the values present in
+  CTRIE</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTRIE-KEYS  (CTRIE &amp;KEY ATOMIC)</code></p>
+
+<blockquote>
+<p>Construct and return a list containing all keys present in CTRIE.
+  If ATOMIC is non-NIL, the operation will be performed on a read-only
+  atomic snapshot of CTRIE, which guarantees a consistent,
+  point-in-time representation of the keys present in CTRIE</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTRIE-VALUES  (CTRIE &amp;KEY ATOMIC)</code></p>
+
+<blockquote>
+<p>Construct and return a list containing all values present in CTRIE.
+  If ATOMIC is non-NIL, the operation will be performed on a read-only
+  atomic snapshot of CTRIE, which guarantees a consistent,
+  point-in-time representation of the values present in CTRIE</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTRIE-SIZE  (CTRIE &amp;KEY ATOMIC &amp;AUX (ACCUM 0))</code></p>
+
+<blockquote>
+<p>Return the number of entries present in CTRIE.  If ATOMIC is non-NIL,
+  the operation will be performed on a read-only atomic snapshot of CTRIE,
+  which guarantees a consistent, point-in-time representation of CTRIE</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTRIE-EMPTY-P  (CTRIE)</code></p>
+
+<blockquote>
+<p>Return T if CTRIE contains no entries, otherwise NIL. This function is
+  O(1) and is much more efficient than testing for <code>CTRIE-SIZE</code> of 0</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTRIE-TO-ALIST  (CTRIE &amp;KEY ATOMIC)</code></p>
+
+<blockquote>
+<p>Return an alist containing all (key . value) pairs found in CTRIE.
+  If ATOMIC is non-NIL, the operation will be performed on a read-only
+  atomic snapshot of CTRIE, which guarantees a consistent,
+  point-in-time representation of the entries in CTRIE</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTRIE-TO-HASHTABLE  (CTRIE &amp;KEY ATOMIC HASH-TABLE &amp;AUX
+                                           (ACCUM
+                                            (OR HASH-TABLE
+                                                (MAKE-HASH-TABLE :TEST
+                                                                 (CTRIE-TEST
+                                                                  CTRIE)
+                                                                 :HASH-FUNCTION
+                                                                 (CTRIE-HASH
+                                                                  CTRIE)
+                                                                 :SYNCHRONIZED
+                                                                 ATOMIC))))</code></p>
+
+<blockquote>
+<p>Return a hash-table containing all (key . value) pairs found in CTRIE.
+  If ATOMIC is non-NIL, the operation will be performed on a read-only
+  atomic snapshot of CTRIE, which guarantees a consistent,
+  point-in-time representation of the entries in CTRIE. If HASH-TABLE
+  is specified, it will be used as the destination hash-table.
+  Otherwise, a new hash-table will be created with hash-function and
+  test identical to that of CTRIE.  It will be created as synchronized
+  if ATOMIC is not NIL</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTRIE-PPRINT  (CTRIE &amp;OPTIONAL (STREAM T))</code></p>
+
+<blockquote>
+<p>Pretty-print a representation of CTRIE as an alist containing
+  all (key . value) pairs found in it.  Atomicity is not guaranteed</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTRIE-FROM-ALIST  (ALIST &amp;KEY CTRIE)</code></p>
+
+<blockquote>
+<p>Return a CTRIE containing all (key . value) pairs found in ALIST.
+  If CTRIE is specified, it will be used as the destination ctrie.
+  Otherwise, a new ctrie will be created. Atomicity is not guaranteed</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTRIE-FROM-HASHTABLE  (HASH-TABLE &amp;KEY CTRIE)</code></p>
+
+<blockquote>
+<p>Return a CTRIE containing all (key . value) pairs found in HASH-TABLE.
+  If CTRIE is specified, it will be used as the destination ctrie.
+  Otherwise, a new ctrie will be created with test identical to that
+  of HASH-TABLE. The hash-function will NOT be preserved, as that
+  information does not appear to be recoverable from a hash-table once
+  created</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTRIE-MAX-DEPTH  (THING)</code></p>
+
+<blockquote>
+<p>Compute the maximum length of any arc. Useful as a diagnostic</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTRIE-MIN-DEPTH  (THING)</code></p>
+
+<blockquote>
+<p>Compute the minimum length of any arc. Useful as a diagnostic</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTRIE-SNAPSHOT  (CTRIE &amp;KEY READ-ONLY)</code></p>
+
+<blockquote>
+<p>Atomically create a clone of CTRIE that may be operated upon
+  independently without affecting or being affected by operations or
+  content of the original CTRIE.  If READ-ONLY is NIL (the default),
+  the new CTRIE will be a READABLE/WRITABLE 'fork' of CTRIE (see
+  <code>CTRIE-FORK</code>) otherwise, the clone will be READABLE only, which has
+  considerable performance benefits in some circumstances, as the arcs
+  will not require <code>REFRESH</code> and should be the preferred mode when
+  updates (writability) of the clone are not required</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTRIE-FORK  (CTRIE)</code></p>
+
+<blockquote>
+<p>Atomically create a READABLE and WRITABLE clone of CTRIE that may
+  be operated upon independently without affecting or being affected
+  by the original CTRIE.</p>
+</blockquote>
+
+<p><em>[macro]</em>            <code>CTRIE-LAMBDA  (&amp;ONCE CTRIE &amp;REST REST)</code></p>
+
+<blockquote>
+<p>Pandoric Object and Inter-Lexical Communication Protocol
+  this macro builds the most unencumbered and widely applicable
+  'purist edition' Of our PLAMBDA based form.  Even as such,
+  a lot of care has been given to many subtle ways it has been
+  refined to offer the most convenient and natural tool possible.</p>
+
+<pre lang=";;;"><code>     ;;; (plambda (#&lt;CLOSURE (LAMBDA (&amp;REST ARGS)) {100929EB1B}&gt; )
+     ;;;
+     ;;; DISPATCHING to FUNCTIONAL MAPPING:
+     ;;;   (IF (REST ARGS)
+     ;;;          (APPLY ARG (REST ARGS))
+     ;;;          (FUNCALL ARG #'IDENTITY)) =&gt;
+     ;;; ------------------------------------------------------------
+     ;;; INITIALIZING PLAMBDA
+     ;;; ------------------------------------------------------------
+     ;;;   IT =&gt; #S(CTRIE
+     ;;;               :READONLY-P NIL
+     ;;;               :TEST EQUAL
+     ;;;               :HASH SXHASH
+     ;;;               :STAMP #&lt;CLOSURE (LAMBDA # :IN CONSTANTLY) {10092B516B}&gt;
+     ;;;               :ROOT #S(INODE
+     ;;;                        :GEN #:|ctrie2196|
+     ;;;                        :REF #S(REF
+     ;;;                                :STAMP @2012-08-19T13:34:58.314457-04:00
+     ;;;                                :VALUE #S(CNODE :BITMAP 0 :ARCS #())
+     ;;;                                :PREV NIL)))
+     ;;;   PLIST =&gt; (:CONTAINER #&lt;CLOSURE (LAMBDA #) {100929EACB}&gt; 
+     ;;;             :TIMESTAMP @2012-08-19T13:34:58.314464-04:00)
+     ;;;   STACK =&gt; (#&lt;CLOSURE (LAMBDA #) {100929EACB}&gt;)
+     ;;; 
+     ;;; ------------------------------------------------------------
+     ;;;  #&lt;CLOSURE (LAMBDA (&amp;REST #:ARGS55)) {100929EACB}&gt;
+     ;;;```
+
+</code></pre>
+</blockquote>
+
+<p><em>[generic-function]</em> <code>CTRIE-LAMBDA-CTRIE  (CTRIE-LAMBDA-OBJECT)</code></p>
+
+<blockquote>
+<p>Returns and (with setf) changes the ctrie of the specified ctrie-lambda-object</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTRIE-LAMBDA-SPAWN  (SELF &amp;KEY READ-ONLY)</code></p>
+
+<blockquote>
+<p>Causes the atomic clone of enclosed ctrie structure and builds a new
+  lexical closure to operate on it.  Does not bother to reproduce fancy
+  (expensive) object, class, bindings, but provides almost identical
+  functionality.  May be used to more efficintly distribute workload
+  in parallel</p>
+</blockquote>
+
+<p><em>[macro]</em>            <code>DEFINE-CTRIE  (NAME CTRIE &amp;REST ARGS &amp;KEY (OBJECT T) SPEC)</code></p>
+
+<blockquote>
+<p>Define a 'functional' <strong>CTRIE-LAMBDA</strong> that combines all the the
+  capabilities of the raw data structure with behavior and semantics
+  one would expect of any other ordinary common-lisp function.  The
+  resulting symbol defined as 'name will be bound in three distinct
+  namespaces: the <code>SYMBOL-VALUE</code> will be bound to the LAMBDA CLOSURE
+  object, <code>SYMBOL-FUNCTION</code> (fdefinition) will be FBOUND to the
+  compiled function, and the corresponding '(SETF NAME) form will be
+  SETF-BOUND.  the syntax for invoking NAME is as in a LISP1; i.e., no
+  'funcall' is required (but still works if you prefer).
+  Calling <code>(NAME key)</code> returns the value mapped to key, or <code>NIL</code> just
+  as if by <code>(CTRIE-GET ctrie-name key).</code> Analogously when used as a
+  setf-able place such as by <code>(setf (NAME key) value)</code> it has the
+  equivalent behavior to the operation <code>(CTRIE-PUT ctrie-name key
+  value).</code> Use of this type of binding technique has some really
+  convenient effects that I've quickly started to become quite fond
+  of.  One such idiom, for example, <code>(mapcar MY-CTRIE '(key1 key2 key3
+  key4 ...))</code> returns a list containing all the mapped values
+  corresponding to the respective keys.  One additional feature that
+  I've found extremely useful is included <em>under the hood:</em> Invoking
+  MY-CTRIE on an object of type FUNCTION will not search the ctrie for
+  an entry having that function ast its key, but will instead APPLY
+  that function to the actual CTRIE structure wrapped within the
+  closure.  Thus, <code>(MY-CTRIE #'identity)</code> will return the underlying
+  ctrie as just an ordinary instance of a CTRIE STRUCTURE.<br>
+  There are many other functions this is handy with, like
+  <code>(MY-CTRIE #'ctrie-size)</code> <code>(MY-CTRIE #'ctrie-to-hashtable)</code>
+  etc.  Some additional examples are provided below.</p>
+
+<pre><code>  ;;;  (define-ctrie my-ctrie)
+  ;;;    =&gt;  MY-CTRIE
+  ;;;
+  ;;;  (describe 'my-ctrie)
+  ;;;
+  ;;;     CL-CTRIE::MY-CTRIE
+  ;;;       [symbol]
+  ;;;    
+  ;;;     MY-CTRIE names a special variable:
+  ;;;       Value: #&lt;CLOSURE (LAMBDA # :IN MAKE-CTRIE-LAMBDA) {100F73261B}&gt;
+  ;;;    
+  ;;;     MY-CTRIE names a compiled function:
+  ;;;       Lambda-list: (&amp;REST ARGS1)
+  ;;;       Derived type: FUNCTION
+  ;;;    
+  ;;;     (SETF MY-CTRIE) names a compiled function:
+  ;;;       Lambda-list: (VALUE KEY)
+  ;;;       Derived type: (FUNCTION (T T) *)
+  ;;;
+  ;;;
+  ;;;   (my-ctrie :HONG-KONG :FOOY)
+  ;;;     =&gt;  :FOOY
+  ;;;
+  ;;;   (my-ctrie :HONG-KONG)
+  ;;;     =&gt;  :FOOY ; T
+  ;;;
+  ;;;   (map 'list #'eval (mapcar #`(my-ctrie ,a1 ,a1) (iota 12)))
+  ;;;     =&gt;  (0 1 2 3 4 5 6 7 8 9 10 11)
+  ;;;
+  ;;;   (mapcar my-ctrie (iota 12))
+  ;;;     =&gt;  (0 1 2 3 4 5 6 7 8 9 10 11)
+</code></pre>
+</blockquote>
+
+<p><em>[macro]</em>            <code>CTRIE-ERROR  (CONDITION &amp;REST ARGS)</code></p>
+
+<blockquote>
+<p>Signal a CTRIE related condition.</p>
+</blockquote>
+
+<p><em>[condition]</em>        <code>CTRIE-ERROR (ERROR)</code></p>
+
+<blockquote>
+<p>Abstract superclass of CTRIE related conditions.</p>
+</blockquote>
+
+<p><em>[condition]</em>        <code>CTRIE-STRUCTURAL-ERROR (CTRIE-ERROR)</code></p>
+
+<blockquote>
+<p>Condition designating that the CTRIE data structure
+   has been determined to be invalid.</p>
+</blockquote>
+
+<p><em>[condition]</em>        <code>CTRIE-OPERATIONAL-ERROR (CTRIE-ERROR)</code></p>
+
+<blockquote>
+<p>Condition for when an operational failure or
+  inconsistency has occurred.</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>CTRIE-MODIFICATION-FAILED  (REASON &amp;KEY OP PLACE)</code></p>
+
+<blockquote>
+<p>Signal a modification failure with the appropriate attendant metadata.</p>
+</blockquote>
+
+<p><em>[condition]</em>        <code>CTRIE-MODIFICATION-FAILED (CTRIE-OPERATIONAL-ERROR)</code></p>
+
+<blockquote>
+<p>This condition indicates an unhandled failure of an attempt to
+         perform stateful modification to CTRIE.  The most common case in
+         which this might occur is when such an attempt is mode on a CTRIE
+         designated as READONLY-P.  In any case, this condition represents an
+         exception from which processing cannot continue and requires
+         interactive user intervention in order to recover.</p>
+</blockquote>
+
+<p><em>[condition]</em>        <code>CTRIE-OPERATION-RETRIES-EXCEEDED (CTRIE-OPERATIONAL-ERROR)</code></p>
+
+<blockquote>
+<p>Condition indicating an operation has failed the
+   maximum number of times specified by the special-variable
+   <em>retries</em></p>
+</blockquote>
+
+<p><em>[condition]</em>        <code>CTRIE-NOT-IMPLEMENTED (CTRIE-ERROR)</code></p>
+
+<blockquote>
+<p>Condition designating functionality for which the
+   implementation has not been written, but has not been deliberately
+   excluded.</p>
+</blockquote>
+
+<p><em>[condition]</em>        <code>CTRIE-NOT-SUPPORTED (CTRIE-ERROR)</code></p>
+
+<blockquote>
+<p>Condition designating functionality that is
+  deliberately not supported.</p>
+</blockquote>
+
+<p><em>[condition]</em>        <code>CTRIE-INVALID-DYNAMIC-CONTEXT (CTRIE-OPERATIONAL-ERROR)</code></p>
+
+<blockquote>
+<p>Condition indicating an operation was attempted
+   outside the dynamic extent of a valid enclosing WITH-CTRIE form</p>
+</blockquote>
+
+<p><em>[condition]</em>        <code>CTRIE-GENERATIONAL-MISMATCH (CTRIE-STRUCTURAL-ERROR)</code></p>
+
+<blockquote>
+<p>Condition indicating an operation encountered an
+   outdated or inconsistent node during its attempted traversal</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>README  (&amp;OPTIONAL (STREAM *STANDARD-OUTPUT*))</code></p>
+
+<blockquote>
+<p>Update documentation sections of the README file. When an output stream
+  is specified, the results are also echoed to that stream. To inhibit
+  output, invoke as <code>(readme (make-broadcast-stream))</code> or use <code>README-QUIETLY</code></p>
+</blockquote>
+
+<p><em>[function]</em>         <code>README-QUIETLY  ()</code></p>
+
+<blockquote>
+<p>Update documentation sections of the README file, inhibiting any other
+  printed output.</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>APIDOC  (&amp;OPTIONAL (SCOPE :EXTERNAL))</code></p>
+
+<blockquote>
+<p>Collect a list of strings representing the documentation for
+  CL-CTRIE rendered in a compact format suitable for inclusion in a
+  lightweight text-markup format document.  If SCOPE is specified it
+  must be either :EXTERNAL. corresponding to those symbols exported as
+  the public API, or :HOME, which designates all symbols defined
+  locally in package.</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>PRINC-APIDOC  (&amp;OPTIONAL (SCOPE :EXTERNAL))</code></p>
+
+<blockquote>
+<p>Print to <code>*STANDARD-OUTPUT*</code> the documentation for CL-CTRIE rendered
+  in a compact format.  This is intended primarily as a convenience to
+  the interactive user seeking quick reference at the REPL.  If SCOPE
+  is specified it must be either :EXTERNAL. corresponding to those
+  symbols exported as the public API, or :HOME, which designates all
+  symbols defined locally in package.</p>
+</blockquote>
+
+<p><em>[function]</em>         <code>COLLECT-DOCS  (&amp;OPTIONAL (SCOPE :EXTERNAL)
+                                     (SORT #'STRING&lt;))</code></p>
+
+<blockquote>
+<p>Regenerate on-disk html documentation and collect the cached
+  in-memory descriptors for further processing. If SCOPE is specified
+  it must be either :EXTERNAL. corresponding to those symbols exported
+  as the public API, or :HOME, which designates all symbols defined
+  locally in package.  Output order may be customized by an optionally
+  specified SORT function.</p>
+</blockquote>
+
+<p><em>[macro]</em>            <code>DEFINE-DIAGRAM  (TYPE (&amp;OPTIONAL CONTEXT) &amp;BODY BODY)</code></p>
+
+<blockquote>
+<p>Define a diagrammatic representation of TYPE, optionally specialized
+  for a specific CONTEXT. See {defgeneric cl-ctrie::make-diagram}.</p>
+</blockquote>
+
+<hr>
       </section>
-      <footer>
-        <p>This project is maintained by <a href="https://github.com/danlentz">danlentz</a></p>
-        <p><small>Hosted on GitHub Pages &mdash; Theme by <a href="https://github.com/orderedlist">orderedlist</a></small></p>
-      </footer>
+
     </div>
-    <script src="javascripts/scale.fix.js"></script>
-    
+    <!--[if !IE]><script>fixScale(document);</script><![endif]-->
+              <script type="text/javascript">
+            var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
+            document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
+          </script>
+          <script type="text/javascript">
+            try {
+              var pageTracker = _gat._getTracker("UA-37992128-3");
+            pageTracker._trackPageview();
+            } catch(err) {}
+          </script>
+
   </body>
 </html>
